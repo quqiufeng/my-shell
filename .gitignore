@@ -53,3 +53,33 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# 本地配置
+.env
+.env.local
+
+# 日志
+*.log
+
+# 图片
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest/
+
+# 视频
+*.mp4
+*.avi
+*.mov
+
+# 系统
+.DS_Store
+Thumbs.db
