@@ -21,8 +21,8 @@
 | run_qwen_api_3080.sh | Qwen API 服务 |
 | build_sd_cpp_3080.sh | 编译 stable-diffusion.cpp |
 | build_llama_cpp_3080.sh | 编译 llama.cpp |
-| img_to_video_v1.sh | 图片生成视频 (SFT预设音色) |
-| img_to_video_v2.sh | 图片生成视频 (声音克隆) |
+| img_to_video_v1_3080.sh | 图片生成视频 (SFT预设音色) |
+| img_to_video_v2_3080.sh | 图片生成视频 (声音克隆) |
 | test_cosyvoice.sh | CosyVoice 功能测试 |
 | build_cosy_voice_3080.sh | 编译 CosyVoice 环境 |
 | build_sense_voice_3080.sh | 编译 SenseVoice.cpp |
@@ -230,10 +230,10 @@ netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 conn
 
 ```bash
 # 单文案
-./img_to_video_v1.sh './story/' 2 '古时候有个书生'
+./img_to_video_v1_3080.sh './story/' 2 '古时候有个书生'
 
 # 多段文案
-./img_to_video_v1.sh './story/' 2 '第一句|第二句|第三句' output.mp4
+./img_to_video_v1_3080.sh './story/' 2 '第一句|第二句|第三句' output.mp4
 ```
 
 ### 特点
@@ -273,7 +273,7 @@ netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 conn
 ### 用法
 
 ```bash
-./img_to_video_v2.sh './story/' 2 '第一句|第二句|第三句' ./voice.wav output.mp4
+./img_to_video_v2_3080.sh './story/' 2 '第一句|第二句|第三句' ./voice.wav output.mp4
 ```
 
 ### 特点
