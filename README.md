@@ -21,7 +21,11 @@
 | run_qwen_api_3080.sh | Qwen API 服务 |
 | build_sd_cpp_3080.sh | 编译 stable-diffusion.cpp |
 | build_llama_cpp_3080.sh | 编译 llama.cpp |
-| img.py | Nano Banana API 图片生成 |
+| img_to_video_v1.sh | 图片生成视频 (SFT预设音色) |
+| img_to_video_v2.sh | 图片生成视频 (声音克隆) |
+| test_cosyvoice.sh | CosyVoice 功能测试 |
+| build_cosy_voice_3080.sh | 编译 CosyVoice 环境 |
+| build_sense_voice_3080.sh | 编译 SenseVoice.cpp |
 
 ---
 
@@ -206,6 +210,170 @@ netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 conn
 
 - ~/llama.cpp/build/bin/llama-cli
 - ~/llama.cpp/build/bin/llama-server
+
+---
+
+## img_to_video_v1.sh
+
+图片生成视频脚本 (SFT 预设音色版本)。
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| 第1个 | 图片文件夹/图片路径 | 必需 |
+| 第2个 | 每张图片展示秒数 | 2 |
+| 第3个 | 文案 (用 `|` 分隔多段) | 必需 |
+| 第4个 | 输出文件名 | output.mp4 |
+
+### 用法
+
+```bash
+# 单文案
+./img_to_video_v1.sh './story/' 2 '古时候有个书生'
+
+# 多段文案
+./img_to_video_v1.sh './story/' 2 '第一句|第二句|第三句' output.mp4
+```
+
+### 特点
+
+- 模型: CosyVoice-300M-SFT
+- 音色: 预设中文女声
+- **不需要**参考音频
+- 自动生成 ASS 字幕
+
+### 原理
+
+1. CosyVoice TTS 生成配音
+2. 每张图片转为视频片段
+3. 合并配音+字幕+视频
+
+---
+
+## img_to_video_v2.sh
+
+图片生成视频脚本 (声音克隆版本)。
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| 第1个 | 图片文件夹/图片路径 | 必需 |
+| 第2个 | 每张图片展示秒数 | 2 |
+| 第3个 | 文案 (用 `|` 分隔多段) | 必需 |
+| 第4个 | 参考音频 (用于克隆声音) | 必需 |
+| 第5个 | 输出文件名 | output.mp4 |
+
+### 用法
+
+```bash
+./img_to_video_v2.sh './story/' 2 '第一句|第二句|第三句' ./voice.wav output.mp4
+```
+
+### 特点
+
+- 模型: Fun-CosyVoice3-0.5B
+- 音色: 克隆参考音频的声音
+- **需要**提供参考音频 (3-30秒)
+- 支持自然语言指令控制 (方言、语速等)
+
+### 修复记录
+
+- 短文本 (<10字) 会生成异常音频 (0.08秒)
+- 解决方案: 使用 `inference_instruct2` + tts_text 前加换行符
+
+---
+
+## test_cosyvoice.sh
+
+CosyVoice 功能测试脚本。
+
+### 用法
+
+```bash
+bash ~/my-shell/test_cosyvoice.sh
+```
+
+### 测试内容
+
+1. **zero_shot** - 零样本语音克隆
+2. **cross_lingual** - 跨语言合成
+3. **instruct2** - 指令控制 (方言、语速)
+4. **fine_grained_control** - 细粒度控制 (呼吸声、笑声)
+5. **add_zero_shot_spk** - 保存音色供后续使用
+
+### 输出
+
+生成文件: `/tmp/cosyvoice_test*.wav`
+
+---
+
+## build_cosy_voice_3080.sh
+
+CosyVoice 环境搭建脚本 (语音合成 TTS)。
+
+### 用法
+
+```bash
+bash ~/my-shell/build_cosy_voice_3080.sh
+```
+
+### 步骤
+
+1. 克隆 CosyVoice 源码
+2. 安装 FFmpeg 系统依赖
+3. 创建 conda 环境 (Python 3.10)
+4. 安装所有 Python 依赖
+5. 下载预训练模型
+
+### 环境变量
+
+激活 conda:
+```bash
+conda activate cosyvoice
+```
+
+### 依赖包
+
+- hyperpyyaml
+- onnxruntime
+- openai-whisper
+- transformers
+- x-transformers
+- pyarrow
+- pyworld
+- torchcodec
+- torchaudio
+- pytorch-lightning
+- torchmetrics
+
+### 模型位置
+
+- `/opt/image/CosyVoice-300M-SFT`
+- `/opt/image/Fun-CosyVoice3-0.5B`
+
+---
+
+## build_sense_voice_3080.sh
+
+SenseVoice.cpp 编译脚本 (语音识别 STT)。
+
+### 用法
+
+```bash
+bash ~/my-shell/build_sense_voice_3080.sh
+```
+
+### 产出
+
+- `~/SenseVoice.cpp/bin/sense-voice-*`
+
+### 功能
+
+- 语音 → 文字 (Speech-to-Text)
+- 多语言支持
+- 音频文件转写
 
 ---
 
