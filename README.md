@@ -242,6 +242,11 @@ netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 conn
 - 音色: 预设中文女声
 - **不需要**参考音频
 - 自动生成 ASS 字幕
+- **支持 TensorRT 加速** (需先运行 build_cosy_voice_3080.sh)
+
+### ⚠️ 前提条件
+
+必须先运行 `bash ~/my-shell/build_cosy_voice_3080.sh` 编译 TensorRT 引擎，否则脚本无法运行。
 
 ### 原理
 
@@ -277,6 +282,11 @@ netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 conn
 - 音色: 克隆参考音频的声音
 - **需要**提供参考音频 (3-30秒)
 - 支持自然语言指令控制 (方言、语速等)
+- **支持 TensorRT 加速** (需先运行 build_cosy_voice_3080.sh)
+
+### ⚠️ 前提条件
+
+必须先运行 `bash ~/my-shell/build_cosy_voice_3080.sh` 编译 TensorRT 引擎，否则脚本无法运行。
 
 ### 修复记录
 
@@ -313,19 +323,33 @@ bash ~/my-shell/test_cosyvoice.sh
 
 CosyVoice 环境搭建脚本 (语音合成 TTS)。
 
+### ⚠️ 重要：必须先运行此脚本
+
+**v1 和 v2 脚本依赖 TensorRT 加速，必须先运行此脚本完成以下操作：**
+
+1. 安装 FFmpeg 系统依赖
+2. 创建 conda 环境 (Python 3.10)
+3. 安装 CUDA 12.1、cuDNN 8.9 (conda)
+4. 安装 TensorRT 8.6.1 (pip)
+5. 下载预训练模型到 /opt/image
+6. **编译 TensorRT 引擎** (关键步骤)
+
 ### 用法
 
 ```bash
 bash ~/my-shell/build_cosy_voice_3080.sh
 ```
 
-### 步骤
+### TensorRT 引擎说明
 
-1. 克隆 CosyVoice 源码
-2. 安装 FFmpeg 系统依赖
-3. 创建 conda 环境 (Python 3.10)
-4. 安装所有 Python 依赖
-5. 下载预训练模型
+编译后的引擎文件位置：
+
+| 模型 | 路径 | 大小 |
+|------|------|------|
+| CosyVoice-300M-SFT | `/opt/image/CosyVoice-300M-SFT/flow.decoder.estimator.fp16.mygpu.plan` | ~202MB |
+| Fun-CosyVoice3-0.5B | `/opt/image/Fun-CosyVoice3-0.5B/flow.decoder.estimator.fp16.mygpu.plan` | ~640MB |
+
+**引擎只需编译一次**，之后运行 v1/v2 会自动使用缓存的引擎加速推理。
 
 ### 环境变量
 
