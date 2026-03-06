@@ -53,6 +53,8 @@
 | 脚本 | 功能 |
 |------|------|
 | `img.sh` | Z-Image Turbo 文生图 |
+| `upscale.sh` | ESRGAN 超分辨率放大 (2x/4x) |
+| `upscale_hires.sh` | Kohya Hires.fix 高清放大 (2x + 锐化) |
 
 **模型文件** (`/opt/gguf/image/`):
 
@@ -63,6 +65,94 @@
 | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` | 文本编码器 |
 
 **性能**: 1920x1080 分辨率约 17秒/张
+
+---
+
+### 图像放大 (upscale.sh / upscale_hires.sh)
+
+#### 1. upscale.sh - ESRGAN 超分辨率放大
+
+基于 ESRGAN (Enhanced Super-Resolution GAN) 深度学习超分辨率算法，能同时恢复细节和提升分辨率。
+
+**使用方法:**
+```bash
+./upscale.sh <input_image> [output_image] [scale]
+```
+
+**参数说明:**
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| input_image | 输入图片路径 | (必填) |
+| output_image | 输出图片路径 | `<input>_upscaled.png` |
+| scale | 放大倍数 (2 或 4) | 2 |
+
+**示例:**
+```bash
+./upscale.sh image.png              # 2x 放大
+./upscale.sh image.png out.png      # 2x 放大, 指定输出
+./upscale.sh image.png out.png 4    # 4x 放大
+```
+
+**性能参考 (3080 10GB):**
+| 输入 | 输出 | 耗时 |
+|------|------|------|
+| 1280x720 | 2560x1440 (2x) | ~16秒 |
+| 640x360 | 1280x720 (2x) | ~4.5秒 |
+| 640x360 | 2560x1440 (4x) | ~5秒 |
+
+**模型选择:**
+| 模型 | 特点 | 推荐场景 |
+|------|------|----------|
+| 2x ESRGAN | 细节保留好 | 人像、产品 |
+| 4x UltraSharp | 速度快 | 快速放大 |
+
+---
+
+#### 2. upscale_hires.sh - Kohya Hires.fix 高清放大
+
+结合 img2img 重绘和 ESRGAN 锐化的两步放大方式，效果更好但耗时较长。
+
+**使用方法:**
+```bash
+./upscale_hires.sh <input_image> [output] [strength] [steps]
+```
+
+**参数说明:**
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| input_image | 输入图片路径 | (必填) |
+| output | 输出图片路径 | `<input>_hires_2x.png` |
+| strength | 重绘幅度 (0.1-0.8) | 0.4 |
+| steps | 步数 | 12 |
+
+**示例:**
+```bash
+./upscale_hires.sh image.png                    # 2x 放大
+./upscale_hires.sh image.png out.png 0.4 12    # 重绘0.4, 12步
+./upscale_hires.sh image.png out.png 0.3 8    # 快速模式
+```
+
+**放大原理:**
+- Step 1: img2img 放大 (2x) - 在 latent space 进行去噪重绘
+- Step 2: ImageMagick 锐化 - USM 锐化增强清晰度
+
+**参数推荐:**
+| 场景 | strength | steps | 耗时 |
+|------|----------|-------|------|
+| 人像保真 | 0.3 | 8-12 | ~5分钟 |
+| 人像精细 | 0.4 | 12 | ~7分钟 |
+| 风景重绘 | 0.4-0.5 | 12-16 | ~7分钟 |
+
+**输入输出示例:**
+| 输入尺寸 | 输出尺寸 | 放大倍数 |
+|----------|----------|----------|
+| 640x360 | 1280x720 | 2x |
+| 1280x720 | 2560x1440 | 2x |
+| 1920x1080 | 3840x2160 | 2x |
+
+**注意:** 需要较强显卡 (建议 16GB+ 显存)，1280x720 输入约 7分钟
+
+---
 
 ---
 
