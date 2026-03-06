@@ -19,7 +19,7 @@ $LLAMA_SERVER \
   --port 11434 \
   -n -1 \
   -ngl 99 \
-  -fa \
+  --flash-attn on \
   -c 32768 \
   --batch-size 4096 \
   --cache-type-k q4_0 \
