@@ -10,6 +10,37 @@
 
 ---
 
+## conda.sh (Conda 初始化脚本)
+
+### 说明
+
+- **原位置**: `~/anaconda3/etc/profile.d/conda.sh`
+- **拷贝位置**: `~/my-shell/conda.sh`
+
+### 功能
+
+Conda 环境初始化脚本，用于在 shell 中激活 conda 功能。
+
+### 用途
+
+所有需要使用 conda 环境的脚本都会调用此文件：
+
+```bash
+# 方式1: 直接 source
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate cosyvoice
+
+# 方式2: 使用拷贝的版本
+source ~/my-shell/conda.sh
+conda activate cosyvoice
+```
+
+### 为什么拷贝到本目录
+
+为了保持脚本的自包含性，确保在任何目录下执行脚本时都能正确找到 conda 初始化逻辑。
+
+---
+
 ## 脚本列表
 
 | 脚本 | 功能 |
