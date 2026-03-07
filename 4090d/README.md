@@ -24,6 +24,18 @@
 
 ---
 
+## ExLLamaV2 框架介绍
+
+ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
+
+- **EXL2 量化格式**: 支持 1-8bpw 量化，大幅减少显存占用
+- **投机采样 (Speculative Decoding)**: 使用小模型预测多个 token，主模型验证/修正，大幅提升推理速度
+- **Flash Attention**: 支持 Flash Attention 2.5.7+ 加速
+- **Paged Attention**: 高效管理 KV Cache
+- **自动内存分配**: 支持 GPU 自动分割模型
+
+---
+
 ## ✅ 已完成
 
 ### 1. 编译脚本
@@ -43,8 +55,92 @@
 | `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | ~40 tokens/s |
 | `run_qwen3.5-9b_api.sh` | Qwen3.5-9B | `/opt/gguf/Qwen3.5-9B-Q6_K.gguf` | 通用对话 | ~94 tokens/s |
 | `run_qwq32b_api.sh` | QwQ-32B | `/opt/gguf/QwQ-32B-Q4_K_M.gguf` | 推理/数学/代码（带思考能力） | ~20 tokens/s |
+| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样) | **~80 tokens/s** |
 
 **端口**: 全部为 11434
+
+---
+
+### ExLLamaV2 API 服务 (run_qwen2.5-coder-32b_exl2.py)
+
+基于 exllamav2 框架的 Qwen2.5-Coder-32B 推理服务，支持投机采样加速。
+
+#### 硬件配置
+
+- GPU: RTX 4090 D (24GB VRAM)
+- 主模型: Qwen2.5-Coder-32B (4.0bpw EXL2)
+- 草稿模型: Qwen2.5-Coder-0.5B (32K)
+
+#### 启动方式
+
+```bash
+# 使用 nohup 启动
+nohup python3 /opt/my-shell/4090d/run_qwen2.5-coder-32b_exl2.py > /tmp/api.log 2>&1 &
+
+# 或使用后台运行
+python3 /opt/my-shell/4090d/run_qwen2.5-coder-32b_exl2.py &
+```
+
+#### 核心参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| MAIN_MODEL_DIR | /opt/gguf/exl2_4_0 | 主模型路径 (32B) |
+| DRAFT_MODEL_DIR | /opt/gguf/Qwen2.5-Coder-0.5B-exl2 | 草稿模型路径 (0.5B) |
+| MAX_SEQ_LEN | 32768 | 最大上下文长度 (32K) |
+| NUM_SPECULATIVE_TOKENS | 2 | 投机采样步数 |
+| PORT | 11434 | 服务端口 |
+
+#### 访问地址
+
+启动后会输出：
+- 对内地址: `http://localhost:11434`
+- 对外地址: `http://{instance_id}-11434.container.x-gpu.com/v1/chat/completions`
+
+#### API 调用
+
+```bash
+# 非流式调用
+curl -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "用Python写快速排序"}],
+    "max_tokens": 2048
+  }'
+
+# 流式调用
+curl -N -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "用Python写快速排序"}],
+    "max_tokens": 2048,
+    "stream": true
+  }'
+```
+
+#### 性能数据
+
+10个中等难度Python编程任务测试结果：
+
+| 任务 | chars/s |
+|------|---------|
+| LRU缓存类 | 150 |
+| 线程安全单例 | 179 |
+| 生产者消费者 | 165 |
+| 斐波那契装饰器 | 280 |
+| 二叉搜索树 | 125 |
+| 事件总线 | 274 |
+| 对象池 | 163 |
+| 优先级队列 | 79 |
+| 依赖注入容器 | 95 |
+
+**平均速度: ~150-160 chars/s (约 75-80 tokens/s)**
+
+#### 停止服务
+
+```bash
+pkill -f run_qwen2.5-coder-32b_exl2
+```
 
 ---
 
@@ -645,7 +741,8 @@ cd /opt/CosyVoice && python example.py
 | 模型 | 功能 | 速度 |
 |------|------|------|
 | Z-Image Turbo | 文生图 | ~17秒/张 (1920x1080) |
-| Qwen2.5-Coder-32B | 代码生成 | ~40 tokens/s |
+| Qwen2.5-Coder-32B (llama.cpp) | 代码生成 | ~40 tokens/s |
+| **Qwen2.5-Coder-32B (exllamav2)** | 代码生成 | **~80 tokens/s** |
 | Qwen3.5-9B | 通用对话 | ~94 tokens/s |
 | QwQ-32B | 推理/思考 | ~20 tokens/s |
 | SenseVoice | 语音识别 | RTF 0.06 (16倍速) |
