@@ -55,9 +55,37 @@ ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
 | `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | ~40 tokens/s |
 | `run_qwen3.5-9b_api.sh` | Qwen3.5-9B | `/opt/gguf/Qwen3.5-9B-Q6_K.gguf` | 通用对话 | ~94 tokens/s |
 | `run_qwq32b_api.sh` | QwQ-32B | `/opt/gguf/QwQ-32B-Q4_K_M.gguf` | 推理/数学/代码（带思考能力） | ~20 tokens/s |
-| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样) | **~80 tokens/s** |
+| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~175 tokens/s** |
+
+**⚠️ 重要：安装 FlashAttention (显著提升性能 50%+)**
+
+```bash
+# 首次编译 FlashAttention (针对 RTX 4090D)
+bash /opt/my-shell/4090d/build_flash_attention.sh
+
+# 验证安装
+python3 -c "import flash_attn; print(f'FlashAttention 版本: {flash_attn.__version__}')"
+```
 
 **端口**: 全部为 11434
+
+---
+
+### 🚀 性能优化历程 (4090D 单卡极限优化)
+
+| 阶段 | 配置 | 速度 | 优化说明 |
+|------|------|------|----------|
+| 初始 | 4bit + 投机2 | ~50 tok/s | 基础配置 |
+| 优化1 | 4bit + 投机4 | ~100 tok/s | 增加投机步数 |
+| 优化2 | 4bit + 投机4 + FlashAttention | ~164 tok/s | 编译安装FA2 |
+| **优化3** | **4bit + 投机6 + FlashAttention** | **~175 tok/s** | 极限配置 |
+
+**优化要点**:
+1. **FlashAttention 2.8.3** - 针对4090D(8.9)架构编译，显存带宽优化
+2. **NUM_SPECULATIVE_TOKENS=6** - 投机采样步数从2提升到6
+3. **显式配置** - `no_flash_attn=False`, `no_sdpa=False`
+
+**硬件**: RTX 4090D 24GB | **显存**: 21.4GB / 24GB
 
 ---
 

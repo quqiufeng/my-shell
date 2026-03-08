@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+
+# =============================================================================
+# 依赖安装 (首次运行前执行)
+# =============================================================================
+# ⚠️ 重要: 安装 FlashAttention 可提升 50%+ 速度
+# 编译安装 (针对 RTX 4090D):
+#   bash /opt/my-shell/4090d/build_flash_attention.sh
+#
+# 验证安装:
+# python3 -c "import flash_attn; print(flash_attn.__version__)"
+# =============================================================================
+
 import sys
 import time
 import socket
@@ -17,12 +29,15 @@ DRAFT_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-0.5B-exl2"
 
 MAX_SEQ_LEN = 32768
 PORT = 11434
-NUM_SPECULATIVE_TOKENS = 4
+NUM_SPECULATIVE_TOKENS = 6  # 优化: FA2安装后可尝试6
 
 print("Loading main model...")
 
 config = ExLlamaV2Config(MAIN_MODEL_DIR)
 config.max_seq_len = MAX_SEQ_LEN
+config.no_flash_attn = False  # 确保启用FlashAttention
+config.no_sdpa = False         # 禁用SDPA，强制用FlashAttention
+config.no_xformers = False     # 禁用xformers
 model = ExLlamaV2(config)
 cache = ExLlamaV2Cache_Q4(model, lazy=True)  # 优化: Q4 KV Cache
 model.load_autosplit(cache)
@@ -31,6 +46,8 @@ print("Loading draft model...")
 
 draft_config = ExLlamaV2Config(DRAFT_MODEL_DIR)
 draft_config.max_seq_len = MAX_SEQ_LEN
+draft_config.no_flash_attn = False
+draft_config.no_sdpa = False
 draft_model = ExLlamaV2(draft_config)
 draft_cache = ExLlamaV2Cache(draft_model)  # 草稿模型用默认 cache
 draft_model.load_autosplit(draft_cache)
@@ -198,4 +215,19 @@ if __name__ == "__main__":
 # 4. Batch Size: 调整批处理大小
 # 5. Flash Attention: 确保启用
 # 6. TensorRT: 当前不支持
+# =============================================================================
+
+
+# =============================================================================
+# 投机采样接受率测试
+# 使用方法: 每次运行一条命令
+# =============================================================================
+
+# 测试1: 红黑树 (带接受率)
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个红黑树数据结构'}],'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); d=r.json()['choices'][0]['message']['content']; print(f\"{time.time()-t:.2f}s | {len(d)} | {len(d)/(time.time()-t):.1f} tok/s\")"
+
+# =============================================================================
+# FlashAttention-2 确认方法
+# 运行以下命令检查是否安装:
+# python3 -c "from flash_attn import flash_attn_func; print('FlashAttention 已安装')"
 # =============================================================================
