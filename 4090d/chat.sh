@@ -1,8 +1,6 @@
 #!/bin/bash
 
-get_external_ip() {
-    curl -s ifconfig.me 2>/dev/null || curl -s ipify.org 2>/dev/null || echo "未知"
-}
+INSTANCE_ID=${XGC_INSTANCE_ID:-$(hostname)}
 
 case "$1" in
     start)
@@ -13,13 +11,12 @@ case "$1" in
         sleep 5
         curl -s http://localhost:8501 | head -1 > /dev/null
         
-        EXTERNAL_IP=$(get_external_ip)
         echo ""
         echo "=============================="
         echo "Chat 服务已启动!"
         echo "=============================="
         echo "对内地址: http://localhost:8501"
-        echo "对外地址: http://${EXTERNAL_IP}:8501"
+        echo "对外地址: http://${INSTANCE_ID}-8501.container.x-gpu.com"
         echo "=============================="
         ;;
     stop)

@@ -1,22 +1,18 @@
 import streamlit as st
 import requests
-import socket
-import urllib.request
+import os
 
 api_url = "http://localhost:11434/v1/chat/completions"
+
+INSTANCE_ID = os.environ.get('XGC_INSTANCE_ID', '未知')
 
 st.set_page_config(page_title="ExLlamaV2 Chat", page_icon="🤖")
 st.title("🤖 ExLlamaV2 Qwen2.5-Coder")
 
-try:
-    external_ip = urllib.request.urlopen('https://ifconfig.me', timeout=5).read().decode()
-except:
-    external_ip = "未知"
-
 st.markdown(f"""
 <div style="padding: 10px; background: #1e1e1e; border-radius: 5px; margin-bottom: 20px;">
     <b>对内地址:</b> <code>http://localhost:8501</code><br>
-    <b>对外地址:</b> <code>http://{external_ip}:8501</code>
+    <b>对外地址:</b> <code>http://{INSTANCE_ID}-8501.container.x-gpu.com</code>
 </div>
 """, unsafe_allow_html=True)
 
