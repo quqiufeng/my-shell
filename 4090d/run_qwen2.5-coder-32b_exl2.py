@@ -29,7 +29,7 @@ DRAFT_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-0.5B-exl2"
 
 MAX_SEQ_LEN = 32768
 PORT = 11434
-NUM_SPECULATIVE_TOKENS = 6  # 优化: FA2安装后可尝试6
+NUM_SPECULATIVE_TOKENS = 6  # 最优配置: 8投机反而下降
 
 print("Loading main model...")
 
@@ -39,7 +39,7 @@ config.no_flash_attn = False  # 确保启用FlashAttention
 config.no_sdpa = False         # 禁用SDPA，强制用FlashAttention
 config.no_xformers = False     # 禁用xformers
 model = ExLlamaV2(config)
-cache = ExLlamaV2Cache_Q4(model, lazy=True)  # 优化: Q4 KV Cache
+cache = ExLlamaV2Cache_Q4(model, lazy=True)  # Q4 KV Cache (速度最快)
 model.load_autosplit(cache)
 
 print("Loading draft model...")

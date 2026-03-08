@@ -55,7 +55,18 @@ ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
 | `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | ~40 tokens/s |
 | `run_qwen3.5-9b_api.sh` | Qwen3.5-9B | `/opt/gguf/Qwen3.5-9B-Q6_K.gguf` | 通用对话 | ~94 tokens/s |
 | `run_qwq32b_api.sh` | QwQ-32B | `/opt/gguf/QwQ-32B-Q4_K_M.gguf` | 推理/数学/代码（带思考能力） | ~20 tokens/s |
-| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~175 tokens/s** |
+| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~170 tokens/s** |
+| `chat.py` | Web Chat UI | - | Gradio 网页聊天界面 | 左右布局 |
+
+### 启动方式
+
+```bash
+# 1. 启动大模型 API 服务
+python3 run_qwen2.5-coder-32b_exl2.py
+
+# 2. 启动 Web Chat UI (Streamlit)
+python3 -m streamlit run chat.py --server.port 8501 --server.address 0.0.0.0 --browser.gatherUsageStats=false --server.headless=true
+```
 
 **⚠️ 重要：安装 FlashAttention (显著提升性能 50%+)**
 
