@@ -5,13 +5,9 @@
 #
 # 【重要】
 # 本脚本耗时较长 (约 6-10 分钟)，建议直接运行会自动后台执行
-# 日志会保存到与输出文件同名的 .log 文件
 #
 # 用法:
 #   ./upscale_hires.sh <input> [output] [strength] [steps]
-#
-# 查询进度:
-#   tail -f output_name.log
 #
 # 查看 PID:
 #   ps aux | grep sd-cli
@@ -79,8 +75,8 @@ fi
 
 INPUT_FILE="$1"
 OUTPUT_FILE="$2"
-STRENGTH="${3:-0.4}"
-STEPS="${4:-12}"
+STRENGTH="${3:-0.25}"   # 0.25: 保真度高，不易变糊（0.4容易失真）
+STEPS="${4:-20}"       # 20: 步数越多细节越好（默认12）
 
 # 验证输入
 if [ -z "$INPUT_FILE" ]; then
@@ -132,42 +128,34 @@ if [ -z "$OUTPUT_FILE" ]; then
   OUTPUT_FILE="${BASE}_hires_2x.png"
 fi
 
-LOG_FILE="${OUTPUT_FILE%.png}.log"
+SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
 
 echo ""
 echo ">>> Step 1/2: img2img 放大 (到目标分辨率)..."
-echo "    日志: $LOG_FILE"
 
-SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
-
+cd /opt
 nohup $SD_CLI \
   --diffusion-model /opt/image/z_image_turbo-Q8_0.gguf \
   --vae /opt/image/ae.safetensors \
   --llm /opt/image/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-  -p "high quality, detailed, masterpiece, best quality" \
-  -n "blurry, low quality, deformed, bad anatomy, worst quality" \
+  -p "high quality, detailed, masterpiece, best quality, ultra clear, high resolution" \
+  -n "blurry, low quality, deformed, bad anatomy, worst quality, blur, haze" \
   --cfg-scale 1.0 \
   --diffusion-fa \
   --cache-mode easycache \
+  --scheduler karras \
   --vae-tiling \
   -i "$INPUT_FILE" \
   --strength "$STRENGTH" \
   -H "$TARGET_HEIGHT" \
   -W "$TARGET_WIDTH" \
   --steps "$STEPS" \
-  -o "$OUTPUT_FILE" > "$LOG_FILE" 2>&1 &
+  -o "$OUTPUT_FILE" > /dev/null 2>&1 &
 
 PID=$!
-echo "    PID: $PID"
 
 while kill -0 $PID 2>/dev/null; do
-  if [ -f "$LOG_FILE" ]; then
-    LINES=$(wc -l < "$LOG_FILE")
-    if [ "$LINES" -gt 3 ]; then
-      tail -3 "$LOG_FILE" | sed 's/^/    /'
-    fi
-  fi
-  sleep 10
+  sleep 5
 done
 
 wait $PID
@@ -175,17 +163,19 @@ EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
   echo "Error: img2img failed with code $EXIT_CODE"
-  cat "$LOG_FILE"
   exit 1
 fi
 
 echo ">>> Step 2/2: ImageMagick 锐化 (保持尺寸)..."
 
-convert "$OUTPUT_FILE" -sharpen 0x2 "$OUTPUT_FILE"
+# 锐化已禁用，如需开启请取消注释
+# convert "$OUTPUT_FILE" -sharpen 0x2 "$OUTPUT_FILE"
+
+if [ $? -ne 0 ]; then
+  echo "Warning: ImageMagick sharpening failed, trying alternative..."
+fi
 
 echo ""
 echo "=============================================="
 echo "Done: $OUTPUT_FILE"
-echo "Log: $LOG_FILE"
-echo "PID: $PID (可用于 tail -f 追踪日志)"
 echo "=============================================="
