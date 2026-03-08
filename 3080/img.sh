@@ -1,8 +1,7 @@
 #!/bin/bash
-# Model: Z-Image Turbo (z_image_turbo-Q8_0.gguf)
-# Best for: realistic, photorealistic, portrait, fashion, product, architecture, landscape, general purpose
-# NOT good for: anime, cartoon, illustrations
-# Steps: 20, CFG: 1.0
+# Model: FLUX1 Schnell (flux1-schnell-Q4_K_S.gguf)
+# Best for: high quality, detailed, photorealistic, general purpose
+# Steps: 4 (Schnell 最佳), CFG: 1.0
 # Usage: ./img.sh "prompt" [output] [width] [height]
 
 PROMPT="$1"
@@ -25,21 +24,17 @@ else
   OUTPUT="${TIMESTAMP}_${MD5}.png"
 fi
 
-NEG_PROMPT="[Pastedsource_furry, source_Futanari, censored, worst quality, low quality, ugly, deformed fingers, extra fingers, fused fingers, too many fingers, grainy, Sweat, looking up, monochrome, missing head, bad anatomy, bad hands, extra fingers, missing fingers, blurry"
+NEG_PROMPT="worst quality, low quality, blurry, deformed, bad anatomy, ugly"
 
 CMD="$HOME/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model /opt/image/z_image_turbo-Q8_0.gguf \
+  --diffusion-model /opt/image/flux1-schnell-Q4_K_S.gguf \
   --vae /opt/image/ae.safetensors \
-  --llm /opt/image/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
   -p \"$PROMPT\" \
   -n \"$NEG_PROMPT\" \
   --cfg-scale 1.0 \
-  --diffusion-fa \
   --cache-mode easycache \
-  --scheduler karras \
-  --vae-tiling \
   -H $HEIGHT -W $WIDTH \
-  --steps 25 \
+  --steps 4 \
   -s $RANDOM \
   -o \"$OUTPUT_DIR/$OUTPUT\" > /dev/null 2>&1"
 

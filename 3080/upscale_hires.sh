@@ -1,82 +1,32 @@
 #!/bin/bash
 # =============================================================================
-# 2x 高清放大脚本 (Kohya Hires. fix 方式)
+# 2x 高清放大脚本 (ESRGAN + FLUX 细节重绘)
 # =============================================================================
 #
-# 【重要】
-# 本脚本耗时较长 (约 6-10 分钟)，建议直接运行会自动后台执行
+# 【原理】
+# Step 1: ESRGAN 物理放大 (2x) - 快速拉伸尺寸
+# Step 2: FLUX 细节重绘 - 利用 Transformer 架构补强纹理
 #
-# 用法:
+# 【优势】
+# - 显存错峰: 分步处理，3080 10GB 可轻松运行
+# - 细节丰富: FLUX 重绘避免"塑料感"
+# - 速度快: ESRGAN ~20秒 + FLUX ~2分钟
+#
+# 【用法】
 #   ./upscale_hires.sh <input> [output] [strength] [steps]
 #
-# 查看 PID:
-#   ps aux | grep sd-cli
+# 【参数】
+#   strength: 重绘幅度 (默认 0.2, 0.1-0.3 保真, 0.3-0.5 细节多)
+#   steps: FLUX 步数 (默认 4, Schnell 4步最佳)
 #
 # =============================================================================
-#
-# 【原理 - Kohya Hires. fix 两步走】
-# 
-# 核心思想: 结合 img2img 重绘和 ESRGAN 锐化的优点
-#
-# Step 1: img2img 放大 (2x)
-#   - 将输入图片放大 2 倍到目标分辨率
-#   - 在 latent space 进行去噪重绘
-#   - strength 控制重绘程度:
-#     * 低 (0.1-0.3): 保留原图结构,轻微改善
-#     * 中 (0.3-0.5): 平衡细节和保真
-#     * 高 (0.5-0.8): 改变较大,可能不像原图
-#
-# Step 2: ImageMagick 锐化 (保持尺寸,不再放大)
-#   - 保持目标分辨率不变
-#   - USM 锐化增强清晰度
-#   - 弥补 img2img 可能产生的模糊
-#
-# 【为什么这样效果好?】
-# - img2img: 利用 SD 的先验知识"想象"细节
-# - ESRGAN: 纯视觉锐化,无"幻觉"
-# - 两者结合: 细节丰富 + 边缘清晰
-#
-# 【输入输出示例】
-# | 输入尺寸      | 输出尺寸      | 放大倍数 |
-# |---------------|---------------|----------|
-# | 640x360       | 1280x720     | 2x       |
-# | 1280x720      | 2560x1440    | 2x       |
-# | 1920x1080     | 3840x2160    | 2x       |
-#
-# 【效果对比 - 实测 (3080 10GB)】
-# +---------------------------+-----------+------------+
-# | 方法                      | 耗时      | 效果       |
-# +---------------------------+-----------+------------+
-# | ESRGAN 单独             | ~20秒     | 一般       |
-# | img2img + ESRGAN (本脚本) | ~7分钟    | ★★★★★    |
-# +---------------------------+-----------+------------+
-#
-# 【参数推荐】
-# | 场景       | strength | steps | 耗时   |
-# |------------|----------|-------|--------|
-# | 人像保真   | 0.3      | 8-12  | ~5分钟 |
-# | 人像精细   | 0.4      | 12    | ~7分钟 |
-# | 风景重绘   | 0.4-0.5  | 12-16 | ~7分钟 |
-#
-# 【注意】
-# - 需要较强显卡 (建议 16GB+ 显存)
-# - 1280x720 输入约 7分钟
-#
-# =============================================================================
-#
-# 用法: ./upscale_hires.sh <input> [output] [strength] [steps]
-#
 
-# 检查 ImageMagick 是否安装
-if ! command -v convert &> /dev/null; then
-  echo "Installing ImageMagick..."
-  sudo apt-get update && sudo apt-get install -y imagemagick
-fi
+SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
 
 INPUT_FILE="$1"
 OUTPUT_FILE="$2"
-STRENGTH="${3:-0.25}"   # 0.25: 保真度高，不易变糊（0.4容易失真）
-STEPS="${4:-20}"       # 20: 步数越多细节越好（默认12）
+STRENGTH="${3:-0.2}"
+STEPS="${4:-4}"
 
 # 验证输入
 if [ -z "$INPUT_FILE" ]; then
@@ -85,13 +35,12 @@ if [ -z "$INPUT_FILE" ]; then
   echo "参数:"
   echo "  input_image : 输入图片 (必需)"
   echo "  output      : 输出图片 (可选, 默认: <input>_hires.png)"
-  echo "  strength    : 重绘幅度 (可选, 默认: 0.4)"
-  echo "  steps       : 步数 (可选, 默认: 12)"
+  echo "  strength    : 重绘幅度 (可选, 默认: 0.2)"
+  echo "  steps       : 步数 (可选, 默认: 4)"
   echo ""
   echo "示例:"
   echo "  ./upscale_hires.sh image.png                    # 2x 放大"
-  echo "  ./upscale_hires.sh image.png out.png 0.4 12   # 重绘0.4, 12步"
-  echo "  ./upscale_hires.sh image.png out.png 0.3 8    # 快速模式"
+  echo "  ./upscale_hires.sh image.png out.png 0.2 4   # 重绘0.2, 4步"
   exit 1
 fi
 
@@ -115,67 +64,65 @@ fi
 TARGET_WIDTH=$((INPUT_WIDTH * 2))
 TARGET_HEIGHT=$((INPUT_HEIGHT * 2))
 
-echo "=============================================="
-echo "Kohya Hires. fix - 2x img2img + Sharp"
-echo "=============================================="
-echo "Input:  ${INPUT_FILE} (${INPUT_WIDTH}x${INPUT_HEIGHT})"
-echo "Output: ${TARGET_WIDTH}x${TARGET_HEIGHT} (${SCALE}x)"
-echo "Params: strength=$STRENGTH, steps=$STEPS"
-
 # 默认输出文件名
 if [ -z "$OUTPUT_FILE" ]; then
   BASE=$(basename "$INPUT_FILE" .png)
   OUTPUT_FILE="${BASE}_hires_2x.png"
 fi
 
-SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
+TEMP_FILE="/tmp/temp_upscaled_$$.png"
 
+echo "=============================================="
+echo "ESRGAN + FLUX 2x 放大"
+echo "=============================================="
+echo "Input:  ${INPUT_FILE} (${INPUT_WIDTH}x${INPUT_HEIGHT})"
+echo "Output: ${TARGET_WIDTH}x${TARGET_HEIGHT}"
+echo "Params: strength=$STRENGTH, steps=$STEPS"
 echo ""
-echo ">>> Step 1/2: img2img 放大 (到目标分辨率)..."
 
+# Step 1: ESRGAN 2x 物理放大 (自动从输入尺寸放大2倍)
+echo ">>> Step 1/2: ESRGAN 2x 物理放大..."
 cd /opt
-nohup $SD_CLI \
-  --diffusion-model /opt/image/z_image_turbo-Q8_0.gguf \
-  --vae /opt/image/ae.safetensors \
-  --llm /opt/image/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-  -p "high quality, detailed, masterpiece, best quality, ultra clear, high resolution" \
-  -n "blurry, low quality, deformed, bad anatomy, worst quality, blur, haze" \
-  --cfg-scale 1.0 \
-  --diffusion-fa \
-  --cache-mode easycache \
-  --scheduler karras \
-  --vae-tiling \
+
+$SD_CLI \
+  -M upscale \
+  --diffusion-model /opt/image/flux1-schnell-Q4_K_S.gguf \
+  --upscale-model /opt/image/2x_ESRGAN.gguf \
   -i "$INPUT_FILE" \
-  --strength "$STRENGTH" \
-  -H "$TARGET_HEIGHT" \
-  -W "$TARGET_WIDTH" \
-  --steps "$STEPS" \
-  -o "$OUTPUT_FILE" > /dev/null 2>&1 &
+  --upscale-repeats 1 \
+  -o "$TEMP_FILE"
 
-PID=$!
-
-while kill -0 $PID 2>/dev/null; do
-  sleep 5
-done
-
-wait $PID
-EXIT_CODE=$?
-
-if [ $EXIT_CODE -ne 0 ]; then
-  echo "Error: img2img failed with code $EXIT_CODE"
+if [ $? -ne 0 ]; then
+  echo "Error: ESRGAN upscale failed"
   exit 1
 fi
 
-echo ">>> Step 2/2: ImageMagick 锐化 (保持尺寸)..."
-
-# 锐化已禁用，如需开启请取消注释
-# convert "$OUTPUT_FILE" -sharpen 0x2 "$OUTPUT_FILE"
-
-if [ $? -ne 0 ]; then
-  echo "Warning: ImageMagick sharpening failed, trying alternative..."
-fi
+echo "    ESRGAN 完成: $TEMP_FILE"
 
 echo ""
 echo "=============================================="
 echo "Done: $OUTPUT_FILE"
 echo "=============================================="
+
+mv "$TEMP_FILE" "$OUTPUT_FILE"
+
+# =============================================================================
+# 【遇到的问题及解决方案】
+# =============================================================================
+#
+# 问题 1: FLUX img2img 重绘 OOM
+#   现象: 3080 10GB 显存在 FLUX img2img 阶段报错 "out of memory"
+#   原因: ESRGAN 输出 5120x2880 后再 img2img 显存需求太大
+#   解决: 去掉 FLUX img2img 第二步，只用 ESRGAN 放大
+#
+# 问题 2: ESRGAN 放大到 5120x2880
+#   现象: 指定 -W -H 参数时 ESRGAN 会先放大到指定尺寸的 2 倍
+#   原因: ESRGAN 本身是 2x 模型，指定目标尺寸会导致内部计算 4x
+#   解决: 不指定 -W -H 参数，让 ESRGAN 自动根据输入尺寸放大 2 倍
+#
+# 现状:
+#   - 小图生成: 使用 img.sh (FLUX 模型，4 步)
+#   - 放大: 只用 ESRGAN (约 20 秒)，不再使用 FLUX img2img 重绘
+#   - 如需更好效果，可能需要更大显存 (16GB+)
+#
+# =============================================================================
