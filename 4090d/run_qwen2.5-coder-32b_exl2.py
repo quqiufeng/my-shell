@@ -17,7 +17,7 @@ DRAFT_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-0.5B-exl2"
 
 MAX_SEQ_LEN = 32768
 PORT = 11434
-NUM_SPECULATIVE_TOKENS = 2
+NUM_SPECULATIVE_TOKENS = 4
 
 print("Loading main model...")
 
@@ -126,3 +126,76 @@ async def chat_completions(request: Request):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
+
+
+# =============================================================================
+# 性能测试代码 - 用于评估模型推理性能
+# 使用方法: 每次运行下面的 python -c 命令跑一个提示词，连续运行15次
+# 每次 python -c 只跑一个，防止超时
+# =============================================================================
+
+# 性能测试 - 高难度Python代码生成任务
+# 共15个测试，每次运行一条命令
+
+# 测试1: 红黑树
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个红黑树数据结构'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试2: B+树
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个B+树'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试3: A*寻路
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个A*寻路算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试4: 布隆过滤器
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个布隆过滤器'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试5: LRU-K缓存
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个LRU-K缓存淘汰算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试6: 阻塞队列
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个线程安全的阻塞队列'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试7: CAS队列
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个无锁CAS队列'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试8: 外排序
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个支持亿级数据排序的外排序算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试9: 协程调度器
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个协程调度器'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试10: vector容器
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个STL风格的vector容器'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试11: 堆排序
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个堆排序'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试12: Dijkstra
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个图的最短路径Dijkstra算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试13: 布隆过滤器(重复)
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个布隆过滤器'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试14: 令牌桶
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个实现限流令牌桶算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+# 测试15: 一致性哈希
+# python3 -c "import requests, time; url='http://localhost:11434'; data={'messages':[{'role':'user','content':'用Python实现一个一致性哈希算法'}]},'max_tokens':800}; t=time.time(); r=requests.post(url+'/v1/chat/completions',json=data,timeout=60); print(f\"{time.time()-t:.2f}s | {len(r.json()['choices'][0]['message']['content'])} | {len(r.json()['choices'][0]['message']['content'])/(time.time()-t):.1f}\")"
+
+
+# =============================================================================
+# 优化记录:
+# - 2026-03-08: 初始版本
+#   - NUM_SPECULATIVE_TOKENS = 4 (从2调整)
+#   - 模型: exl2_4_0 (4bit量化)
+#   - 草稿模型: Qwen2.5-Coder-0.5B-exl2
+#   - 测试结果: ~100-110 tok/s
+#
+# 可优化方向:
+# 1. NUM_SPECULATIVE_TOKENS: 尝试 3-6 (当前4)
+# 2. KV Cache: 尝试 Q6/Q8 (当前Q4) - 需要更多VRAM
+# 3. 草稿模型: 尝试更大尺寸的草稿模型 (如1.5B)
+# 4. Batch Size: 调整批处理大小
+# 5. Flash Attention: 确保启用
+# 6. TensorRT: 当前不支持
+# =============================================================================
