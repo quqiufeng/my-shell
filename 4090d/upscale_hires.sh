@@ -76,8 +76,8 @@ fi
 
 INPUT_FILE="$1"
 OUTPUT_FILE="$2"
-STRENGTH="${3:-0.4}"
-STEPS="${4:-12}"
+STRENGTH="${3:-0.25}"   # 0.25: 保真度高，不易变糊（0.4容易失真）
+STEPS="${4:-20}"       # 20: 步数越多细节越好（默认12）
 
 # 验证输入
 if [ -z "$INPUT_FILE" ]; then
@@ -145,11 +145,12 @@ nohup $SD_CLI \
   --diffusion-model /opt/gguf/image/z_image_turbo-Q8_0.gguf \
   --vae /opt/gguf/image/ae.safetensors \
   --llm /opt/gguf/image/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-  -p "high quality, detailed, masterpiece, best quality" \
-  -n "blurry, low quality, deformed, bad anatomy, worst quality" \
+  -p "high quality, detailed, masterpiece, best quality, ultra clear, high resolution" \
+  -n "blurry, low quality, deformed, bad anatomy, worst quality, blur, haze" \
   --cfg-scale 1.0 \
   --diffusion-fa \
   --cache-mode easycache \
+  --scheduler karras \
   --vae-tiling \
   -i "$INPUT_FILE" \
   --strength "$STRENGTH" \
@@ -182,9 +183,8 @@ fi
 
 echo ">>> Step 2/2: ImageMagick 锐化 (保持尺寸)..."
 
-# 修复: 使用更明确的 ImageMagick 命令语法
-# -unsharp 比 -sharpen 效果更好,参数格式: radius x sigma + threshold
-$CONVERT_CMD "$OUTPUT_FILE" -unsharp 1.5x1.0+0.5+0 -gravity center -quality 95 "$OUTPUT_FILE"
+# 锐化已禁用，如需开启请取消注释
+# $CONVERT_CMD "$OUTPUT_FILE" -unsharp 0.3x0.5+0.8+0 -gravity center -quality 95 "$OUTPUT_FILE"
 
 if [ $? -ne 0 ]; then
   echo "Warning: ImageMagick sharpening failed, trying alternative..."

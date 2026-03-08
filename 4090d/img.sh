@@ -51,10 +51,16 @@ echo "Output: $OUTPUT_DIR/$OUTPUT"
   --cfg-scale 1.0 \
   --diffusion-fa \
   --cache-mode easycache \
+  --scheduler karras \
   -H $HEIGHT -W $WIDTH \
-  --steps 20 \
+  --steps 25 \
   -s $RANDOM \
   -o "$OUTPUT_DIR/$OUTPUT" > /dev/null 2>&1
+# 参数说明:
+# --scheduler karras: 使用 Karras 调度器，图像更清晰
+# --steps 25: 步数越多，细节越好（默认20，推荐25）
+# --diffusion-fa: Flash Attention 加速
+# --cache-mode easycache: 缓存加速，跳过部分步骤
 
 echo "Image saved to: $OUTPUT_DIR/$OUTPUT"
 
