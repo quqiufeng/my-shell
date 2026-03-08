@@ -52,8 +52,8 @@ echo "Output: $OUTPUT_DIR/$OUTPUT"
   --diffusion-fa \
   --cache-mode easycache \
   -H $HEIGHT -W $WIDTH \
-  --steps 12 \
+  --steps 20 \
   -s $RANDOM \
-  -o "$OUTPUT_DIR/$OUTPUT"
+  -o "$OUTPUT_DIR/$OUTPUT" > /dev/null 2>&1
 
 echo "Image saved to: $OUTPUT_DIR/$OUTPUT"

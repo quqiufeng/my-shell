@@ -5,13 +5,11 @@
 #
 # 【重要】
 # 本脚本耗时较长 (约 6-10 分钟)，建议直接运行会自动后台执行
-# 日志会保存到与输出文件同名的 .log 文件
 #
 # 用法:
 #   ./upscale_hires_4090d.sh <input> [output] [strength] [steps]
 #
 # 查询进度:
-#   tail -f output_name.log
 #
 # 查看 PID:
 #   ps aux | grep sd-cli
@@ -137,15 +135,11 @@ if [ -z "$OUTPUT_FILE" ]; then
   OUTPUT_FILE="${BASE}_hires_2x.png"
 fi
 
-LOG_FILE="${OUTPUT_FILE%.png}.log"
+SD_CLI="/opt/stable-diffusion.cpp/bin/sd-cli"
 
 echo ""
 echo ">>> Step 1/2: img2img 放大 (到目标分辨率)..."
-echo "    日志: $LOG_FILE"
 
-SD_CLI="/opt/stable-diffusion.cpp/bin/sd-cli"
-
-# 修复: 使用绝对路径运行,避免路径问题
 cd /opt
 nohup $SD_CLI \
   --diffusion-model /opt/gguf/image/z_image_turbo-Q8_0.gguf \
@@ -162,19 +156,12 @@ nohup $SD_CLI \
   -H "$TARGET_HEIGHT" \
   -W "$TARGET_WIDTH" \
   --steps "$STEPS" \
-  -o "$OUTPUT_FILE" > "$LOG_FILE" 2>&1 &
+  -o "$OUTPUT_FILE" > /dev/null 2>&1 &
 
 PID=$!
-echo "    PID: $PID"
 
 while kill -0 $PID 2>/dev/null; do
-  if [ -f "$LOG_FILE" ]; then
-    LINES=$(wc -l < "$LOG_FILE")
-    if [ "$LINES" -gt 3 ]; then
-      tail -3 "$LOG_FILE" | sed 's/^/    /'
-    fi
-  fi
-  sleep 10
+  sleep 5
 done
 
 wait $PID
@@ -182,7 +169,6 @@ EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
   echo "Error: img2img failed with code $EXIT_CODE"
-  cat "$LOG_FILE"
   exit 1
 fi
 
@@ -209,6 +195,4 @@ fi
 echo ""
 echo "=============================================="
 echo "Done: $OUTPUT_FILE"
-echo "Log: $LOG_FILE"
-echo "PID: $PID (可用于 tail -f 追踪日志)"
 echo "=============================================="
