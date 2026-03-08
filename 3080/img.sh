@@ -1,15 +1,29 @@
 #!/bin/bash
-# Model: FLUX1 Schnell (flux1-schnell-Q4_K_S.gguf)
-# Best for: high quality, detailed, photorealistic, general purpose
-# Steps: 4 (Schnell 最佳), CFG: 1.0
-# Usage: ./img.sh "prompt" [output] [width] [height]
 
-PROMPT="$1"
+# 用法:
+#   ./img.sh [提示词] [输出文件] [宽度] [高度]
+# 
+# 参数说明:
+#   提示词     - 要生成的图像描述 (默认: "A beautiful landscape")
+#   输出文件    - 输出文件路径 (默认: /opt/时间戳_md5.png)
+#                如果包含目录路径，则保存到指定目录
+#   宽度       - 图像宽度 (默认: 1920)
+#   高度       - 图像高度 (默认: 1080)
+#
+# 示例:
+#   ./img.sh "A cat on the table"
+#   ./img.sh "A sunset" /opt/sunset.png 2560 1440
+#   ./img.sh "Mountain" mountain.png 1920 1080
+
+# 模型文件路径 (位于 /opt/gguf/image/ 目录)
+MODEL_DIR="/opt/image"
+
+PROMPT="${1:-A beautiful landscape}"
 OUTPUT_FILE="$2"
 WIDTH="${3:-1920}"
 HEIGHT="${4:-1080}"
 
-# 默认保存到 home 目录
+# 默认保存到 /opt 目录
 OUTPUT_DIR="$HOME"
 
 # 如果用户指定的输出路径包含目录，则使用用户指定的目录
@@ -24,29 +38,33 @@ else
   OUTPUT="${TIMESTAMP}_${MD5}.png"
 fi
 
-NEG_PROMPT="worst quality, low quality, blurry, deformed, bad anatomy, ugly"
+echo "Generating image..."
+echo "Prompt: $PROMPT"
+echo "Size: ${WIDTH}x${HEIGHT}"
+echo "Output: $OUTPUT_DIR/$OUTPUT"
 
-CMD="$HOME/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model /opt/image/flux1-schnell-Q4_K_S.gguf \
-  --vae /opt/image/ae.safetensors \
-  -p \"$PROMPT\" \
-  -n \"$NEG_PROMPT\" \
+$HOME/stable-diffusion.cpp/bin/sd-cli \
+  --diffusion-model $MODEL_DIR/z_image_turbo-Q8_0.gguf \
+  --vae $MODEL_DIR/ae.safetensors \
+  --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
+  -p "$PROMPT" \
   --cfg-scale 1.0 \
+  --diffusion-fa \
+  --guidance 3.5 \
+  --vae-tiling \
   --cache-mode easycache \
+  --scheduler karras \
   -H $HEIGHT -W $WIDTH \
-  --steps 4 \
+  --steps 25 \
   -s $RANDOM \
-  -o \"$OUTPUT_DIR/$OUTPUT\" > /dev/null 2>&1"
-
-eval $CMD
-
-echo "$OUTPUT_DIR/$OUTPUT"
-
+  -o "$OUTPUT_DIR/$OUTPUT" > /dev/null 2>&1
 # 参数说明:
 # --scheduler karras: 使用 Karras 调度器，图像更清晰
 # --steps 25: 步数越多，细节越好（默认20，推荐25）
 # --diffusion-fa: Flash Attention 加速
 # --cache-mode easycache: 缓存加速，跳过部分步骤
+
+echo "Image saved to: $OUTPUT_DIR/$OUTPUT"
 
 # =============================================================================
 # 风景壁纸生成参考命令 (1280x720 小图)
