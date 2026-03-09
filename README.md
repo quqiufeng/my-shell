@@ -696,7 +696,8 @@ llama-server -c 131072 ...
       "contextLimit": 100000
     },
     "distill": { "permission": "allow" },
-    "compress": { "permission": "allow" },
+    // ⚠️ 必须禁用 compress！否则会损坏 tool call JSON 格式
+    "compress": { "permission": "deny" },
     "prune": { "permission": "allow" }
   },
   "strategies": {
