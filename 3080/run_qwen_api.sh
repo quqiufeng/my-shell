@@ -16,7 +16,7 @@ echo "Batch Size: 1024"
 echo "Flash Attention: on"
 echo "KV Cache: q4_0"
 echo "Threads: 8"
-echo "Parallel: 4"
+echo "Parallel: 1"
 echo "=============================="
 echo ""
 # echo "📝 上下文参数说明:"
@@ -39,16 +39,16 @@ echo "=============================="
 echo ""
 
 $LLAMA_SERVER \
-  -m "$MODEL_DIR" \
-  --host 0.0.0.0 \
-  --port 11434 \
-  -ngl 60 \
-  -c 131072 \
-  --batch-size 1024 \
-  --flash-attn on \
-  --cache-type-k q4_0 \
-  --cache-type-v q4_0 \
-  --threads 8 \
-  --parallel 4 \
-  --n-predict -1 \
-  --log-disable &
+  -m "$MODEL_DIR" \                          # 模型文件路径
+  --host 0.0.0.0 \                           # 监听地址 (0.0.0.0 允许外部访问)
+  --port 11434 \                             # API 端口
+  -ngl 60 \                                  # GPU 加载层数 (全部60层)
+  -c 131072 \                                # 上下文大小 (实际约32K)
+  --batch-size 1024 \                        # 批处理大小
+  --flash-attn on \                          # Flash Attention 加速 (省显存)
+  --cache-type-k q4_0 \                      # KV Cache 量化 (K值)
+  --cache-type-v q4_0 \                      # KV Cache 量化 (V值)
+  --threads 8 \                               # CPU 线程数
+  --parallel 1 \                             # 并行 slot 数量
+  --n-predict 16384 \                        # 最大输出 tokens
+  --log-disable &                           # 禁用日志输出
