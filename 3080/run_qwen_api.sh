@@ -9,8 +9,8 @@ echo "=============================="
 echo "启动 Qwen3.5-9B API 服务 (3080 10GB 满血版)"
 echo "地址: http://0.0.0.0:11434"
 echo "模型: Qwen3.5-9B-Q4_K_M.gguf"
-echo "上下文参数: -c 131072"
-echo "实际上下文: ~32K"
+echo "上下文参数: -c 262144"
+echo "实际上下文: ~64K"
 echo "GPU层数: 35"
 echo "Batch Size: 256"
 echo "Max Output: 4096 tokens (~200行代码)"
@@ -44,7 +44,7 @@ $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port 11434 \
   -ngl 35 \
-  -c 131072 \
+  -c 262144 \
   --batch-size 256 \
   --flash-attn on \
   --cache-type-k q4_0 \
@@ -52,7 +52,6 @@ $LLAMA_SERVER \
   --threads 12 \
   --parallel 1 \
   --n-predict 4096 \
-  --log-disable \
   --no-mmap \
   --mlock
 
