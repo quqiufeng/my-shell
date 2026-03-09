@@ -656,3 +656,104 @@ llama-server -c 131072 ...
 1. 修改 llama.cpp 启动参数 `-c` 扩展上下文
 2. 修改 OpenCode 配置 `num_ctx` 匹配服务端
 3. 两者需同时匹配，否则会报 `exceeds context size` 错误
+
+---
+
+## DCP 动态上下文压缩插件
+
+### 简介
+
+[DCP (Dynamic Context Pruning)](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) 是 OpenCode 的上下文压缩插件，可以自动减少对话历史的 token 占用，优化长会话性能。
+
+### 安装步骤
+
+#### 1. 添加插件到配置
+
+编辑 `~/.config/opencode/opencode.json`：
+
+```json
+{
+  "plugin": ["@tarquinen/opencode-dcp@latest"],
+  ...
+}
+```
+
+#### 2. 创建 DCP 配置文件
+
+创建 `~/.config/opencode/dcp.jsonc`：
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+  "enabled": true,
+  "debug": false,
+  "pruneNotification": "detailed",
+  "pruneNotificationType": "chat",
+  "tools": {
+    "settings": {
+      "nudgeEnabled": true,
+      "nudgeFrequency": 10,
+      "contextLimit": 100000
+    },
+    "distill": { "permission": "allow" },
+    "compress": { "permission": "allow" },
+    "prune": { "permission": "allow" }
+  },
+  "strategies": {
+    "deduplication": { "enabled": true },
+    "supersedeWrites": { "enabled": true },
+    "purgeErrors": { "enabled": true, "turns": 4 }
+  }
+}
+```
+
+#### 3. 重启 OpenCode
+
+```bash
+# 重新启动 opencode
+opencode
+```
+
+### 使用命令
+
+| 命令 | 功能 |
+|------|------|
+| `/dcp` | 显示可用命令 |
+| `/dcp context` | 查看当前会话 token 使用情况 |
+| `/dcp stats` | 查看累计压缩统计 |
+| `/dcp sweep` | 手动触发压缩 |
+
+### 压缩效果
+
+实际测试效果（Qwen3.5-9B 模型，64K 上下文）：
+
+| 阶段 | Prompt Tokens | 缓存相似度 |
+|------|---------------|------------|
+| 第1次请求 | 10,720 | - |
+| 第2次请求 | 530 | 97.6% |
+| 第3次请求 | 326 | 98.5% |
+| 第4次请求 | 162 | 98.9% |
+
+**效果总结**：
+- Prompt 从 10K 压缩到 162 tokens（**节省 ~98%**）
+- 缓存相似度高达 98.9%
+- DCP 自动执行去重、清除错误、压缩历史
+- 界面显示：`▣ DCP | ~3K tokens saved total`
+
+### 工作原理
+
+#### 工具
+- **Distill** - 将关键内容提炼成摘要后删除原始内容
+- **Compress** - 将大段对话压缩成单个摘要
+- **Prune** - 删除已完成或冗余的工具内容
+
+#### 自动策略
+- **Deduplication** - 去除重复的工具调用（如多次读取同一文件）
+- **Supersede Writes** - 删除已被后续读取覆盖的写操作内容
+- **Purge Errors** - 4 轮后删除错误工具的输入内容
+
+### 注意事项
+
+- DCP 对子代理 (subagents) 禁用
+- 压缩会改变消息内容，影响 Prompt 缓存命中
+- 适合按请求计费的 Provider（如 GitHub Copilot、Google Antigravity）
