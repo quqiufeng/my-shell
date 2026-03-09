@@ -606,3 +606,53 @@ opencode debug config
 ```bash
 cp ~/.config/opencode/opencode.json ~/my-shell/opencode.json
 ```
+
+---
+
+## 原理简述
+
+### llama.cpp 启动参数
+
+```bash
+llama-server -c 131072 ...
+```
+
+| `-c` 参数值 | 实际 Slot 上下文 |
+|------------|-----------------|
+| 65536 | 16K |
+| 131072 | 32K |
+| 262144 | 64K |
+
+**原理**：Qwen3.5-9B 原始训练上下文是 16K，`-c` 参数用于扩展上下文，实际可用约为参数的 **1/4**。
+
+### OpenCode 配置参数
+
+```json
+{
+  "model": "llama.cpp/qwen3.5-9b",
+  "provider": {
+    "llama.cpp": {
+      "options": { "baseURL": "http://localhost:11434/v1" },
+      "models": {
+        "qwen3.5-9b": {
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 65536,
+          "options": { "num_ctx": 131072 }
+        }
+      }
+    }
+  }
+}
+```
+
+| 配置项 | 作用 |
+|--------|------|
+| `maxContextWindow` | 声明最大上下文窗口 |
+| `options.num_ctx` | 传递给 API 的实际上下文参数 |
+| `maxOutputTokens` | 最大输出 tokens |
+
+### 解决思路
+
+1. 修改 llama.cpp 启动参数 `-c` 扩展上下文
+2. 修改 OpenCode 配置 `num_ctx` 匹配服务端
+3. 两者需同时匹配，否则会报 `exceeds context size` 错误
