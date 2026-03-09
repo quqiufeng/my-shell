@@ -1,0 +1,55 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["oh-my-opencode@3.5.2"],
+  "model": "llama.cpp/qwen3.5-9b",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3.5-9b": {
+          "name": "qwen3.5-9b",
+          "maxContextWindow": 131072,
+          "options": {"num_ctx": 131072}
+        }
+      }
+    },
+    "llama.cpp": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3.5-9b": {
+          "name": "qwen3.5-9b",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 65536,
+          "options": {"num_ctx": 131072}
+        }
+      }
+    },
+    "minimax": {
+      "npm": "@ai-sdk/anthropic",
+      "options": {
+        "baseURL": "https://api.minimax.io/anthropic/v1",
+        "apiKey": "YOUR_MINIMAX_API_KEY"
+      },
+      "models": {
+        "MiniMax-M2.5": {"name": "MiniMax-M2.5"}
+      }
+    }
+  },
+  "mcp": {
+    "minimax-tools": {
+      "type": "local",
+      "command": ["uvx", "minimax-coding-plan-mcp", "-y"],
+      "environment": {
+        "MINIMAX_API_KEY": "YOUR_MINIMAX_API_KEY",
+        "MINIMAX_API_HOST": "https://api.minimaxi.com"
+      },
+      "enabled": true
+    }
+  }
+}
