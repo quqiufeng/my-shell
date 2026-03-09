@@ -68,32 +68,15 @@ echo "  KV缓存: $KV_CACHE"
 echo "  Flash Attention: on"
 
 # ==========================================
-# 测试命令 (curl)
+# 性能测试 (使用 usage 字段获取准确 token 数)
 # ==========================================
-# 非流式测试:
-# curl -s http://localhost:11434/v1/chat/completions \
-#   -H "Content-Type: application/json" \
-#   -d '{
-#     "model": "'"$MODEL_NAME"'",
-#     "messages": [{"role": "user", "content": "用Python实现一个支持并发请求的异步HTTP客户端，包含连接池、限流、重试机制，并给出完整的使用示例"}],
-#     "max_tokens": 1000
-#   }'
-# 
-# 流式测试:
-# curl -N http://localhost:11434/v1/chat/completions \
-#   -H "Content-Type: application/json" \
-#   -d '{
-#     "model": "'"$MODEL_NAME"'",
-#     "messages": [{"role": "user", "content": "用Python实现一个支持并发请求的异步HTTP客户端，包含连接池、限流、重试机制，并给出完整的使用示例"}],
-#     "max_tokens": 1000,
-#     "stream": true
-#   }'
-# 
-# 性能测试:
-# time curl -s http://localhost:11434/v1/chat/completions \
-#   -H "Content-Type: application/json" \
-#   -d '{
-#     "model": "'"$MODEL_NAME"'",
-#     "messages": [{"role": "user", "content": "用Python写一个快速排序函数"}],
-#     "max_tokens": 200
-#   }' | jq -r '.usage'
+# python3 -c "
+# import requests, time
+# url = 'http://localhost:11434/v1/chat/completions'
+# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个红黑树'}], 'max_tokens': 800, 'stream': False}
+# t = time.time()
+# r = requests.post(url, json=data, timeout=60).json()
+# elapsed = time.time() - t
+# gen_tokens = r['usage']['completion_tokens']
+# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
+# "
