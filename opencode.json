@@ -5,7 +5,7 @@
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://localhost:11434/v1"
+": "http://        "baseURLlocalhost:11434/v1"
       },
       "models": {
         "qwen3.5-9b": {
@@ -18,14 +18,14 @@
     "llama.cpp": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://localhost:11434/v1"
+        "baseURL": "http://localhost1"
       },
-      "models": {
+:11434/v      "models": {
         "qwen3.5-9b": {
           "name": "qwen3.5-9b",
-          "maxContextWindow": 131072,
+          "maxContextWindow": 262144,
           "maxOutputTokens": 65536,
-          "options": {"num_ctx": 131072}
+          "options": {"num_ctx": 262144}
         }
       }
     },
