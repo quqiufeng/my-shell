@@ -10,9 +10,10 @@ echo "启动 Qwen3.5-9B API 服务 (3080 10GB 满血版)"
 echo "地址: http://0.0.0.0:11434"
 echo "模型: Qwen3.5-9B-Q4_K_M.gguf"
 echo "上下文参数: -c 131072"
-echo "实际上下文: ~32K (约为参数的1/4)"
-echo "GPU层数: 60"
-echo "Batch Size: 1024"
+echo "实际上下文: ~32K"
+echo "GPU层数: 35"
+echo "Batch Size: 256"
+echo "Max Output: 4096 tokens (~200行代码)"
 echo "Flash Attention: on"
 echo "KV Cache: q4_0"
 echo "Threads: 12"
@@ -39,19 +40,21 @@ echo "=============================="
 echo ""
 
 $LLAMA_SERVER \
-  -m "$MODEL_DIR" \                             # [稳定性] 模型文件路径
-  --host 0.0.0.0 \                           # [稳定性] 监听地址 (0.0.0.0允许外部访问)
-  --port 11434 \                               # [稳定性] API端口
-  -ngl 60 \                                  # [性能] GPU加载层数 (全部60层,越多越快越显存)
-  -c 131072 \                                # [性能] 上下文大小 (实际约32K,影响长对话)
-  --batch-size 1024 \                        # [性能] 批处理大小 (越大越快越显存)
-  --flash-attn on \                          # [性能] Flash Attention加速 (省显存,提升性能)
-  --cache-type-k q4_0 \                      # [性能] KV Cache量化K值 (q4省显存,q8更准)
-  --cache-type-v q4_0 \                      # [性能] KV Cache量化V值 (q4省显存,q8更准)
-  --threads 12 \                               # [性能] CPU线程数 (越多越快,建议8-16)
-  --parallel 1 \                             # [稳定性] 并行slot数量 (越多并发但显存高,建议1)
-  --n-predict 4096 \                        # [稳定性] 最大输出tokens (决定单次生成最长长度)
-  --log-disable &                           # [稳定性] 禁用日志输出
+  -m "$MODEL_DIR" \
+  --host 0.0.0.0 \
+  --port 11434 \
+  -ngl 35 \
+  -c 131072 \
+  --batch-size 256 \
+  --flash-attn on \
+  --cache-type-k q4_0 \
+  --cache-type-v q4_0 \
+  --threads 12 \
+  --parallel 1 \
+  --n-predict 4096 \
+  --log-disable \
+  --no-mmap \
+  --mlock
 
 # =============================================================================
 # 性能测试代码 - 用于评估模型推理性能
