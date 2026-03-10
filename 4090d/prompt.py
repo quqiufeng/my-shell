@@ -97,19 +97,21 @@ def calculate_char_count(video_duration: float, speed: float = 3.1,
     return total_chars
 
 
-def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, speed: float = 3.1) -> str:
+def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, speed: float = 3.1, total_chars: int = None) -> str:
     """生成字幕文案
     参数:
         video_path: 视频文件路径
         info_file: 文案文件路径
         adjust: 调整值，默认10，用于微调预估汉字数
-        speed: 语速，默认4.0字/秒
+        speed: 语速，默认3.1字/秒
+        total_chars: 预估汉字总数，如果为None则自动计算
     """
     # 获取视频时长
     duration = get_video_duration(video_path)
     
     # 预估字幕汉字总数
-    total_chars = calculate_char_count(duration, speed=speed, adjust=adjust)
+    if total_chars is None:
+        total_chars = calculate_char_count(duration, speed=speed, adjust=adjust)
     
     if info_file is None:
         info_file = "/opt/video/info.txt"
