@@ -68,6 +68,26 @@ print(result)
 ")
 echo "  自动生成文案: ${TEXT:0:50}..."
 
+# 检测每段文案是否达到15汉字及以上
+MIN_CHARS=10
+INVALID=$(python3 -c "
+import sys
+text = '''$TEXT'''
+segments = text.split('|')
+for seg in segments:
+    # 只统计汉字
+    chinese = sum(1 for c in seg if '\u4e00' <= c <= '\u9fff')
+    if chinese < $MIN_CHARS:
+        print(seg)
+        sys.exit(1)
+")
+if [ $? -ne 0 ]; then
+    echo "错误: 文案格式不对，每段需至少$MIN_CHARS个汉字"
+    echo "不合规文案:"
+    echo "$TEXT"
+    exit 1
+fi
+
 if [ ! -f "$INPUT_VIDEO" ]; then
     echo "错误: 视频文件不存在: $INPUT_VIDEO"
     exit 1
