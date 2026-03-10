@@ -16,7 +16,7 @@
 
 # ==================== 配置变量 ====================
 INTRO_PAUSE=0.2
-SPEED=1.0
+SPEED=1.2
 PAUSE=0.3
 SUBTITLE_CHAR_LIMIT=12
 # ==================== 配置变量 ====================
@@ -230,7 +230,7 @@ ffmpeg -y -f concat -safe 0 -i "$AUDIO_LIST" -c:a aac "$COMBINED_AAC" 2>/dev/nul
 # 整体前置0.2秒静音对齐字幕
 ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$COMBINED_AAC" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$COMBINED_AAC" 2>/dev/null
 
-ffmpeg -y -i "$INPUT_VIDEO" -i "$COMBINED_AAC" -vf "ass=$SUB_ASS" \
+ffmpeg -y -i "$INPUT_VIDEO" -i "$COMBINED_AAC" -vf "ass=$SUB_ASS" -af "volume=1.5" \
     -map 0:v -map 1:a \
     -c:v libx264 -c:a aac -shortest \
     "$OUTPUT" 2>/dev/null

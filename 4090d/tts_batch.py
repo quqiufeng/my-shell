@@ -31,9 +31,9 @@ def main():
         print(f"[生成] {idx}: {text[:30]}...")
         
         if prompt_wav and os.path.exists(prompt_wav):
-            prompt = '<|endofprompt|>'
+            instruct = 'You are a helpful assistant. 请用真诚推荐好物分享的语气说。<|endofprompt|>'
             tts_text = f'\n{text}'
-            result = cosyvoice.inference_instruct2(tts_text, prompt, prompt_wav, stream=False, speed=speed)
+            result = cosyvoice.inference_instruct2(tts_text, instruct, prompt_wav, stream=False, speed=speed)
         else:
             result = cosyvoice.inference_sft(text, '中文女', stream=False, speed=speed)
             
