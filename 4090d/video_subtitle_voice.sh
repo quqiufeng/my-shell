@@ -3,16 +3,16 @@
 # 
 # 参数说明:
 #   $1 视频: 输入视频文件
-#   $2 克隆音频: 用于克隆声音的音频文件
-#   $3 文案: 用|分隔每段文字，如 "第一句|第二句|第三句"
+#   $2 文案信息文件: 包含产品介绍信息的文件路径
+#   $3 克隆音频: (可选)用于克隆声音的音频文件，不传则使用默认SFT音色
 #   $4 输出视频: (可选)输出文件路径，默认在输入视频同目录下添加 _subtitled 后缀
 #
 # 示例:
-#   ./video_subtitle_voice.sh ./input.mp4 ./voice.wav '文案1|文案2|文案3'
-#   ./video_subtitle_voice.sh ./input.mp4 ./voice.wav ./subtitle.txt
+#   ./video_subtitle_voice.sh ./video.mp4 ./info.txt
+#   ./video_subtitle_voice.sh ./video.mp4 ./info.txt ./voice.wav
 #
 # 案例：JBL产品介绍
-#   ./video_subtitle_voice.sh '/opt/video/1.mp4' /opt/video/voice.wav '百年纯正低频音响界的活化石大品牌|横跨五大领域包括大部分影院还有体育场馆|它真正了定义扩声系统监听扬声器金标准|被哈曼卡顿集团收购的超强美式低音品牌|特别是弹性下潜深度高动态适合流行坚韧耐用|适合喜欢超强重低音的爱好者体验|想要的来我直播间'
+#   ./video_subtitle_voice.sh '/opt/video/1.mp4' /opt/video/info.txt
 
 # ==================== 配置变量 ====================
 INTRO_PAUSE=0.2
@@ -25,30 +25,48 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 INPUT_VIDEO="$1"
-PROMPT_WAV="$2"
-TEXT="$3"
+INFO_FILE="$2"
+PROMPT_WAV="$3"
 OUTPUT="$4"
 
 # 参数检查
-if [ -z "$INPUT_VIDEO" ] || [ -z "$PROMPT_WAV" ] || [ -z "$TEXT" ]; then
-    echo "用法: $0 <视频> <克隆音频> <文案> [输出视频]"
+if [ -z "$INPUT_VIDEO" ] || [ -z "$INFO_FILE" ]; then
+    echo "用法: $0 <视频> <文案信息文件> [克隆音频] [输出视频]"
     echo ""
     echo "参数说明:"
     echo "  视频: 输入视频文件 (必填)"
-    echo "  克隆音频: (必填)用于克隆声音的音频文件"
-    echo "  文案: 字幕文案，用|分隔 (必填，支持文件路径或直接文本)"
+    echo "  文案信息文件: (必填)包含产品介绍信息的文件路径"
+    echo "  克隆音频: (可选)用于克隆声音的音频文件，默认 ./voice.wav"
     echo "  输出视频: (可选)输出文件路径，默认在输入视频同目录下添加 _subtitled 后缀"
     echo ""
     echo "示例:"
-    echo "  $0 ./video.mp4 ./voice.wav '文案1|文案2|文案3'"
-    echo "  $0 ./video.mp4 ./voice.wav ./subtitle.txt"
+    echo "  $0 ./video.mp4 ./info.txt"
+    echo "  $0 ./video.mp4 ./info.txt ./voice.wav"
     exit 1
 fi
 
-# 如果文案是文件路径，读取文件内容
-if [ -f "$TEXT" ]; then
-    TEXT=$(cat "$TEXT")
+# 默认克隆音频
+if [ -z "$PROMPT_WAV" ]; then
+    PROMPT_WAV="./voice.wav"
 fi
+
+if [ ! -f "$INFO_FILE" ]; then
+    echo "错误: 文案信息文件不存在: $INFO_FILE"
+    exit 1
+fi
+
+# 从信息文件生成文案
+echo "[0/3] 自动生成文案..."
+TEXT=$(python3 -c "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from prompt import get_video_duration, calculate_char_count, generate_subtitle
+duration = get_video_duration('$INPUT_VIDEO')
+est_chars = calculate_char_count(duration, speed=3.1, adjust=0)
+result = generate_subtitle('$INPUT_VIDEO', '$INFO_FILE', total_chars=est_chars)
+print(result)
+")
+echo "  自动生成文案: ${TEXT:0:50}..."
 
 if [ ! -f "$INPUT_VIDEO" ]; then
     echo "错误: 视频文件不存在: $INPUT_VIDEO"

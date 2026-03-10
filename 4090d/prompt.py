@@ -123,6 +123,7 @@ def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, 
 1. 每段约20汉字，用|分隔
 2. 约{total_chars}字
 3. 语气：真诚推荐好物分享
+4. 不要返回标点符号
 
 示例格式：
 百年纯正低频音响界的活化石大品牌|横跨五大领域包括大部分影院还有体育场馆|它真正了定义扩声系统监听扬声器金标准|被哈曼卡顿集团收购的超强美式低音品牌|特别是弹性下潜深度高动态适合流行坚韧耐用|适合喜欢超强重低音的爱好者体验|想要的来我直播间
@@ -138,6 +139,11 @@ def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, 
             result = result.split("\n", 1)[1]
         if result.endswith("```"):
             result = result.rsplit("```", 1)[0]
+    
+    # 过滤think标签
+    import re
+    result = re.sub(r'<think>.*?</think>', '', result, flags=re.DOTALL)
+    
     return result.strip()
 
 
