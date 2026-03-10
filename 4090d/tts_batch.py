@@ -34,7 +34,7 @@ def main():
             tts_text = f'\n{text}'
             result = cosyvoice.inference_instruct2(tts_text, prompt, prompt_wav, stream=False)
         else:
-            result = cosyvoice.inference_sft(text, 'neutral', stream=False)
+            result = cosyvoice.inference_sft(text, '中文女', stream=False)
             
         for j in result:
             torchaudio.save(output_path, j['tts_speech'], cosyvoice.sample_rate)
