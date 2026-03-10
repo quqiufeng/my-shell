@@ -1,17 +1,19 @@
 #!/bin/bash
 
+export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
+
 MODEL_TYPE="${1:-q4}"
 
 if [ "$MODEL_TYPE" = "q3" ]; then
   MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q3_k_m.gguf"
   MODEL_NAME="qwen2.5-coder-32b-instruct-q3_k_m.gguf"
   KV_CACHE="q4_0"
-  CTX_SIZE=131072
+  CTX_SIZE=65536
 else
   MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf"
   MODEL_NAME="qwen2.5-coder-32b-instruct-q4_k_m.gguf"
   KV_CACHE="q4_0"
-  CTX_SIZE=131072
+  CTX_SIZE=65536
 fi
 
 if [ ! -f "$MODEL_DIR" ]; then
@@ -19,7 +21,6 @@ if [ ! -f "$MODEL_DIR" ]; then
   exit 1
 fi
 
-export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
 echo "=============================="
@@ -34,15 +35,17 @@ $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port 11434 \
-  --n-gpu-layers 99 \
+  --n-gpu-layers 80 \
   --ctx-size $CTX_SIZE \
-  --n-predict 16384 \
-  --batch-size 4096 \
+  --batch-size 1024 \
+  --ubatch-size 512 \
   --flash-attn on \
   --cache-type-k "$KV_CACHE" \
   --cache-type-v "$KV_CACHE" \
   --threads 14 \
-  --log-disable &
+  --no-mmap \
+  --mlock \
+  2>&1 | tee /opt/my-shell/4090d/qwen_api.log &
 
 sleep 40
 
