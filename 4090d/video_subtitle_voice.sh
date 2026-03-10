@@ -16,7 +16,7 @@
 
 # ==================== 配置变量 ====================
 INTRO_PAUSE=0.2
-SPEED=4.5
+SPEED=1.0
 PAUSE=0.3
 SUBTITLE_CHAR_LIMIT=12
 # ==================== 配置变量 ====================
@@ -125,12 +125,14 @@ if [ -n "$PROMPT_WAV" ] && [ -f "$PROMPT_WAV" ]; then
         "/opt/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B" \
         "$PROMPT_WAV" \
         "$AUDIO_DIR" \
+        "$SPEED" \
         "${TEXT_ARRAY[@]}"
 else
     conda run -n cosyvoice2 python3 /opt/my-shell/4090d/tts_batch.py \
         "/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT" \
         "none" \
         "$AUDIO_DIR" \
+        "$SPEED" \
         "${TEXT_ARRAY[@]}"
 fi
 

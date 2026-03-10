@@ -11,7 +11,8 @@ def main():
     model_dir = sys.argv[1]
     prompt_wav = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "none" else None
     output_dir = sys.argv[3]
-    texts = sys.argv[4:]
+    speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    texts = sys.argv[5:]
     
     print(f"加载模型: {model_dir}")
     cosyvoice = AutoModel(model_dir=model_dir, load_trt=True, fp16=True)
@@ -32,9 +33,9 @@ def main():
         if prompt_wav and os.path.exists(prompt_wav):
             prompt = '<|endofprompt|>'
             tts_text = f'\n{text}'
-            result = cosyvoice.inference_instruct2(tts_text, prompt, prompt_wav, stream=False)
+            result = cosyvoice.inference_instruct2(tts_text, prompt, prompt_wav, stream=False, speed=speed)
         else:
-            result = cosyvoice.inference_sft(text, '中文女', stream=False)
+            result = cosyvoice.inference_sft(text, '中文女', stream=False, speed=speed)
             
         for j in result:
             torchaudio.save(output_path, j['tts_speech'], cosyvoice.sample_rate)
