@@ -95,8 +95,12 @@ if [ ! -f "$PROMPT_WAV" ]; then
     exit 1
 fi
 
-# 判断文案类型
-IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
+# 判断文案类型（支持|或空格分隔）
+if [[ "$TEXT" == *"|"* ]]; then
+    IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
+else
+    IFS=' ' read -ra TEXT_ARRAY <<< "$TEXT"
+fi
 TOTAL_TEXTS=${#TEXT_ARRAY[@]}
 
 echo "========================================"
