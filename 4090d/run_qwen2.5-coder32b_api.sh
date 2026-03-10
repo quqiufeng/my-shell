@@ -1,17 +1,17 @@
 #!/bin/bash
 
-MODEL_TYPE="${1:-q3}"
+MODEL_TYPE="${1:-q4}"
 
 if [ "$MODEL_TYPE" = "q3" ]; then
   MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q3_k_m.gguf"
   MODEL_NAME="qwen2.5-coder-32b-instruct-q3_k_m.gguf"
   KV_CACHE="q4_0"
-  CTX_SIZE=65536
+  CTX_SIZE=131072
 else
   MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf"
   MODEL_NAME="qwen2.5-coder-32b-instruct-q4_k_m.gguf"
   KV_CACHE="q4_0"
-  CTX_SIZE=32768
+  CTX_SIZE=131072
 fi
 
 if [ ! -f "$MODEL_DIR" ]; then
@@ -36,6 +36,7 @@ $LLAMA_SERVER \
   --port 11434 \
   --n-gpu-layers 99 \
   --ctx-size $CTX_SIZE \
+  --n-predict 16384 \
   --batch-size 4096 \
   --flash-attn on \
   --cache-type-k "$KV_CACHE" \
