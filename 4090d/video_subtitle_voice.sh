@@ -136,25 +136,10 @@ fi
 
 echo "  配音生成完成"
 
-# 统一语速：根据每段字数计算目标时长，然后用atempo拉伸
-CHARS_PER_SEC=3.5
-echo "  统一语速: ${CHARS_PER_SEC}字/秒"
-
+# 获取每段时长
 declare -a ADJUSTED_DURATIONS
-for i in "${!TEXT_ARRAY[@]}"; do
-    idx=$((i+1))
-    text="${TEXT_ARRAY[$i]}"
-    text_len=${#text}
-    target_dur=$(awk "BEGIN {printf \"%.2f\", $text_len / $CHARS_PER_SEC}")
-    
-    orig_dur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$idx.wav")
-    ratio=$(awk "BEGIN {printf \"%.3f\", $orig_dur / $target_dur}")
-    
-    echo "  段$idx: ${text_len}字, ${orig_dur}秒 → ${target_dur}秒 (atempo=$ratio)"
-    ffmpeg -y -i "$AUDIO_DIR/$idx.wav" -af "atempo=$ratio" "$AUDIO_DIR/${idx}_norm.wav" 2>/dev/null
-    mv "$AUDIO_DIR/${idx}_norm.wav" "$AUDIO_DIR/$idx.wav"
-    
-    dur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$idx.wav")
+for i in $(seq 1 $TOTAL_TEXTS); do
+    dur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$i.wav")
     ADJUSTED_DURATIONS+=($dur)
 done
 
