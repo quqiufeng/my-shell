@@ -3,16 +3,16 @@
 # 
 # 参数说明:
 #   $1 视频: 输入视频文件
-#   $2 文案: 用|分隔每段文字，如 "第一句|第二句|第三句"
-#   $3 克隆音频: (可选)用于克隆声音的音频文件路径，不提供则使用默认SFT音色
+#   $2 克隆音频: 用于克隆声音的音频文件
+#   $3 文案: 用|分隔每段文字，如 "第一句|第二句|第三句"
 #   $4 输出视频: (可选)输出文件路径，默认在输入视频同目录下添加 _subtitled 后缀
 #
 # 示例:
-#   ./video_subtitle_voice.sh ./input.mp4 '文案1|文案2|文案3' ./voice.wav
-#   ./video_subtitle_voice.sh ./input.mp4 '文案1|文案2|文案3'
+#   ./video_subtitle_voice.sh ./input.mp4 ./voice.wav '文案1|文案2|文案3'
+#   ./video_subtitle_voice.sh ./input.mp4 ./voice.wav ./subtitle.txt
 #
 # 案例：38秒视频，每12汉字一段字幕
-#   ./video_subtitle_voice.sh '/opt/video/1.mp4' 'JBL成立于1946年是全球|全球音响领域中极少数横跨|专业录音室电影院大型演出|现场车载音响及个人消费电|子五大领域顶级品牌标准制|定者全球超过50的影院和|70的大型体育场馆均采用|JBL设备它定义了现代扩|声系统的音效标准监听标杆|其经典的监听扬声器曾广泛|应用于顶级录音室被视为还|原音乐真实动态的教科书' /opt/video/voice.wav
+#   ./video_subtitle_voice.sh '/opt/video/1.mp4' /opt/video/voice.wav 'JBL成立于1946年是全球|全球音响领域中极少数横跨|专业录音室电影院大型演出|现场车载音响及个人消费电|子五大领域顶级品牌标准制|定者全球超过50的影院和|70的大型体育场馆均采用|JBL设备它定义了现代扩|声系统的音效标准监听标杆|其经典的监听扬声器曾广泛|应用于顶级录音室被视为还|原音乐真实动态的教科书'
 
 # ==================== 配置变量 ====================
 INTRO_PAUSE=0.2
@@ -170,9 +170,29 @@ for i in "${!TEXT_ARRAY[@]}"; do
     text=$(echo "$text" | xargs)
     text_no_punct=$(echo "$text" | sed 's/[,，。、！!？?。；;：:""''（）()【】《》]//g')
     
+    # 超过12个汉字则换行
+    chinese_count=$(echo "$text_no_punct" | grep -oP '\p{Han}' | wc -l)
+    if [ "$chinese_count" -gt 12 ]; then
+        text_no_punct=$(python3 -c "
+text = '''$text_no_punct'''
+count = 0
+pos = 0
+for i, c in enumerate(text):
+    if '\u4e00' <= c <= '\u9fff':
+        count += 1
+        if count == 12:
+            pos = i + 1
+            break
+if pos > 0:
+    print(text[:pos] + r'\N' + text[pos:])
+else:
+    print(text)
+")
+    fi
+    
     duration="${ADJUSTED_DURATIONS[$i]}"
-    # 每段字幕后加0.3秒停顿
-    duration_with_pause=$(awk "BEGIN {print $duration + $PAUSE}")
+    # 每段字幕前后各加0.2秒停顿
+    duration_with_pause=$(awk "BEGIN {print $duration + $PAUSE + $INTRO_PAUSE}")
     
     # 不拆分字幕，整段显示
     START_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($CURRENT_TIME/60), $CURRENT_TIME%60}")
@@ -186,17 +206,17 @@ echo "  字幕生成完成"
 echo ""
 echo "[3/3] 合成最终视频..."
 
-# 给每段音频加0.3秒静音
+# 给每段音频加0.2秒前后停顿
 PADDED_DIR="/tmp/padded_$$"
 mkdir -p "$PADDED_DIR"
 for i in $(seq 1 $TOTAL_TEXTS); do
-    ffmpeg -y -i "$AUDIO_DIR/$i.wav" -af "apad=pad_dur=$PAUSE" "$PADDED_DIR/$i.wav" 2>/dev/null
+    # 先加前端0.2秒静音
+    ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$AUDIO_DIR/$i.wav" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$PADDED_DIR/${i}_prefix.wav" 2>/dev/null
+    # 再加后端0.3秒静音
+    ffmpeg -y -i "$PADDED_DIR/${i}_prefix.wav" -af "apad=pad_dur=$PAUSE" "$PADDED_DIR/$i.wav" 2>/dev/null
 done
 
-# 给第一个音频文件前端加0.2秒静音
-ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$PADDED_DIR/1.wav" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$PADDED_DIR/1_intro.wav" 2>/dev/null && \
-mv "$PADDED_DIR/1_intro.wav" "$PADDED_DIR/1.wav"
-
+# 给整体音频加0.2秒前置偏移，对齐字幕
 AUDIO_LIST="/tmp/audio_list_$$.txt"
 for i in $(seq 1 $TOTAL_TEXTS); do
     echo "file '$PADDED_DIR/$i.wav'" >> "$AUDIO_LIST"
@@ -204,6 +224,9 @@ done
 
 COMBINED_AAC="/tmp/combined_$$.aac"
 ffmpeg -y -f concat -safe 0 -i "$AUDIO_LIST" -c:a aac "$COMBINED_AAC" 2>/dev/null
+
+# 整体前置0.2秒静音对齐字幕
+ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$COMBINED_AAC" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$COMBINED_AAC" 2>/dev/null
 
 ffmpeg -y -i "$INPUT_VIDEO" -i "$COMBINED_AAC" -vf "ass=$SUB_ASS" \
     -map 0:v -map 1:a \
