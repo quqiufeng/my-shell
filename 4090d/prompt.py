@@ -56,7 +56,7 @@ def get_video_duration(video_path: str) -> float:
     return float(result.stdout.strip())
 
 
-def calculate_char_count(video_duration: float, speed: float = 4.0, 
+def calculate_char_count(video_duration: float, speed: float = 3.0, 
                          intro_pause: float = 0.2, segment_pause: float = 0.3,
                          segment_count: int = None, adjust: int = 10) -> int:
     """
@@ -97,7 +97,7 @@ def calculate_char_count(video_duration: float, speed: float = 4.0,
     return total_chars
 
 
-def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, speed: float = 4.0) -> str:
+def generate_subtitle(video_path: str, info_file: str = None, adjust: int = 10, speed: float = 3.0) -> str:
     """生成字幕文案
     参数:
         video_path: 视频文件路径
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # 显示视频信息
     duration = get_video_duration(video_file)
     adjust = 80  # 默认调整值80
-    est_chars = calculate_char_count(duration, speed=4.0, adjust=adjust)
+    est_chars = calculate_char_count(duration, speed=3.0, adjust=adjust)
     print(f"视频时长: {duration:.1f}秒", file=sys.stderr)
     print(f"预估汉字: {est_chars}字 (调整值: {adjust})", file=sys.stderr)
     print("-" * 30, file=sys.stderr)
