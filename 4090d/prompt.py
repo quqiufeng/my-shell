@@ -160,7 +160,7 @@ if __name__ == "__main__":
     
     # 显示视频信息
     duration = get_video_duration(video_file)
-    adjust = 80  # 默认调整值80
+    adjust = 0  # 默认调整值0
     est_chars = calculate_char_count(duration, speed=3.1, adjust=adjust)
     print(f"视频时长: {duration:.1f}秒", file=sys.stderr)
     print(f"预估汉字: {est_chars}字 (调整值: {adjust})", file=sys.stderr)
