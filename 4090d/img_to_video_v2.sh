@@ -117,41 +117,16 @@ AUDIO_DIR="/tmp/audios_$$"
 mkdir -p "$AUDIO_DIR"
 SUB_ASS="/tmp/sub_$$.ass"
 
-# 激活 conda
-source /root/miniconda3/bin/activate cosyvoice2
-
 echo ""
 echo "[1/4] 生成配音..."
 
-# v2版本：每段单独配音
+# 使用批量配音脚本，模型只加载一次
 cd /opt/CosyVoice
-
-for i in "${!TEXT_ARRAY[@]}"; do
-    idx=$((i+1))
-    text="${TEXT_ARRAY[$i]}"
-    text=$(echo "$text" | xargs)
-    
-    echo "  配音 $idx: $text"
-    
-    # 使用 Fun-CosyVoice3-0.5B + TensorRT
-    python3 << EOF
-import sys
-sys.path.append('/opt/CosyVoice/third_party/Matcha-TTS')
-from cosyvoice.cli.cosyvoice import AutoModel
-import torchaudio
-
-cosyvoice = AutoModel(model_dir='/opt/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B', load_trt=True, fp16=True)
-
-# prompt_text改为空，tts_text前加换行符
-prompt = '<|endofprompt|>'
-tts_text = '\n$text'
-
-for j in cosyvoice.inference_instruct2(tts_text, prompt, '$PROMPT_WAV', stream=False):
-    torchaudio.save('$AUDIO_DIR/$idx.wav', j['tts_speech'], cosyvoice.sample_rate)
-    audio_len = j["tts_speech"].shape[1]/cosyvoice.sample_rate
-    print(f'    长度: {audio_len:.2f}秒')
-EOF
-done
+conda run -n cosyvoice2 python3 /opt/my-shell/4090d/tts_batch.py \
+    "/opt/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B" \
+    "$PROMPT_WAV" \
+    "$AUDIO_DIR" \
+    "${TEXT_ARRAY[@]}"
 
 echo "  配音生成完成"
 
