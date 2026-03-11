@@ -3,8 +3,8 @@
 # 2x 高清放大脚本 - 先放大再细修
 # =============================================================================
 # 流程：
-#   Step 1: 放大2倍到目标分辨率
-#   Step 2: img2img丰富细节
+#   Step 1: 用 Lanczos 算法物理放大2倍
+#   Step 2: img2img 丰富细节
 #
 # 参数:
 #   $1 输入图片
@@ -14,6 +14,7 @@
 #
 # 示例:
 #   ./upscale_hires.sh input.png output.png 0.3 20
+#   ./upscale_hires.sh /tmp/girl.png /tmp/girl_hires.png 0.3 20
 
 INPUT_FILE="$1"
 OUTPUT_FILE="$2"
@@ -61,57 +62,36 @@ fi
 
 SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
 MODEL_DIR="/opt/image"
-
-# 使用可用的模型
 DIFFUSION_MODEL="$MODEL_DIR/z_image_turbo-Q6_K.gguf"
-
-# 临时文件
-TEMP_UPSCALE="/tmp/upscale_temp_$$.png"
+TEMP_UPSCALE="/tmp/upscale_hires_temp.png"
 
 echo ""
-echo ">>> Step 1/2: 放大到 ${TARGET_WIDTH}x${TARGET_HEIGHT} ..."
+echo ">>> Step 1/2: 物理放大 (Lanczos) ..."
 
-cd /opt
-  nohup $SD_CLI \
-  --diffusion-model $DIFFUSION_MODEL \
-  --vae $MODEL_DIR/ae.safetensors \
-  --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-  -p "high quality, detailed, masterpiece, best quality, ultra clear" \
-  -n "blurry, low quality, deformed, bad anatomy, worst quality, blur" \
-  --cfg-scale 1.0 \
-  --diffusion-fa \
-  --cache-mode easycache \
-  --scheduler karras \
-  --vae-tiling \
-  -i "$INPUT_FILE" \
-  --strength 0.1 \
-  -H "$TARGET_HEIGHT" \
-  -W "$TARGET_WIDTH" \
-  --steps 8 \
-  -o "$TEMP_UPSCALE" > /dev/null 2>&1 &
+/usr/bin/convert "$INPUT_FILE" -filter Lanczos -resize ${TARGET_WIDTH}x${TARGET_HEIGHT} "$TEMP_UPSCALE" 2>/dev/null
 
-PID=$!
-while kill -0 $PID 2>/dev/null; do
-  sleep 5
-done
-wait $PID
-
-if [ $? -ne 0 ] || [ ! -f "$TEMP_UPSCALE" ]; then
-  echo "Error: Step 1 failed"
+if [ ! -s "$TEMP_UPSCALE" ]; then
+  echo "Error: Step 1 failed - file not created"
   exit 1
 fi
 
-echo ">>> Step 2/2: img2img 细修细节 ..."
+echo "  放大完成: $(ls -lh "$TEMP_UPSCALE" | awk '{print $5}')"
 
-  nohup $SD_CLI \
+echo ""
+echo ">>> Step 2/2: img2img 细节重绘 ..."
+
+# 优化后的Prompt
+DETAIL_PROMPT="masterpiece, ultra-high definition, sharp focus, highly detailed, 8k, photorealistic"
+NEGATIVE_PROMPT="blurry, low quality, deformed, worst quality, smooth, plastic skin, artifacts, ghosting"
+
+nohup $SD_CLI \
   --diffusion-model $DIFFUSION_MODEL \
   --vae $MODEL_DIR/ae.safetensors \
   --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-  -p "high quality, detailed, masterpiece, best quality, ultra clear, sharp, crisp" \
-  -n "blurry, low quality, deformed, bad anatomy, worst quality, blur, haze" \
-  --cfg-scale 1.0 \
+  -p "$DETAIL_PROMPT" \
+  -n "$NEGATIVE_PROMPT" \
+  --cfg-scale 2.0 \
   --diffusion-fa \
-  --cache-mode easycache \
   --scheduler karras \
   --vae-tiling \
   -i "$TEMP_UPSCALE" \
