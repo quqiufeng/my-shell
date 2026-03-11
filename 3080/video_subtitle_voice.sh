@@ -220,9 +220,9 @@ for i in "${!TEXT_ARRAY[@]}"; do
     text=$(echo "$text" | xargs)
     text_no_punct=$(echo "$text" | sed 's/[,，。、！!？?。；;：:""''（）()【】《》]//g')
     
-    # 超过12个汉字则换行
+    # 超过15个汉字则换行
     chinese_count=$(echo "$text_no_punct" | grep -oP '\p{Han}' | wc -l)
-    if [ "$chinese_count" -gt 12 ]; then
+    if [ "$chinese_count" -gt 15 ]; then
         text_no_punct=$(python3 -c "
 text = '''$text_no_punct'''
 count = 0
@@ -230,7 +230,7 @@ pos = 0
 for i, c in enumerate(text):
     if '\u4e00' <= c <= '\u9fff':
         count += 1
-        if count == 12:
+        if count == 15:
             pos = i + 1
             break
 if pos > 0:
