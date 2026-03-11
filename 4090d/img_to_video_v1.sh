@@ -99,7 +99,7 @@ echo "[1/4] 生成配音..."
 
 # 使用批量配音脚本，模型只加载一次
 cd /opt/CosyVoice
-conda run -n cosyvoice2 python3 /opt/my-shell/4090d/tts_batch.py \
+conda run -n cosyvoice2 python3 /opt/my-shell/4090d/tts_batch_v1.py \
     "/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT" \
     "none" \
     "$AUDIO_DIR" \
