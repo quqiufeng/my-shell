@@ -10,14 +10,15 @@ from cosyvoice.cli.cosyvoice import AutoModel
 
 
 def main():
-    model_dir = sys.argv[1]
+    model_dir = os.path.expanduser(sys.argv[1])
     prompt_wav = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "none" else None
     output_dir = sys.argv[3]
     speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
     texts = sys.argv[5:]
 
     print(f"加载模型: {model_dir}")
-    cosyvoice = AutoModel(model_dir=model_dir, load_trt=True, fp16=True)
+    load_trt = "Fun-CosyVoice3" in model_dir
+    cosyvoice = AutoModel(model_dir=model_dir, load_trt=load_trt, fp16=True)
     print("模型加载完成")
 
     for idx, text in enumerate(texts, 1):
@@ -38,8 +39,13 @@ def main():
             result = cosyvoice.inference_instruct2(
                 tts_text, instruct, prompt_wav, stream=False, speed=speed
             )
-        else:
+        elif "CosyVoice-300M-SFT" in model_dir:
             result = cosyvoice.inference_sft(text, "中文女", stream=False, speed=speed)
+        else:
+            instruct = "You are a helpful assistant. 请用真诚推荐好物分享的语气说。<|endofprompt|>"
+            result = cosyvoice.inference_instruct2(
+                f"\n{text}", instruct, prompt_wav, stream=False, speed=speed
+            )
 
         for j in result:
             torchaudio.save(output_path, j["tts_speech"], cosyvoice.sample_rate)

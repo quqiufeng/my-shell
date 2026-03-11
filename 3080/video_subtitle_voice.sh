@@ -68,23 +68,30 @@ print(result)
 ")
 echo "  自动生成文案: ${TEXT:0:50}..."
 
-# 检测每段文案是否达到15汉字及以上
+# 检测并合并不达标的段落（每段至少10个汉字）
 MIN_CHARS=10
-INVALID=$(python3 -c "
+TEXT=$(python3 -c "
 import sys
 text = '''$TEXT'''
 segments = text.split('|')
+result = []
+current = ''
 for seg in segments:
-    # 只统计汉字
     chinese = sum(1 for c in seg if '\u4e00' <= c <= '\u9fff')
-    if chinese < $MIN_CHARS:
-        print(seg)
-        sys.exit(1)
+    if chinese >= $MIN_CHARS:
+        if current:
+            result.append(current)
+            current = ''
+        result.append(seg)
+    else:
+        current += seg
+if current:
+    result.append(current)
+print('|'.join(result))
 ")
-if [ $? -ne 0 ]; then
-    echo "错误: 文案格式不对，每段需至少$MIN_CHARS个汉字"
-    echo "不合规文案:"
-    echo "$TEXT"
+
+if [ -z "$TEXT" ]; then
+    echo "错误: 文案为空"
     exit 1
 fi
 
@@ -163,14 +170,14 @@ echo "[1/3] 生成配音..."
 
 if [ -n "$PROMPT_WAV" ] && [ -f "$PROMPT_WAV" ]; then
     python3 ~/my-shell/3080/tts_batch.py \
-        "~/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B" \
+        "/opt/image/Fun-CosyVoice3-0.5B" \
         "$PROMPT_WAV" \
         "$AUDIO_DIR" \
         "$SPEED" \
         "${TEXT_ARRAY[@]}"
 else
     python3 ~/my-shell/3080/tts_batch.py \
-        "~/CosyVoice/pretrained_models/CosyVoice-300M-SFT" \
+        "/opt/image/CosyVoice-300M-SFT" \
         "none" \
         "$AUDIO_DIR" \
         "$SPEED" \
