@@ -3,8 +3,8 @@ import sys
 import torchaudio
 import os
 
-sys.path.insert(0, '/opt/CosyVoice')
-sys.path.insert(0, '/opt/CosyVoice/third_party/Matcha-TTS')
+sys.path.insert(0, '/home/dministraor/CosyVoice')
+sys.path.insert(0, '/home/dministrator/CosyVoice/third_party/Matcha-TTS')
 from cosyvoice.cli.cosyvoice import AutoModel
 
 def main():
