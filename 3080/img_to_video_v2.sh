@@ -119,34 +119,17 @@ source $HOME/anaconda3/bin/activate cosyvoice
 echo ""
 echo "[1/4] 生成配音..."
 
-# v2版本：每段单独配音
+# v2版本：使用tts_batch.py批量生成配音
 cd $HOME/CosyVoice
+source $HOME/anaconda3/bin/activate cosyvoice
 
-for i in "${!TEXT_ARRAY[@]}"; do
-    idx=$((i+1))
-    text="${TEXT_ARRAY[$i]}"
-    text=$(echo "$text" | xargs)
-    
-    echo "  配音 $idx: $text"
-    
-    # 使用 Fun-CosyVoice3-0.5B + TensorRT
-    python3 << EOF
-import sys
-sys.path.append('$HOME/CosyVoice/third_party/Matcha-TTS')
-from cosyvoice.cli.cosyvoice import AutoModel
-import torchaudio
-
-cosyvoice = AutoModel(model_dir='/opt/image/Fun-CosyVoice3-0.5B', load_trt=True, fp16=True)
-
-# prompt_text改为空，tts_text前加换行符
-prompt = '<|endofprompt|>'
-tts_text = '\n$text'
-
-for j in cosyvoice.inference_instruct2(tts_text, prompt, '$PROMPT_WAV', stream=False):
-    torchaudio.save('$AUDIO_DIR/$idx.wav', j['tts_speech'], cosyvoice.sample_rate)
-    audio_len = j["tts_speech"].shape[1]/cosyvoice.sample_rate
-    print(f'    长度: {audio_len:.2f}秒')
-EOF
+echo "  使用 Fun-CosyVoice3-0.5B 生成配音..."
+python3 ~/my-shell/3080/tts_batch.py \
+    "/opt/image/Fun-CosyVoice3-0.5B" \
+    "$PROMPT_WAV" \
+    "$AUDIO_DIR" \
+    1.0 \
+    "${TEXT_ARRAY[@]}"
 done
 
 echo "  配音生成完成"

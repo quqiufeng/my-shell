@@ -114,34 +114,15 @@ echo "[1/4] 生成配音..."
 
 # 生成每段配音
 cd $HOME/CosyVoice
+source $HOME/anaconda3/bin/activate cosyvoice
 
-for i in "${!TEXT_ARRAY[@]}"; do
-    idx=$((i+1))
-    text="${TEXT_ARRAY[$i]}"
-    text=$(echo "$text" | xargs)
-    
-    echo "  配音 $idx: $text"
-    
-    # 使用 CosyVoice-300M-SFT + TensorRT加速
-    python3 << EOF
-import sys
-sys.path.append('$HOME/CosyVoice/third_party/Matcha-TTS')
-from cosyvoice.cli.cosyvoice import AutoModel
-import torchaudio
-
-cosyvoice = AutoModel(model_dir='/opt/image/CosyVoice-300M-SFT', load_jit=True, load_trt=True, fp16=True)
-
-for j in cosyvoice.inference_sft('$text', '中文女', stream=False):
-    torchaudio.save('$AUDIO_DIR/$idx.wav', j['tts_speech'], cosyvoice.sample_rate)
-    print(f'    长度: {j["tts_speech"].shape[1]/cosyvoice.sample_rate:.2f}秒')
-EOF
-
-    # 获取该配音时长
-    if [ -f "$AUDIO_DIR/$idx.wav" ]; then
-        DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$idx.wav")
-        echo "    实际时长: ${DURATION}秒"
-    fi
-done
+echo "  使用 CosyVoice-300M-SFT 生成配音..."
+python3 ~/my-shell/3080/tts_batch.py \
+    "/opt/image/CosyVoice-300M-SFT" \
+    "none" \
+    "$AUDIO_DIR" \
+    1.0 \
+    "${TEXT_ARRAY[@]}"
 echo "  配音生成完成"
 
 echo ""
