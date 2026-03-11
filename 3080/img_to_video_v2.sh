@@ -95,8 +95,12 @@ if [ ! -f "$PROMPT_WAV" ]; then
     exit 1
 fi
 
-# 判断文案类型
-IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
+# 判断文案类型（支持|或空格分隔）
+if [[ "$TEXT" == *"|"* ]]; then
+    IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
+else
+    IFS=' ' read -ra TEXT_ARRAY <<< "$TEXT"
+fi
 TOTAL_TEXTS=${#TEXT_ARRAY[@]}
 
 echo "========================================"
@@ -113,24 +117,17 @@ AUDIO_DIR="/tmp/audios_$$"
 mkdir -p "$AUDIO_DIR"
 SUB_ASS="/tmp/sub_$$.ass"
 
-# 激活 conda
-source $HOME/anaconda3/bin/activate cosyvoice
-
 echo ""
 echo "[1/4] 生成配音..."
 
-# v2版本：使用tts_batch.py批量生成配音
-cd $HOME/CosyVoice
+# 使用批量配音脚本，模型只加载一次
+cd ~/CosyVoice
 source $HOME/anaconda3/bin/activate cosyvoice
-
-echo "  使用 Fun-CosyVoice3-0.5B 生成配音..."
 python3 ~/my-shell/3080/tts_batch.py \
     "/opt/image/Fun-CosyVoice3-0.5B" \
     "$PROMPT_WAV" \
     "$AUDIO_DIR" \
-    1.0 \
     "${TEXT_ARRAY[@]}"
-done
 
 echo "  配音生成完成"
 
@@ -154,7 +151,7 @@ YCbCr Matrix: None
 # 黑色 = &H000000
 # MarginV: 字幕距离底部距离
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,WenQuanYi Zen Hei,14,&H00FFFF,&H00FFFF,&H000000,&H00666666,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,20,1
+Style: Default,Noto Sans CJK SC Bold,14,&H00FFFFFF,&H00FFFFFF,&H00FFA500,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

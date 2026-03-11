@@ -1,18 +1,6 @@
 #!/bin/bash
 # 图片生成视频 + 配音 + 字幕（多段文案版）
-#
-# 参数说明:
-#   $1 图片: 图片文件夹/单张图片/空格分隔的图片路径
-#   $2 每张秒数: 每张图片展示时长(秒)，默认2秒
-#   $3 文案: 用|分隔每段文字，如 "第一句|第二句|第三句"
-#   $4 输出视频: 输出文件路径，默认 output.mp4
-#   $5 延迟: 音频延迟，默认0.6秒
-#
-# 模型: CosyVoice-300M-SFT (SFT预设音色，中文女)
-# 注意: 使用 TensorRT 加速需先编译引擎 (见 build_cosy_voice_3080.sh)
-#
-# 示例:
-#   ./img_to_video_v1.sh '/opt/image/story/' 2 '第一句|第二句|第三句' output.mp4
+# 用法: ./img_to_video.sh <图片> <每张秒数> <文案> <参考音频> [输出视频] [延迟]
 
 # 保存脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -106,23 +94,18 @@ AUDIO_DIR="/tmp/audios_$$"
 mkdir -p "$AUDIO_DIR"
 SUB_ASS="/tmp/sub_$$.ass"
 
-# 激活 conda
-source $HOME/anaconda3/bin/activate cosyvoice
-
 echo ""
 echo "[1/4] 生成配音..."
 
-# 生成每段配音
-cd $HOME/CosyVoice
+# 使用批量配音脚本，模型只加载一次
+cd ~/CosyVoice
 source $HOME/anaconda3/bin/activate cosyvoice
-
-echo "  使用 CosyVoice-300M-SFT 生成配音..."
 python3 ~/my-shell/3080/tts_batch.py \
     "/opt/image/CosyVoice-300M-SFT" \
     "none" \
     "$AUDIO_DIR" \
-    1.0 \
     "${TEXT_ARRAY[@]}"
+
 echo "  配音生成完成"
 
 echo ""
@@ -145,7 +128,7 @@ YCbCr Matrix: None
 # 黑色 = &H000000
 # MarginV: 字幕距离底部距离
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,WenQuanYi Zen Hei,14,&H00FFFF,&H00FFFF,&H000000,&H00666666,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,20,1
+Style: Default,Noto Sans CJK SC Bold,14,&H00FFFFFF,&H00FFFFFF,&H00FFA500,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
