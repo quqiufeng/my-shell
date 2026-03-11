@@ -2,10 +2,10 @@
 import sys
 import torchaudio
 import os
-import os
 
-sys.path.insert(0, os.path.expanduser("~/CosyVoice"))
-sys.path.insert(0, os.path.expanduser("~/CosyVoice/third_party/Matcha-TTS"))
+os.chdir("/home/dministrator/CosyVoice")
+sys.path.append("third_party/Matcha-TTS")
+sys.path.append(".")
 from cosyvoice.cli.cosyvoice import AutoModel
 
 
@@ -17,8 +17,7 @@ def main():
     texts = sys.argv[5:]
 
     print(f"加载模型: {model_dir}")
-    load_trt = "Fun-CosyVoice3" in model_dir
-    cosyvoice = AutoModel(model_dir=model_dir, load_trt=load_trt, fp16=True)
+    cosyvoice = AutoModel(model_dir=model_dir, load_trt=False, fp16=True)
     print("模型加载完成")
 
     for idx, text in enumerate(texts, 1):
@@ -34,18 +33,14 @@ def main():
         print(f"[生成] {idx}: {text[:30]}...")
 
         if prompt_wav and os.path.exists(prompt_wav):
-            instruct = "You are a helpful assistant. 请用真诚推荐好物分享的语气说。<|endofprompt|>"
-            tts_text = f"\n{text}"
-            result = cosyvoice.inference_instruct2(
-                tts_text, instruct, prompt_wav, stream=False, speed=speed
+            # 转换为相对路径
+            prompt_wav_rel = os.path.relpath(prompt_wav, "/home/dministrator/CosyVoice")
+            text_frontend = "You are a helpful assistant.<|endofprompt|>"
+            result = cosyvoice.inference_zero_shot(
+                f"\n{text}", text_frontend, prompt_wav_rel, stream=False, speed=speed
             )
-        elif "CosyVoice-300M-SFT" in model_dir:
-            result = cosyvoice.inference_sft(text, "中文女", stream=False, speed=speed)
         else:
-            instruct = "You are a helpful assistant. 请用真诚推荐好物分享的语气说。<|endofprompt|>"
-            result = cosyvoice.inference_instruct2(
-                f"\n{text}", instruct, prompt_wav, stream=False, speed=speed
-            )
+            result = cosyvoice.inference_sft(text, "中文女", stream=False, speed=speed)
 
         for j in result:
             torchaudio.save(output_path, j["tts_speech"], cosyvoice.sample_rate)

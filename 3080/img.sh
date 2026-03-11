@@ -16,6 +16,8 @@
 #   ./img.sh "Mountain" mountain.png 1920 1080
 
 # 模型文件路径 (位于 /opt/gguf/image/ 目录)
+# Stable Diffusion GGUF 模型 (stable-diffusion.cpp 作者维护)
+# https://huggingface.co/leejet/Z-Image-Turbo-GGUF
 MODEL_DIR="/opt/image"
 
 PROMPT="${1:-A beautiful landscape}"
@@ -44,18 +46,15 @@ echo "Size: ${WIDTH}x${HEIGHT}"
 echo "Output: $OUTPUT_DIR/$OUTPUT"
 
 $HOME/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model $MODEL_DIR/z-image-Q5_K_M.gguf \
+  --diffusion-model $MODEL_DIR/z_image_turbo-Q6_K.gguf \
   --vae $MODEL_DIR/ae.safetensors \
   --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
   -p "$PROMPT" \
   --cfg-scale 1.0 \
   --diffusion-fa \
-  --guidance 3.5 \
-  --vae-tiling \
-  --cache-mode easycache \
-  --scheduler karras \
+  --sampling-method euler \
   -H $HEIGHT -W $WIDTH \
-  --steps 25 \
+  --steps 4 \
   -s $RANDOM \
   -o "$OUTPUT_DIR/$OUTPUT" > /dev/null 2>&1
 # 参数说明:

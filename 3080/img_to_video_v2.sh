@@ -29,7 +29,7 @@ OUTPUT="${5:-}"
 IMAGES=$(echo "$IMAGES" | sed 's|/$||')
 
 # 默认值设置
-DEFAULT_PROMPT_WAV="$HOME/CosyVoice/asset/zero_shot_prompt.wav"
+DEFAULT_PROMPT_WAV="/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav"
 if [ -z "$PROMPT_WAV" ]; then
     PROMPT_WAV="$DEFAULT_PROMPT_WAV"
 fi
@@ -98,7 +98,7 @@ echo "图片数量: $TOTAL_IMAGES"
 echo "使用图片: $IMG_LIST"
 
 # 默认克隆音频
-DEFAULT_PROMPT_WAV="$HOME/CosyVoice/asset/zero_shot_prompt.wav"
+DEFAULT_PROMPT_WAV="/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav"
 if [ -z "$PROMPT_WAV" ] || [ "$PROMPT_WAV" = "none" ]; then
     PROMPT_WAV="$DEFAULT_PROMPT_WAV"
 fi

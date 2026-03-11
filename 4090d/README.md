@@ -185,6 +185,8 @@ pkill -f run_qwen2.5-coder-32b_exl2
 
 ### 3. AI 生图
 
+> **重要**: 图像生成模型来自 [leejet/Z-Image-Turbo-GGUF](https://huggingface.co/leejet/Z-Image-Turbo-GGUF)，这是 stable-diffusion.cpp 作者本人维护的官方仓库。
+
 | 脚本 | 功能 |
 |------|------|
 | `img.sh` | Z-Image Turbo 文生图 |
