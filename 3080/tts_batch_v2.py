@@ -9,9 +9,14 @@ import torchaudio
 
 
 def main():
-    prompt_wav = "./asset/zero_shot_prompt.wav"
-    output_dir = sys.argv[1]
-    texts = sys.argv[2:]
+    prompt_wav = sys.argv[
+        1
+    ]  # 绝对路径，如 /home/dministrator/CosyVoice/asset/zero_shot_prompt.wav
+    output_dir = sys.argv[2]
+    texts = sys.argv[3:]
+
+    # 切换到CosyVoice目录，使相对路径生效
+    os.chdir("/home/dministrator/CosyVoice")
 
     model_dir = "/opt/image/Fun-CosyVoice3-0.5B"
     print(f"加载模型: {model_dir}")

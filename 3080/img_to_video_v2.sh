@@ -124,6 +124,7 @@ echo "[1/4] 生成配音..."
 source /home/dministrator/anaconda3/bin/activate cosyvoice
 cd /home/dministrator/CosyVoice
 python3 /home/dministrator/my-shell/3080/tts_batch_v2.py \
+    "/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav" \
     "$AUDIO_DIR" \
     "${TEXT_ARRAY[@]}"
 
