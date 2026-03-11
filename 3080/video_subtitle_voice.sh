@@ -206,7 +206,7 @@ YCbCr Matrix: None
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,WenQuanYi Zen Hei,14,&H00FFFF,&H00FFFF,&H000000,&H00666666,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,20,1
+Style: Default,WenQuanYi Zen Hei,14,&H00FFFF,&H00FFFF,&H000000,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -220,9 +220,9 @@ for i in "${!TEXT_ARRAY[@]}"; do
     text=$(echo "$text" | xargs)
     text_no_punct=$(echo "$text" | sed 's/[,，。、！!？?。；;：:""''（）()【】《》]//g')
     
-    # 超过15个汉字则换行
+    # 超过13个汉字则换行
     chinese_count=$(echo "$text_no_punct" | grep -oP '\p{Han}' | wc -l)
-    if [ "$chinese_count" -gt 15 ]; then
+    if [ "$chinese_count" -gt 13 ]; then
         text_no_punct=$(python3 -c "
 text = '''$text_no_punct'''
 count = 0
@@ -230,7 +230,7 @@ pos = 0
 for i, c in enumerate(text):
     if '\u4e00' <= c <= '\u9fff':
         count += 1
-        if count == 15:
+        if count == 13:
             pos = i + 1
             break
 if pos > 0:
