@@ -68,8 +68,8 @@ print(result)
 ")
 echo "  自动生成文案: ${TEXT:0:50}..."
 
-# 检测并合并不达标的段落（每段至少10个汉字）
-MIN_CHARS=10
+# 检测并合并不达标的段落（每段至少12个汉字）
+MIN_CHARS=12
 TEXT=$(python3 -c "
 import sys
 text = '''$TEXT'''
