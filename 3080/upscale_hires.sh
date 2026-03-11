@@ -18,7 +18,7 @@
 
 INPUT_FILE="$1"
 OUTPUT_FILE="$2"
-STRENGTH="${3:-0.3}"
+STRENGTH="${3:-0.35}"
 STEPS="${4:-20}"
 
 if [ -z "$INPUT_FILE" ]; then
@@ -81,7 +81,7 @@ echo ""
 echo ">>> Step 2/2: img2img 细节重绘 ..."
 
 # 优化后的Prompt
-DETAIL_PROMPT="masterpiece, ultra-high definition, sharp focus, highly detailed, 8k, photorealistic"
+DETAIL_PROMPT="masterpiece, ultra-high definition, sharp focus, highly detailed, 8k, photorealistic, sharp textures, high resolution, film grain"
 NEGATIVE_PROMPT="blurry, low quality, deformed, worst quality, smooth, plastic skin, artifacts, ghosting"
 
 nohup $SD_CLI \
