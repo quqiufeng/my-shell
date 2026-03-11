@@ -89,6 +89,12 @@ fi
 echo "图片数量: $TOTAL_IMAGES"
 echo "使用图片: $IMG_LIST"
 
+# 默认克隆音频
+DEFAULT_PROMPT_WAV="$HOME/CosyVoice/asset/zero_shot_prompt.wav"
+if [ -z "$PROMPT_WAV" ] || [ "$PROMPT_WAV" = "none" ]; then
+    PROMPT_WAV="$DEFAULT_PROMPT_WAV"
+fi
+
 if [ ! -f "$PROMPT_WAV" ]; then
     echo "错误: 参考音频不存在: $PROMPT_WAV"
     rm -rf "$WORK_DIR"
@@ -127,6 +133,7 @@ python3 ~/my-shell/3080/tts_batch.py \
     "/opt/image/Fun-CosyVoice3-0.5B" \
     "$PROMPT_WAV" \
     "$AUDIO_DIR" \
+    1.0 \
     "${TEXT_ARRAY[@]}"
 
 echo "  配音生成完成"

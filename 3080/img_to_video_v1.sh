@@ -104,6 +104,7 @@ python3 ~/my-shell/3080/tts_batch.py \
     "/opt/image/CosyVoice-300M-SFT" \
     "none" \
     "$AUDIO_DIR" \
+    1.0 \
     "${TEXT_ARRAY[@]}"
 
 echo "  配音生成完成"
