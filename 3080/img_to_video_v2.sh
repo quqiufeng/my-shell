@@ -123,7 +123,7 @@ echo "[1/4] 生成配音..."
 # 使用批量配音脚本，模型只加载一次
 source /home/dministrator/anaconda3/bin/activate cosyvoice
 cd /home/dministrator/CosyVoice
-python3 /home/dministrator/my-shell/3080/tts_batch.py \
+python3 /home/dministrator/my-shell/3080/tts_batch_v2.py \
     "/opt/image" \
     "$PROMPT_WAV" \
     "$AUDIO_DIR" \
