@@ -23,6 +23,9 @@ import torch
 # 段间停顿时间（秒），控制每段配音之间的静音时长，用于节奏控制和字幕对齐
 PAUSE_SECONDS = 0.3
 
+# 开头延迟时间（秒），视频开始时的静音时长，让观众有时间准备
+INTRO_SILENCE = 0.3
+
 
 def remove_punctuation(text):
     return re.sub(r"[^\w\s\u4e00-\u9fff]", "", text)
@@ -68,7 +71,11 @@ def main():
                 audio_segments.append(j["tts_speech"])
 
     if audio_segments:
-        merged = audio_segments[0]
+        intro_samples = int(INTRO_SILENCE * sample_rate)
+        intro_silence = torch.zeros((1, intro_samples))
+
+        merged = torch.cat([intro_silence, audio_segments[0]], dim=1)
+
         for seg in audio_segments[1:]:
             merged = torch.cat([merged, pause, seg], dim=1)
 
@@ -88,11 +95,19 @@ def main():
         timings.append((start_time, end_time, duration))
         current_time = end_time + PAUSE_SECONDS
 
-    # 保存时间信息到文件
+    # 保存时间信息到文件（包含开头延迟）
     timing_file = f"{output_dir}/timings.txt"
     with open(timing_file, "w") as f:
+        # 写入开头延迟信息
+        f.write(f"# INTRO_SILENCE: {INTRO_SILENCE}\n")
+        f.write(f"# PAUSE_SECONDS: {PAUSE_SECONDS}\n")
         for i, (start, end, dur) in enumerate(timings, 1):
-            f.write(f"{i}: {start:.2f} {end:.2f} {dur:.2f}\n")
+            # 字幕时间需要加上开头延迟
+            subtitle_start = start + INTRO_SILENCE
+            subtitle_end = end + INTRO_SILENCE
+            f.write(
+                f"{i}: {start:.2f} {end:.2f} {dur:.2f} {subtitle_start:.2f} {subtitle_end:.2f}\n"
+            )
     print(f"时间信息已保存: {timing_file}")
     print("配音生成完成")
 

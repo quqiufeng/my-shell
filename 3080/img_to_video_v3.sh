@@ -1,16 +1,40 @@
 #!/bin/bash
+# =============================================================================
 # 图片生成视频 + 配音 + 字幕（新流程）
-# 特点：一次性配音，每段开头静音，段间停顿，根据配音时长生成字幕和分配图片时间
+# =============================================================================
+# 
+# 特点:
+#   - 一次性配音：所有文案一次生成，模型只加载一次，效率高
+#   - 固定停顿：每段配音之间添加固定0.3秒停顿，节奏可控
+#   - 字幕对齐：根据配音实际时长+停顿时间生成精确对齐的字幕
+#   - 图片停留：根据配音总时长自动计算每张图片的展示时间
 #
 # 参数说明:
-#   $1 图片: 图片文件夹/单张图片/空格分隔的图片路径
-#   $2 每张秒数: 每张图片展示时长(秒)，默认2秒。建议: 短文案用2秒，长文案用2.5秒
-#   $3 文案: 用|分隔每段文字
-#   $4 参考音频: 用于克隆声音的音频文件路径
-#   $5 输出视频: 输出文件路径，默认 output.mp4
+#   $1 图片     : 图片文件夹/单张图片/空格分隔的图片路径
+#   $2 每张秒数 : 每张图片展示时长(秒)，默认2秒，会被配音总时长覆盖
+#   $3 文案     : 用|分隔每段文字（不要包含标点符号）
+#   $4 参考音频 : 用于克隆声音的音频文件路径
+#   $5 输出视频 : 输出文件路径，默认 output.mp4
 #
-# 示例:
-#   ./img_to_video_v3.sh '/opt/image/' 2 '文案1|文案2|文案3' ./voice.wav output.mp4
+# 使用示例:
+#   # 基础用法
+#   ./img_to_video_v3.sh '/opt/image/' 2 '文案一|文案二|文案三' './voice.wav' output.mp4
+#
+#   # 完整示例 - 高山流水成语故事
+#   ./img_to_video_v3.sh '/opt/image/' 2 \
+#       '战国时期俞伯牙是著名的琴师琴艺高超|一天伯牙在山间弹琴遇到砍柴的钟子期|子期听出伯牙琴中之意两人成为知音|伯牙弹高山子期曰巍巍乎若泰山|子期病逝后伯牙再无知音可寻|伯牙摔琴断弦高山流水比喻知音难觅' \
+#       '/home/dministrator/video/voice.wav' \
+#       '/opt/image/gaoshan_v3.mp4'
+#
+#   # 使用默认系统音源
+#   ./img_to_video_v3.sh '/opt/image/' 2 '文案一|文案二' '/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav' output.mp4
+#
+# 注意事项:
+#   - 文案不要包含标点符号，会影响配音节奏和字幕对齐
+#   - 配音时长 = 所有文案配音时长 + 开头延迟(0.3秒) + 段间停顿(0.3秒×段数)
+#   - 每张图停留时间 = 配音总时长 ÷ 图片数量
+#   - 字幕会在停顿期间自动隐藏（因为下一段还没开始）
+# =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -22,8 +46,8 @@ TEXT="$3"
 PROMPT_WAV="$4"
 OUTPUT="${5:-output.mp4}"
 
-# 静音参数
-INTRO_SILENCE=0.3  # 每段开头静音
+# 静音参数（与tts_batch_v3.py保持一致）
+INTRO_SILENCE=0.3  # 视频开头延迟
 PAUSE=0.3          # 段间停顿
 
 # 解析文案
@@ -160,24 +184,32 @@ auto_wrap() {
 # 从tts_batch_v3.py生成的时间文件读取
 TIMING_FILE="$AUDIO_DIR/timings.txt"
 
-if [ -f "$TIMING_FILE" ]; then
-    while IFS=' :' read -r idx start end dur; do
-        if [ -z "$idx" ] || [ "$idx" = "#" ]; then
+    if [ -f "$TIMING_FILE" ]; then
+    # 格式: 1: 原始开始 原始结束 配音时长 字幕开始 字幕结束
+    # 读取所有行到数组避免子shell变量问题
+    mapfile -t lines < <(grep -v "^#" "$TIMING_FILE")
+    
+    for line in "${lines[@]}"; do
+        if [ -z "$line" ]; then
             continue
         fi
         
-        text_idx=$(echo "$idx" | tr -d ':')
-        text="${TEXT_ARRAY[$((text_idx-1))]}"
+        idx=$(echo "$line" | awk '{print $1}' | tr -d ':')
+        # 第5字段是字幕开始，第6字段是字幕结束
+        subtitle_start=$(echo "$line" | awk '{print $5}')
+        subtitle_end=$(echo "$line" | awk '{print $6}')
+        
+        text="${TEXT_ARRAY[$((idx-1))]}"
         text=$(echo "$text" | xargs)
         text=$(auto_wrap "$text")
         
-        START_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($start/60), $start%60}")
-        END_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($end/60), $end%60}")
+        START_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($subtitle_start/60), $subtitle_start%60}")
+        END_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($subtitle_end/60), $subtitle_end%60}")
         
         echo "Dialogue: 0,$START_TIME,$END_TIME,Default,,0,0,0,,$text" >> "$SUB_ASS"
         
-        echo "  字幕 $text_idx: $START_TIME -> $END_TIME"
-    done < "$TIMING_FILE"
+        echo "  字幕 $idx: $START_TIME -> $END_TIME"
+    done
 else
     echo "警告: 时间文件不存在，使用简单计算"
     CURRENT_TIME=0
