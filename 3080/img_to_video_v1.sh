@@ -29,6 +29,9 @@ if [ -z "$IMAGES" ] || [ -z "$TEXT" ]; then
     exit 1
 fi
 
+OUTPUT="${4:-output_v1.mp4}"
+BASENAME=$(basename "$OUTPUT" .mp4)
+
 # 处理图片输入
 IMG_LIST=""
 WORK_DIR="/tmp/img_$$"
@@ -80,6 +83,19 @@ echo "使用图片: $IMG_LIST"
 IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
 TOTAL_TEXTS=${#TEXT_ARRAY[@]}
 
+# 验证字幕文案格式：每段10-25个汉字
+for i in "${!TEXT_ARRAY[@]}"; do
+    text="${TEXT_ARRAY[$i]}"
+    chinese_count=$(echo "$text" | grep -oP '\p{Han}' | wc -l)
+    if [ "$chinese_count" -lt 10 ] || [ "$chinese_count" -gt 25 ]; then
+        echo "错误: 字幕文案格式错误"
+        echo "第$((i+1))段文案汉字数为 $chinese_count，需要10-25个汉字"
+        echo "不合规文案: $text"
+        rm -rf "$WORK_DIR"
+        exit 1
+    fi
+done
+
 echo "========================================"
 echo "图片生成视频 + 配音 + 字幕"
 echo "========================================"
@@ -89,10 +105,10 @@ echo "文案: $TOTAL_TEXTS 段"
 echo "输出: $OUTPUT"
 echo "========================================"
 
-# 临时文件
-AUDIO_DIR="/tmp/audios_$$"
+# 临时文件保存到图片同一目录
+AUDIO_DIR="${IMAGES}/audio_${BASENAME}"
 mkdir -p "$AUDIO_DIR"
-SUB_ASS="/tmp/sub_$$.ass"
+SUB_ASS="${IMAGES}/sub_${BASENAME}.ass"
 
 echo ""
 echo "[1/4] 生成配音..."
@@ -138,41 +154,51 @@ ASS_EOF
 # 计算每段字幕时间（和配音同步，每段后加0.3秒延迟）
 CURRENT_TIME=0
 
-# 自动换行函数（根据分辨率动态计算）
+# 自动换行函数（按汉字数计算）
 auto_wrap() {
     local text="$1"
-    local width=${2:-1080}  # 默认1080宽度
+    local max_chinese=15  # 每行最多15个汉字
     
-    # 1080宽度约12个汉字每行，按比例计算
-    local max_len=$((width / 90))
-    if [ $max_len -lt 6 ]; then
-        max_len=6
-    fi
+    # 统计汉字数
+    local chinese_count=$(echo "$text" | grep -oP '\p{Han}' | wc -l)
     
-    local len=${#text}
-    
-    if [ $len -le $max_len ]; then
+    if [ "$chinese_count" -le "$max_chinese" ]; then
         echo "$text"
         return
     fi
     
-    # 计算需要几行
-    local lines=$(( (len + max_len - 1) / max_len ))
+    # 按汉字数换行
     local result=""
+    local chinese=0
+    local current_line=""
     
-    for i in $(seq 0 $((lines-1))); do
-        local start=$((i * max_len))
-        local end=$(((i + 1) * max_len))
-        if [ $end -gt $len ]; then
-            end=$len
+    for ((i=0; i<${#text}; i++)); do
+        local char="${text:$i:1}"
+        current_line+="$char"
+        
+        if [[ "$char" =~ [\p{Han}] ]]; then
+            chinese=$((chinese + 1))
         fi
-        local chunk="${text:$start:$((end-start))}"
-        if [ -n "$result" ]; then
-            result="$result\\N$chunk"
-        else
-            result="$chunk"
+        
+        if [ "$chinese" -eq "$max_chinese" ]; then
+            if [ -n "$result" ]; then
+                result="$result\\N$current_line"
+            else
+                result="$current_line"
+            fi
+            current_line=""
+            chinese=0
         fi
     done
+    
+    if [ -n "$current_line" ]; then
+        if [ -n "$result" ]; then
+            result="$result\\N$current_line"
+        else
+            result="$current_line"
+        fi
+    fi
+    
     echo "$result"
 }
 
@@ -285,5 +311,10 @@ echo "========================================"
 echo "完成！输出: $OUTPUT"
 echo "========================================"
 
-# 清理
-rm -rf "$WORK_DIR" "$AUDIO_DIR" "$SEG_DIR" "$CONCAT_LIST" "$AUDIO_LIST" "$TEMP_VIDEO" "$COMBINED_AAC" "$SUB_ASS"
+# 清理临时文件，保留音频和字幕
+rm -rf "$WORK_DIR" "$SEG_DIR" "$CONCAT_LIST" "$AUDIO_LIST" "$TEMP_VIDEO" "$COMBINED_AAC"
+
+echo ""
+echo "完成! 输出: $OUTPUT"
+echo "配音: $AUDIO_DIR"
+echo "字幕: $SUB_ASS"

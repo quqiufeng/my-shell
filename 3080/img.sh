@@ -44,7 +44,7 @@ echo "Size: ${WIDTH}x${HEIGHT}"
 echo "Output: $OUTPUT_DIR/$OUTPUT"
 
 $HOME/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model $MODEL_DIR/z_image_turbo-Q8_0.gguf \
+  --diffusion-model $MODEL_DIR/z-image-Q5_K_M.gguf \
   --vae $MODEL_DIR/ae.safetensors \
   --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
   -p "$PROMPT" \
