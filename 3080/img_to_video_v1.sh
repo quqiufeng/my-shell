@@ -1,6 +1,18 @@
 #!/bin/bash
 # 图片生成视频 + 配音 + 字幕（多段文案版）
-# 用法: ./img_to_video.sh <图片> <每张秒数> <文案> <参考音频> [输出视频] [延迟]
+#
+# 参数说明:
+#   $1 图片: 图片文件夹/单张图片/空格分隔的图片路径
+#   $2 每张秒数: 每张图片展示时长(秒)，默认2秒
+#   $3 文案: 用|分隔每段文字，如 "第一句|第二句|第三句"
+#   $4 输出视频: 输出文件路径，默认 output.mp4
+#   $5 延迟: 音频延迟，默认0.6秒
+#
+# 模型: CosyVoice-300M-SFT (SFT预设音色，中文女)
+# 注意: 使用 TensorRT 加速需先编译引擎 (见 build_cosy_voice_3080.sh)
+#
+# 示例:
+#   ./img_to_video_v1.sh '/opt/image/story/' 2 '第一句|第二句|第三句' output.mp4
 
 # 保存脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -28,9 +40,6 @@ if [ -z "$IMAGES" ] || [ -z "$TEXT" ]; then
     echo "  ./img_to_video.sh './story/' 2 '第一句|第二句|第三句' ./voice.wav"
     exit 1
 fi
-
-OUTPUT="${4:-output_v1.mp4}"
-BASENAME=$(basename "$OUTPUT" .mp4)
 
 # 处理图片输入
 IMG_LIST=""
@@ -83,19 +92,6 @@ echo "使用图片: $IMG_LIST"
 IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
 TOTAL_TEXTS=${#TEXT_ARRAY[@]}
 
-# 验证字幕文案格式：每段10-25个汉字
-for i in "${!TEXT_ARRAY[@]}"; do
-    text="${TEXT_ARRAY[$i]}"
-    chinese_count=$(echo "$text" | grep -oP '\p{Han}' | wc -l)
-    if [ "$chinese_count" -lt 10 ] || [ "$chinese_count" -gt 25 ]; then
-        echo "错误: 字幕文案格式错误"
-        echo "第$((i+1))段文案汉字数为 $chinese_count，需要10-25个汉字"
-        echo "不合规文案: $text"
-        rm -rf "$WORK_DIR"
-        exit 1
-    fi
-done
-
 echo "========================================"
 echo "图片生成视频 + 配音 + 字幕"
 echo "========================================"
@@ -105,24 +101,31 @@ echo "文案: $TOTAL_TEXTS 段"
 echo "输出: $OUTPUT"
 echo "========================================"
 
-# 临时文件保存到图片同一目录
-AUDIO_DIR="${IMAGES}/audio_${BASENAME}"
+# 临时文件
+AUDIO_DIR="/tmp/audios_$$"
 mkdir -p "$AUDIO_DIR"
-SUB_ASS="${IMAGES}/sub_${BASENAME}.ass"
+SUB_ASS="/tmp/sub_$$.ass"
+
+# 激活 conda
+source $HOME/anaconda3/bin/activate cosyvoice
 
 echo ""
 echo "[1/4] 生成配音..."
 
 # 使用批量配音脚本，模型只加载一次
-cd ~/CosyVoice
-source $HOME/anaconda3/bin/activate cosyvoice
-python3 ~/my-shell/3080/tts_batch.py \
-    "/opt/image/CosyVoice-300M-SFT" \
-    "none" \
+cd $HOME/CosyVoice
+python3 /home/dministrator/my-shell/3080/tts_batch_v1.py \
     "$AUDIO_DIR" \
-    1.0 \
     "${TEXT_ARRAY[@]}"
 
+# 获取每段配音时长
+for i in "${!TEXT_ARRAY[@]}"; do
+    idx=$((i+1))
+    if [ -f "$AUDIO_DIR/$idx.wav" ]; then
+        DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$idx.wav")
+        echo "  配音 $idx 实际时长: ${DURATION}秒"
+    fi
+done
 echo "  配音生成完成"
 
 echo ""
@@ -145,7 +148,7 @@ YCbCr Matrix: None
 # 黑色 = &H000000
 # MarginV: 字幕距离底部距离
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Noto Sans CJK SC Bold,14,&H00FFFFFF,&H00FFFFFF,&H00FFA500,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
+Style: Default,WenQuanYi Zen Hei,14,&H00FFFF,&H00FFFF,&H000000,&H00666666,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -154,51 +157,41 @@ ASS_EOF
 # 计算每段字幕时间（和配音同步，每段后加0.3秒延迟）
 CURRENT_TIME=0
 
-# 自动换行函数（按汉字数计算）
+# 自动换行函数（根据分辨率动态计算）
 auto_wrap() {
     local text="$1"
-    local max_chinese=15  # 每行最多15个汉字
+    local width=${2:-1080}  # 默认1080宽度
     
-    # 统计汉字数
-    local chinese_count=$(echo "$text" | grep -oP '\p{Han}' | wc -l)
+    # 1080宽度约12个汉字每行，按比例计算
+    local max_len=$((width / 90))
+    if [ $max_len -lt 6 ]; then
+        max_len=6
+    fi
     
-    if [ "$chinese_count" -le "$max_chinese" ]; then
+    local len=${#text}
+    
+    if [ $len -le $max_len ]; then
         echo "$text"
         return
     fi
     
-    # 按汉字数换行
+    # 计算需要几行
+    local lines=$(( (len + max_len - 1) / max_len ))
     local result=""
-    local chinese=0
-    local current_line=""
     
-    for ((i=0; i<${#text}; i++)); do
-        local char="${text:$i:1}"
-        current_line+="$char"
-        
-        if [[ "$char" =~ [\p{Han}] ]]; then
-            chinese=$((chinese + 1))
+    for i in $(seq 0 $((lines-1))); do
+        local start=$((i * max_len))
+        local end=$(((i + 1) * max_len))
+        if [ $end -gt $len ]; then
+            end=$len
         fi
-        
-        if [ "$chinese" -eq "$max_chinese" ]; then
-            if [ -n "$result" ]; then
-                result="$result\\N$current_line"
-            else
-                result="$current_line"
-            fi
-            current_line=""
-            chinese=0
+        local chunk="${text:$start:$((end-start))}"
+        if [ -n "$result" ]; then
+            result="$result\\N$chunk"
+        else
+            result="$chunk"
         fi
     done
-    
-    if [ -n "$current_line" ]; then
-        if [ -n "$result" ]; then
-            result="$result\\N$current_line"
-        else
-            result="$current_line"
-        fi
-    fi
-    
     echo "$result"
 }
 
@@ -311,10 +304,5 @@ echo "========================================"
 echo "完成！输出: $OUTPUT"
 echo "========================================"
 
-# 清理临时文件，保留音频和字幕
-rm -rf "$WORK_DIR" "$SEG_DIR" "$CONCAT_LIST" "$AUDIO_LIST" "$TEMP_VIDEO" "$COMBINED_AAC"
-
-echo ""
-echo "完成! 输出: $OUTPUT"
-echo "配音: $AUDIO_DIR"
-echo "字幕: $SUB_ASS"
+# 清理
+rm -rf "$WORK_DIR" "$AUDIO_DIR" "$SEG_DIR" "$CONCAT_LIST" "$AUDIO_LIST" "$TEMP_VIDEO" "$COMBINED_AAC" "$SUB_ASS"
