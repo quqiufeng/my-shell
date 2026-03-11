@@ -62,6 +62,9 @@ fi
 SD_CLI="$HOME/stable-diffusion.cpp/bin/sd-cli"
 MODEL_DIR="/opt/image"
 
+# 使用可用的模型
+DIFFUSION_MODEL="$MODEL_DIR/z_image_turbo-Q6_K.gguf"
+
 # 临时文件
 TEMP_UPSCALE="/tmp/upscale_temp_$$.png"
 
@@ -69,8 +72,8 @@ echo ""
 echo ">>> Step 1/2: 放大到 ${TARGET_WIDTH}x${TARGET_HEIGHT} ..."
 
 cd /opt
-nohup $SD_CLI \
-  --diffusion-model $MODEL_DIR/z_image_turbo-Q8_0.gguf \
+  nohup $SD_CLI \
+  --diffusion-model $DIFFUSION_MODEL \
   --vae $MODEL_DIR/ae.safetensors \
   --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
   -p "high quality, detailed, masterpiece, best quality, ultra clear" \
@@ -100,8 +103,8 @@ fi
 
 echo ">>> Step 2/2: img2img 细修细节 ..."
 
-nohup $SD_CLI \
-  --diffusion-model $MODEL_DIR/z_image_turbo-Q8_0.gguf \
+  nohup $SD_CLI \
+  --diffusion-model $DIFFUSION_MODEL \
   --vae $MODEL_DIR/ae.safetensors \
   --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
   -p "high quality, detailed, masterpiece, best quality, ultra clear, sharp, crisp" \
