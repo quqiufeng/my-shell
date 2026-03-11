@@ -20,6 +20,9 @@ from cosyvoice.cli.cosyvoice import AutoModel
 import torchaudio
 import torch
 
+# 段间停顿时间（秒），控制每段配音之间的静音时长，用于节奏控制和字幕对齐
+PAUSE_SECONDS = 0.3
+
 
 def remove_punctuation(text):
     return re.sub(r"[^\w\s\u4e00-\u9fff]", "", text)
@@ -43,6 +46,8 @@ def main():
 
     audio_segments = []
     sample_rate = cosyvoice.sample_rate
+    pause_samples = int(PAUSE_SECONDS * sample_rate)
+    pause = torch.zeros((1, pause_samples))
 
     for idx, text in enumerate(texts, 1):
         text = text.strip()
@@ -63,9 +68,6 @@ def main():
                 audio_segments.append(j["tts_speech"])
 
     if audio_segments:
-        pause_samples = int(0.3 * sample_rate)
-        pause = torch.zeros((1, pause_samples))
-
         merged = audio_segments[0]
         for seg in audio_segments[1:]:
             merged = torch.cat([merged, pause, seg], dim=1)
@@ -84,7 +86,7 @@ def main():
         duration = seg.shape[1] / sample_rate
         end_time = current_time + duration
         timings.append((start_time, end_time, duration))
-        current_time = end_time + 0.3  # 0.3秒停顿
+        current_time = end_time + PAUSE_SECONDS
 
     # 保存时间信息到文件
     timing_file = f"{output_dir}/timings.txt"
