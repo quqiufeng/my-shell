@@ -9,12 +9,12 @@ from cosyvoice.cli.cosyvoice import AutoModel
 import torchaudio
 
 if __name__ == "__main__":
-    model_dir = "/opt/image"
+    model_dir = "/opt/image/CosyVoice-300M-SFT"
     output_dir = sys.argv[1]
     texts = sys.argv[2:]
 
     print(f"加载模型: {model_dir}")
-    cosyvoice = AutoModel(model_dir=model_dir, load_jit=True, load_trt=True, fp16=True)
+    cosyvoice = AutoModel(model_dir=model_dir, load_jit=True, load_trt=False, fp16=True)
 
     for i, text in enumerate(texts, 1):
         text = text.strip()

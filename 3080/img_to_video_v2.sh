@@ -89,7 +89,7 @@ fi
 echo "图片数量: $TOTAL_IMAGES"
 echo "使用图片: $IMG_LIST"
 
-if [ ! -f "$PROMPT_WAV" ]; then
+if [ "$PROMPT_WAV" != "none" ] && [ ! -f "$PROMPT_WAV" ]; then
     echo "错误: 参考音频不存在: $PROMPT_WAV"
     rm -rf "$WORK_DIR"
     exit 1
@@ -112,10 +112,10 @@ echo "文案: $TOTAL_TEXTS 段"
 echo "输出: $OUTPUT"
 echo "========================================"
 
-# 临时文件
-AUDIO_DIR="/tmp/audios_$$"
+# 临时文件（配音和字幕保存到输出目录）
+AUDIO_DIR="$(dirname "$OUTPUT")/audios_$$"
 mkdir -p "$AUDIO_DIR"
-SUB_ASS="/tmp/sub_$$.ass"
+SUB_ASS="$(dirname "$OUTPUT")/subtitle_$$.ass"
 
 echo ""
 echo "[1/4] 生成配音..."
@@ -124,8 +124,6 @@ echo "[1/4] 生成配音..."
 source /home/dministrator/anaconda3/bin/activate cosyvoice
 cd /home/dministrator/CosyVoice
 python3 /home/dministrator/my-shell/3080/tts_batch_v2.py \
-    "/opt/image" \
-    "$PROMPT_WAV" \
     "$AUDIO_DIR" \
     "${TEXT_ARRAY[@]}"
 
@@ -311,5 +309,5 @@ echo "========================================"
 echo "完成！输出: $OUTPUT"
 echo "========================================"
 
-# 清理
-rm -rf "$WORK_DIR" "$AUDIO_DIR" "$SEG_DIR" "$CONCAT_LIST" "$AUDIO_LIST" "$TEMP_VIDEO" "$COMBINED_AAC" "$SUB_ASS"
+# 清理（保留配音和字幕）
+rm -rf "$WORK_DIR" "$SEG_DIR" "$CONCAT_LIST" "$TEMP_VIDEO" "$COMBINED_AAC"
