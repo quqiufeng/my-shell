@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MODEL_DIR="$HOME/Qwen3.5-9B-Q4_K_M.gguf"
+MODEL_DIR="/opt/image/Qwen3.5-9B-Q4_K_M.gguf"
 LLAMA_SERVER="$HOME/llama.cpp/build/bin/llama-server"
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
