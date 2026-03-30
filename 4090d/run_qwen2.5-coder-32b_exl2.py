@@ -323,8 +323,8 @@ async def chat_completions(request: Request):
                             data = {"choices": [{"delta": {"role": "assistant", "tool_calls": tool_call}, "finish_reason": "tool_calls"}]}
                             yield f"data: {json.dumps(data)}\n\n"
                         else:
-                            # 普通回复，发送 finish_reason: stop
-                            data = {"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": input_ids.shape[-1], "completion_tokens": generated}}
+                            # 普通回复，发送 finish_reason: stop (OpenAI 格式要求 delta 为空对象)
+                            data = {"choices": [{"delta": {}, "finish_reason": "stop"}]}
                             yield f"data: {json.dumps(data)}\n\n"
                     yield "data: [DONE]\n\n"
                     break
@@ -423,15 +423,16 @@ def build_prompt(messages, tools=None):
     if not messages:
         return ""
     
+    # Qwen2.5 工具调用格式
     tools_def = ""
     if tools:
-        tools_def = "\n\nYou have access to functions:\n\n"
+        tools_def = "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n"
         for tool in tools:
             name = tool.get("function", {}).get("name", "")
             desc = tool.get("function", {}).get("description", "")
             params = tool.get("function", {}).get("parameters", {})
-            tools_def += f"function {name}\n{desc}\n\nParameters: {params}\n\n"
-        tools_def += "If you need to call a function, output in JSON format: {\"name\": \"function_name\", \"arguments\": {...}}\n"
+            tools_def += f'{json.dumps({"name": name, "description": desc, "parameters": params})}\n'
+        tools_def += "</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": \"<function-name>\", \"arguments\": <args-json-object>}\n</tool_call>"
     
     prompt = ""
     system_set = False
