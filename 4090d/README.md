@@ -55,60 +55,50 @@ ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
 - **更好的 CUDA 内核优化** - 比原版 llama.cpp 快 20-30%
 - **支持 FlashAttention-2** - 更快的注意力计算
 - **支持 cuBLAS 加速** - 更好的矩阵运算性能
+- **支持投机采样** - 草稿模型加速 50-100%
 - **命令行启动** - 虽然是 GUI 工具，但支持命令行参数
 
 #### 安装
 
 ```bash
-# 下载预编译版本
+# 编译 CUDA 版本
+./build_koboldcpp.sh
+
+# 或下载预编译版本
 wget https://github.com/LostRuins/koboldcpp/releases/download/v1.82/koboldcpp-linux-x64-cuda1210.tar.gz
-
-# 解压
 tar -xzf koboldcpp-linux-x64-cuda1210.tar.gz
-
-# 查看帮助
-./koboldcpp --help
 ```
 
 #### 命令行启动
 
 ```bash
-# 基本启动
-./koboldcpp --model model.gguf --port 11434
-
-# 完整参数（推荐）
-./koboldcpp \
-  --model /opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf \
-  --port 11434 \
-  --gpulayers 80 \
-  --contextsize 65536 \
-  --flashattention \
-  --usecublas \
-  --tensor_split 1.0 \
-  --blasbatchsize 512
+./run_qwen2.5-coder32b_koboldcpp.sh
 ```
 
-#### 关键参数
+#### 48GB 显存优化配置
 
-| 参数 | 说明 | 推荐值 |
-|------|------|--------|
-| `--model` | 模型路径 | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` |
-| `--port` | API 端口 | `11434` |
-| `--gpulayers` | GPU 层数 | `80` |
-| `--contextsize` | 上下文长度 | `65536` |
-| `--flashattention` | 启用 FlashAttention | - |
-| `--usecublas` | 启用 cuBLAS | - |
-| `--blasbatchsize` | 批处理大小 | `512` |
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `--gpulayers` | `80` | 全 GPU 层数 |
+| `--contextsize` | `32768` | 32K 上下文 |
+| `--blasbatchsize` | `512` | 批处理大小 |
+| `--draftmodel` | `qwen2.5-coder-0.5b-instruct-q4_k_m.gguf` | 草稿模型 |
+| `--draftamount` | `8` | 预测 token 数 |
+| `--draftgpulayers` | `999` | 草稿模型 GPU 层数 |
 
 #### 性能对比
 
-| 框架 | 速度 | 特点 |
-|------|------|------|
-| llama.cpp | ~42 tok/s | 通用，兼容性好 |
-| **koboldcpp** | **~55 tok/s** | **更快，优化更好** |
-| ExLlamaV2 | ~100-133 tok/s | 最快，需 EXL2 格式 |
+| 框架 | 速度 | 显存需求 | 特点 |
+|------|------|----------|------|
+| llama.cpp | ~42 tok/s | 20GB | 通用，兼容性好 |
+| **koboldcpp (48GB)** | **80-100+ tok/s** | **48GB** | **草稿模型加速** |
+| ExLlamaV2 | ~100-133 tok/s | 20GB | 最快，需 EXL2 格式 |
 
-**推荐**: 追求速度用 **ExLlamaV2**，追求兼容性用 **koboldcpp**，平衡选择用 **llama.cpp**
+**注意**: koboldcpp 需要 **48GB 显存** 才能发挥最佳性能（80层全GPU + 草稿模型）
+
+**推荐**:
+- 24GB 显存: **llama.cpp** 或 **ExLlamaV2**
+- 48GB+ 显存: **koboldcpp** (可能超越 ExLlamaV2!)
 
 ---
 
