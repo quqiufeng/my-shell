@@ -85,6 +85,20 @@ print(f"IP: {ip}")
 print("==============================")
 sys.stdout.flush()
 
+@app.get("/v1/models")
+async def list_models():
+    return {
+        "object": "list",
+        "data": [{
+            "id": "qwen2.5-coder-32b-exl2",
+            "object": "model",
+            "created": 1677610602,
+            "owned_by": "qwen",
+            "permission": [],
+            "root": "qwen2.5-coder-32b-exl2"
+        }]
+    }
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
     data = await request.json()
@@ -92,6 +106,10 @@ async def chat_completions(request: Request):
     model_name = data.get("model", "qwen2.5-coder-32b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
+    
+    print(f"[REQUEST] stream={stream}, messages count={len(messages)}")
+    if messages:
+        print(f"[REQUEST] last msg: {messages[-1].get('content', '')[:100]}")
     
     prompt = build_prompt(messages)
 
@@ -101,6 +119,7 @@ async def chat_completions(request: Request):
 
     if stream:
         def generate():
+            import json
             eos = False
             generated = 0
             generator.begin_stream(input_ids, settings)
@@ -112,8 +131,10 @@ async def chat_completions(request: Request):
                 tokens = result['chunk_token_ids']
                 
                 if chunk:
-                    generated += tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
-                    yield f"data: {{\"choices\": [ {{\"delta\": {{\"content\": \"{chunk}\"}}, \"finish_reason\": null}} ] }}\n\n"
+                    gen_tokens = tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
+                    generated += gen_tokens
+                    data = {"choices": [{"delta": {"content": chunk}, "finish_reason": None}], "usage": {"prompt_tokens": input_ids.shape[-1], "completion_tokens": generated}}
+                    yield f"data: {json.dumps(data)}\n\n"
                 
                 if eos:
                     yield "data: [DONE]\n\n"
@@ -137,15 +158,29 @@ async def chat_completions(request: Request):
             
             if chunk:
                 full_text += chunk
-                generated += tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
+                gen_tokens = tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
+                generated += gen_tokens
             
             if eos:
                 break
         
         import json
+        import time
         return {
+            "id": f"chatcmpl-{int(time.time()*1000)}",
+            "object": "chat.completion",
+            "created": int(time.time()),
             "model": model_name,
-            "choices": [{"message": {"content": full_text}, "finish_reason": "stop"}]
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": full_text},
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids),
+                "completion_tokens": generated,
+                "total_tokens": len(input_ids) + generated
+            }
         }
 
 
@@ -153,16 +188,24 @@ def build_prompt(messages):
     if not messages:
         return ""
     
-    prompt = ""
+    system_msg = ""
+    last_user_content = ""
+    
     for msg in messages:
         role = msg.get("role", "user")
         content = msg.get("content", "")
         if role == "system":
-            prompt += f"<|im_start|>system\n{content}<|im_end|>\n"
+            system_msg = content
         elif role == "user":
-            prompt += f"<|im_start|>user\n{content}<|im_end|>\n"
-        elif role == "assistant":
-            prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
+            last_user_content = content
+    
+    if not last_user_content:
+        return "<|im_start|>assistant\n"
+    
+    prompt = ""
+    if system_msg:
+        prompt += f"<|im_start|>system\n{system_msg}<|im_end|>\n"
+    prompt += f"<|im_start|>user\n{last_user_content}<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
     return prompt
 
