@@ -26,8 +26,10 @@ echo ""
 # 使用 koboldcpp 的 Makefile 编译 CUDA 版本
 # 关键参数:
 # - LLAMA_CUBLAS=1: 启用 cuBLAS 支持 (不是 LLAMA_CUDA)
+# - CUDA_ARCHITECTURES=89: RTX 4090 的 CUDA 架构 (8.9)
 # - 会自动检测 CUDA 路径
-make -j$(nproc) LLAMA_CUBLAS=1
+echo "编译 CUDA 版本 (RTX 4090, 架构 8.9)..."
+make -j$(nproc) LLAMA_CUBLAS=1 CUDA_ARCHITECTURES=89
 
 echo ""
 echo "=== 编译完成 ==="

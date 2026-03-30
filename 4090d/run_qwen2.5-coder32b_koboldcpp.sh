@@ -4,11 +4,14 @@
 # Qwen2.5-Coder-32B GGUF 模型启动脚本 (koboldcpp 版本)
 # =============================================================================
 
-export LD_LIBRARY_PATH=/opt/cuda/lib64:$LD_LIBRARY_PATH
+# 强制使用系统 libstdc++，避免 miniconda 的版本不兼容
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/opt/cuda/lib64:$LD_LIBRARY_PATH
+# 禁用 miniconda 的 libstdc++
+unset LD_PRELOAD
 
 MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf"
 MODEL_NAME="qwen2.5-coder-32b-instruct-q4_k_m.gguf"
-CTX_SIZE=65536
+CTX_SIZE=32768
 
 if [ ! -f "$MODEL_DIR" ]; then
   echo "错误: 模型文件不存在: $MODEL_DIR"
@@ -46,7 +49,7 @@ cd "$KOBOLDCPP_DIR"
 # --flashattention: 启用 FlashAttention
 # --usecublas: 启用 cuBLAS 加速
 # --nomodel: 命令行模式（无 GUI）
-python3 koboldcpp.py \
+/usr/bin/python3 koboldcpp.py \
   --model "$MODEL_DIR" \
   --port 11434 \
   --gpulayers 80 \
