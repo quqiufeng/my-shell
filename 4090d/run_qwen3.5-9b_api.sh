@@ -24,7 +24,8 @@ $LLAMA_SERVER \
   --cache-type-v q4_0 \
   --threads 14 \
   --log-disable \
-  --jinja &
+  --jinja \
+  --temp 0 &
 
 sleep 40
 

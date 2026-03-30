@@ -40,4 +40,5 @@ $LLAMA_SERVER \
   --threads 12 \
   --parallel 1 \
   --n-predict 4096 \
-  --jinja
+  --jinja \
+  --temp 0

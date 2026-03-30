@@ -31,7 +31,8 @@ $LLAMA_SERVER \
   --prio-batch 3 \
   --no-perf \
   --log-disable \
-  --jinja &
+  --jinja \
+  --temp 0 &
 
 sleep 40
 
