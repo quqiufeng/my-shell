@@ -2,13 +2,13 @@
 
 export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
 
-MODEL_DIR="/opt/gguf/Qwen3.5-9B-Q6_K.gguf"
+MODEL_DIR="/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
 echo "=============================="
-echo "启动 Qwen3.5-9B API 服务"
+echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务"
 echo "地址: http://0.0.0.0:11434"
-echo "上下文: 65536"
+echo "上下文: 32768"
 echo "GPU层数: 全部"
 echo "=============================="
 
@@ -17,7 +17,7 @@ $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port 11434 \
   --n-gpu-layers 99 \
-  --ctx-size 65536 \
+  --ctx-size 32768 \
   --batch-size 4096 \
   --flash-attn on \
   --cache-type-k q4_0 \

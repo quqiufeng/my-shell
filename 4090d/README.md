@@ -52,21 +52,160 @@ ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
 
 | 脚本 | 模型 | 路径 | 功能 | 性能 |
 |------|------|------|------|------|
-| `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | ~40 tokens/s |
-| `run_qwen3.5-9b_api.sh` | Qwen3.5-9B | `/opt/gguf/Qwen3.5-9B-Q6_K.gguf` | 通用对话 | ~94 tokens/s |
-| `run_qwq32b_api.sh` | QwQ-32B | `/opt/gguf/QwQ-32B-Q4_K_M.gguf` | 推理/数学/代码（带思考能力） | ~20 tokens/s |
-| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B EXL2** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~170 tokens/s** |
-| `chat.py` | Web Chat UI | - | Gradio 网页聊天界面 | 左右布局 |
+| `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B (llama.cpp) | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | **~42 tokens/s** |
+| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B (ExLlamaV2)** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~100-230 tokens/s** |
+| `run_qwen3.5-9b_api.sh` | **Qwen3.5-9B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | **~110 tok/s** |
+| `run_qwen3.5-27b-claude-46-opus_reasoning_api.sh` | **Qwen3.5-27B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUFF/Qwen3.5-27B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | ~41 tokens/s |
 
-### 启动方式
+---
 
+### 2.1 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled
+
+基于 Qwen3.5-9B 微调的推理增强模型，蒸馏 Claude 4.6 Opus 思维链模式。
+
+#### 模型信息
+- **基础模型**: Qwen3.5-9B
+- **微调方式**: SFT + LoRA，蒸馏 Claude 4.6 Opus 推理模式
+- **量化方式**: Q4_K_M GGUF
+- **模型大小**: 5.3GB
+- **上下文**: 32768
+
+#### 启动脚本
 ```bash
-# 1. 启动大模型 API 服务
-python3 run_qwen2.5-coder-32b_exl2.py
-
-# 2. 启动 Web Chat UI (Streamlit)
-python3 -m streamlit run chat.py --server.port 8501 --server.address 0.0.0.0 --browser.gatherUsageStats=false --server.headless=true
+./run_qwen3.5-9b_api.sh
 ```
+
+#### 运行参数
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `--n-gpu-layers` | 99 | GPU 层数 |
+| `--ctx-size` | 32768 | 上下文大小 |
+| `--batch-size` | 4096 | 批处理大小 |
+| `--flash-attn` | on | Flash Attention |
+| `--cache-type-k/v` | q4_0 | KV 缓存量化 |
+| `--threads` | 14 | CPU 线程数 |
+
+#### 性能表现
+| 测试任务 | token数 | 时间 | 速度 |
+|----------|---------|------|------|
+| 快速排序 | 800 | 7.22s | **110.8 tok/s** |
+| 红黑树 | 800 | 7.21s | **111.0 tok/s** |
+| 阻塞队列 | 800 | 7.19s | **111.3 tok/s** |
+
+---
+
+### 2.2 Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2
+
+基于 Qwen3.5-27B 微调的推理增强模型，蒸馏 Claude 4.6 Opus 思维链模式。
+
+#### 模型信息
+- **基础模型**: Qwen3.5-27B
+- **微调方式**: SFT + LoRA，蒸馏 Claude 4.6 Opus 推理模式
+- **量化方式**: Q4_K_M GGUF
+- **模型大小**: 16GB
+- **上下文**: 262144 (实际可用 65536)
+
+#### 启动脚本
+```bash
+./run_qwen3.5-27b-claude-46-opus_reasoning_api.sh
+```
+
+#### 运行参数
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `-c` | 262144 | 上下文大小 |
+| `-ngl` | 99 | GPU 层数 |
+| `--flash-attn` | on | Flash Attention |
+| `--batch-size` | 4096 | 批处理大小 |
+| `--ubatch-size` | 512 | 物理批处理大小 |
+| `--parallel` | 4 | 并行数 |
+| `--prio` | 3 | 进程优先级 |
+| `--threads` | 14 | CPU 线程数 |
+| `--cache-type-k/v` | q4_0 | KV 缓存量化 |
+
+#### 性能表现
+| 测试任务 | 速度 |
+|----------|------|
+| 综合测试 | **~41 tok/s** |
+
+---
+
+### 2.2 Qwen2.5-Coder-32B (ExLlamaV2 + 投机解码)
+
+基于 ExLlamaV2 框架的推理服务，使用投机解码加速。
+
+#### 模型信息
+- **基础模型**: Qwen2.5-Coder-32B
+- **量化方式**: EXL2 4bit
+- **主模型**: `/opt/gguf/exl2_4_0`
+- **草稿模型**: `/opt/gguf/Qwen2.5-Coder-0.5B-exl2`
+- **加速技术**: 投机解码 (Speculative Decoding)
+
+#### 启动脚本
+```bash
+python3 run_qwen2.5-coder-32b_exl2.py
+```
+
+#### 核心参数
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `MAX_SEQ_LEN` | 32768 | 最大序列长度 |
+| `NUM_SPECULATIVE_TOKENS` | 6 | 投机 token 数 |
+| `no_flash_attn` | False | 启用 FlashAttention |
+| `no_sdpa` | False | 强制使用 FlashAttention |
+| `KV Cache` | Q4 | 量化缓存 |
+
+#### 性能表现
+| 测试任务 | 时间 | 速度 |
+|----------|------|------|
+| 快速排序 | 12.33s | **117.6 tok/s** |
+| 红黑树 | 14.78s | **229.2 tok/s** |
+| 阻塞队列 | 12.38s | **156.7 tok/s** |
+
+---
+
+### 2.3 Qwen2.5-Coder-32B (llama.cpp GGUF)
+
+基于 llama.cpp 的 Qwen2.5-Coder-32B 推理服务。
+
+#### 模型信息
+- **基础模型**: Qwen2.5-Coder-32B
+- **量化方式**: Q4_K_M GGUF
+- **模型路径**: `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf`
+- **模型大小**: 19GB
+
+#### 启动脚本
+```bash
+./run_qwen2.5-coder32b_api.sh
+```
+
+#### 运行参数
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `--n-gpu-layers` | 80 | GPU 层数 |
+| `--ctx-size` | 65536 | 上下文大小 |
+| `--batch-size` | 1024 | 批处理大小 |
+| `--ubatch-size` | 512 | 物理批处理大小 |
+| `--flash-attn` | on | Flash Attention |
+| `--cache-type-k/v` | q4_0 | KV 缓存量化 |
+| `--threads` | 14 | CPU 线程数 |
+| `--no-mmap` | - | 禁用内存映射 |
+| `--mlock` | - | 锁定内存 |
+
+#### 性能表现
+| 测试任务 | token数 | 时间 | 速度 |
+|----------|---------|------|------|
+| 快速排序 | 305 | 7.34s | **41.6 tok/s** |
+| 红黑树 | 800 | 19.05s | **42.0 tok/s** |
+| 阻塞队列 | 584 | 13.93s | **41.9 tok/s** |
+
+#### 性能对比
+| 模型 | 框架 | 加速技术 | 速度 |
+|------|------|----------|------|
+| Qwen3.5-9B-Claude-4.6-Opus | llama.cpp GGUF | 无 | **~110 tok/s** |
+| Qwen2.5-Coder-32B | llama.cpp GGUF | 无 | ~42 tok/s |
+| Qwen2.5-Coder-32B | ExLlamaV2 | 投机解码 | **100-230 tok/s** |
+| Qwen3.5-27B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~41 tok/s |
 
 **⚠️ 重要：安装 FlashAttention (显著提升性能 50%+)**
 
