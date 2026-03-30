@@ -1,20 +1,15 @@
 #!/bin/bash
 
+# =============================================================================
+# Qwen2.5-Coder-32B GGUF 模型启动脚本 (直接对接 OpenCode，无需 LiteLLM)
+# =============================================================================
+
 export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
 
-MODEL_TYPE="${1:-q4}"
-
-if [ "$MODEL_TYPE" = "q3" ]; then
-  MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q3_k_m.gguf"
-  MODEL_NAME="qwen2.5-coder-32b-instruct-q3_k_m.gguf"
-  KV_CACHE="q4_0"
-  CTX_SIZE=65536
-else
-  MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf"
-  MODEL_NAME="qwen2.5-coder-32b-instruct-q4_k_m.gguf"
-  KV_CACHE="q4_0"
-  CTX_SIZE=65536
-fi
+MODEL_DIR="/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf"
+MODEL_NAME="qwen2.5-coder-32b-instruct-q4_k_m.gguf"
+KV_CACHE="q4_0"
+CTX_SIZE=65536
 
 if [ ! -f "$MODEL_DIR" ]; then
   echo "错误: 模型文件不存在: $MODEL_DIR"
@@ -23,14 +18,21 @@ fi
 
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
+# 日志文件
+LOG_FILE="/opt/my-shell/4090d/qwen_api.log"
+
 echo "=============================="
 echo "启动 Qwen2.5-Coder-32B API 服务"
 echo "模型: $MODEL_NAME"
 echo "地址: http://0.0.0.0:11434"
 echo "上下文: $CTX_SIZE"
-echo "GPU层数: 99"
+echo "GPU层数: 80"
 echo "=============================="
 
+# 启动 llama-server
+# 关键参数:
+# --jinja: 启用 Jinja 模板，正确处理工具调用
+# --temp 0: 降低温度，防止随机性导致 JSON 解析失败
 $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
@@ -47,18 +49,20 @@ $LLAMA_SERVER \
   --mlock \
   --jinja \
   --temp 0 \
-  2>&1 | tee /opt/my-shell/4090d/qwen_api.log &
+  2>&1 | tee "$LOG_FILE" &
 
-sleep 40
+LLAMA_PID=$!
 
-export OPENAI_API_KEY=dummy
-nohup litellm \
-  --model openai/qwen2.5-coder \
-  --api_base http://localhost:11434/v1 \
-  --port 4000 \
-  > /tmp/litellm.log 2>&1 &
+# 等待服务启动
+sleep 5
 
-sleep 3
+# 检查服务是否启动成功
+for i in {1..30}; do
+  if curl -s http://localhost:11434/v1/models > /dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
 INSTANCE_ID=${XGC_INSTANCE_ID:-$(hostname)}
 
@@ -66,26 +70,51 @@ echo ""
 echo "=============================="
 echo "服务已启动!"
 echo "=============================="
-echo "llama.cpp: http://localhost:11434"
-echo "LiteLLM:   http://localhost:4000 (OpenCode用这个)"
-echo "对外地址:  http://${INSTANCE_ID}-4000.container.x-gpu.com/v1/"
+echo "API 地址: http://localhost:11434"
+echo "对外地址: http://${INSTANCE_ID}-11434.container.x-gpu.com/v1/"
+echo "日志文件: $LOG_FILE"
+echo "PID: $LLAMA_PID"
 echo "=============================="
 echo ""
 echo "OpenCode 配置:"
-echo '  BaseURL: http://localhost:4000/v1'
-echo "  Model:   openai/qwen2.5-coder"
+echo '{'
+echo '  "$schema": "https://opencode.ai/config.json",'
+echo '  "model": "openai/qwen2.5-coder-32b-gguf",'
+echo '  "provider": {'
+echo '    "openai": {'
+echo '      "npm": "@ai-sdk/openai-compatible",'
+echo '      "name": "llama.cpp (local)",'
+echo '      "options": {'
+echo '        "baseURL": "http://localhost:11434/v1",'
+echo '        "apiKey": "dummy"'
+echo '      },'
+echo '      "models": {'
+echo '        "qwen2.5-coder-32b-gguf": {'
+echo '          "name": "Qwen2.5-Coder-32B-GGUF",'
+echo '          "maxContextWindow": 65536,'
+echo '          "maxOutputTokens": 8192'
+echo '        }'
+echo '      }'
+echo '    }'
+echo '  }'
+echo '}'
 echo ""
 echo "调试命令:"
-echo "curl -s http://localhost:4000/v1/chat/completions \\"
+echo "curl -s http://localhost:11434/v1/chat/completions \\"
 echo '  -H "Content-Type: application/json" \\'
-echo '  -d '"'"'{"model": "openai/qwen2.5-coder", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
+echo '  -d '"'"'{"model": "qwen2.5-coder-32b-gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
 echo ""
 echo "性能参数:"
 echo "  模型: $MODEL_NAME"
 echo "  上下文: $CTX_SIZE"
-echo "  GPU层数: 99"
+echo "  GPU层数: 80"
 echo "  KV缓存: $KV_CACHE"
 echo "  Flash Attention: on"
+echo "  Jinja模板: on"
+echo "  Temperature: 0"
+
+# 保存 PID 到文件
+echo $LLAMA_PID > /tmp/llama_server.pid
 
 # ==========================================
 # 性能测试 (使用 usage 字段获取准确 token 数)
@@ -94,175 +123,7 @@ echo "  Flash Attention: on"
 # python3 -c "
 # import requests, time
 # url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个红黑树'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试2: B+树
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个B+树'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试3: A*寻路
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个A*寻路算法'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试4: 布隆过滤器
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个布隆过滤器'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试5: LRU-K缓存
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个LRU-K缓存淘汰算法'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试6: 阻塞队列
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个线程安全的阻塞队列'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试7: CAS队列
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个无锁CAS队列'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试8: 外排序
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个支持亿级数据排序的外排序算法'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试9: 协程调度器
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个协程调度器'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试10: vector容器
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个STL风格的vector容器'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试11: 堆排序
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个堆排序'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试12: Dijkstra
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个图的最短路径Dijkstra算法'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试13: 布隆过滤器(重复)
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个布隆过滤器'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试14: 令牌桶
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个限流令牌桶算法'}], 'max_tokens': 800, 'stream': False}
-# t = time.time()
-# r = requests.post(url, json=data, timeout=60).json()
-# elapsed = time.time() - t
-# gen_tokens = r['usage']['completion_tokens']
-# print(f'{gen_tokens} tokens / {elapsed:.2f}s = {gen_tokens/elapsed:.1f} tokens/s')
-# "
-
-# 测试15: 一致性哈希
-# python3 -c "
-# import requests, time
-# url = 'http://localhost:11434/v1/chat/completions'
-# data = {'model': '"$MODEL_NAME"', 'messages': [{'role': 'user', 'content': '用Python实现一个一致性哈希算法'}], 'max_tokens': 800, 'stream': False}
+# data = {'model': 'qwen2.5-coder-32b-gguf', 'messages': [{'role': 'user', 'content': '用Python实现一个红黑树'}], 'max_tokens': 800, 'stream': False}
 # t = time.time()
 # r = requests.post(url, json=data, timeout=60).json()
 # elapsed = time.time() - t
