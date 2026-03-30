@@ -1,27 +1,19 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "llama.cpp/qwen2.5-coder-32b",
+  "model": "openai/qwen2.5-coder-32b-exl2",
   "provider": {
-    "llama.cpp": {
+    "openai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "ExLlamaV2 (local)",
       "options": {
-        "baseURL": "http://localhost:4000/v1"
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "dummy"
       },
       "models": {
-        "qwen2.5-coder-32b": {
-          "name": "openai/qwen2.5-coder",
-          "maxContextWindow": 32768,
-          "maxOutputTokens": 16384,
-          "options": {
-            "num_ctx": 32768
-          }
-        },
         "qwen2.5-coder-32b-exl2": {
-          "name": "openai/qwen2.5-coder-32b-exl2",
+          "name": "Qwen2.5-Coder-32B-EXL2",
           "maxContextWindow": 32768,
-          "maxOutputTokens": 8192,
-          "options": {
-            "num_ctx": 32768
-          }
+          "maxOutputTokens": 8192
         }
       }
     }
