@@ -39,4 +39,5 @@ $LLAMA_SERVER \
   --flash-attn on \
   --threads 12 \
   --parallel 1 \
-  --n-predict 4096
+  --n-predict 4096 \
+  --jinja

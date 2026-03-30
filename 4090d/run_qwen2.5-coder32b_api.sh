@@ -45,9 +45,19 @@ $LLAMA_SERVER \
   --threads 14 \
   --no-mmap \
   --mlock \
+  --jinja \
   2>&1 | tee /opt/my-shell/4090d/qwen_api.log &
 
 sleep 40
+
+export OPENAI_API_KEY=dummy
+nohup litellm \
+  --model openai/qwen2.5-coder \
+  --api_base http://localhost:11434/v1 \
+  --port 4000 \
+  > /tmp/litellm.log 2>&1 &
+
+sleep 3
 
 INSTANCE_ID=${XGC_INSTANCE_ID:-$(hostname)}
 
@@ -55,14 +65,19 @@ echo ""
 echo "=============================="
 echo "服务已启动!"
 echo "=============================="
-echo "对内地址: http://localhost:11434"
-echo "对外地址: http://${INSTANCE_ID}-11434.container.x-gpu.com/v1/"
+echo "llama.cpp: http://localhost:11434"
+echo "LiteLLM:   http://localhost:4000 (OpenCode用这个)"
+echo "对外地址:  http://${INSTANCE_ID}-4000.container.x-gpu.com/v1/"
 echo "=============================="
 echo ""
+echo "OpenCode 配置:"
+echo '  BaseURL: http://localhost:4000/v1'
+echo "  Model:   openai/qwen2.5-coder"
+echo ""
 echo "调试命令:"
-echo "curl -s http://localhost:11434/v1/chat/completions \\"
+echo "curl -s http://localhost:4000/v1/chat/completions \\"
 echo '  -H "Content-Type: application/json" \\'
-echo '  -d '"'"'{"model": "'"$MODEL_NAME"'", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
+echo '  -d '"'"'{"model": "openai/qwen2.5-coder", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
 echo ""
 echo "性能参数:"
 echo "  模型: $MODEL_NAME"

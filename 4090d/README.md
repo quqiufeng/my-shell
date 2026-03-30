@@ -1263,3 +1263,118 @@ curl -s http://localhost:11434/slots | grep -o '"n_ctx":[0-9]*'
 # 使用 OpenCode
 opencode -m llama.cpp/qwen2.5-coder-32b
 
+---
+
+## 10. OpenCode + LiteLLM 方案（解决循环调用问题）
+
+### 问题背景
+
+OpenCode 直接连接 llama.cpp 时，存在以下问题：
+1. **循环调用**：模型输出后 OpenCode 不断重复发送请求
+2. **工具调用失败**：无法正确触发 Write/Edit 等工具
+
+这是 OpenCode 工具的已知 bug（GitHub Issue #17052, #16218 等）。
+
+### 解决方案：LiteLLM 代理
+
+LiteLLM 是一个 LLM 网关，可以：
+1. 标准化 OpenAI API 格式
+2. 自动处理工具调用参数
+3. 解决协议兼容性问题
+
+### 安装 LiteLLM
+
+```bash
+pip install litellm -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install 'litellm[proxy]' -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 启动服务（已集成到脚本）
+
+脚本 `run_qwen2.5-coder32b_api.sh` 已自动启动 LiteLLM：
+
+```bash
+./run_qwen2.5-coder32b_api.sh
+```
+
+启动后会同时运行：
+- **llama.cpp**: `http://localhost:11434` (原始 API)
+- **LiteLLM**: `http://localhost:4000` (标准化 API，OpenCode 用这个)
+
+### OpenCode 配置
+
+编辑 `~/.config/opencode/opencode.json`：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "llama.cpp/qwen2.5-coder-32b",
+  "provider": {
+    "llama.cpp": {
+      "options": {
+        "baseURL": "http://localhost:4000/v1"
+      },
+      "models": {
+        "qwen2.5-coder-32b": {
+          "name": "openai/qwen2.5-coder",
+          "maxContextWindow": 65536,
+          "maxOutputTokens": 16384,
+          "options": {
+            "num_ctx": 65536
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**关键配置**：
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| `baseURL` | `http://localhost:4000/v1` | LiteLLM 端口 |
+| `model name` | `openai/qwen2.5-coder` | LiteLLM 模型名 |
+
+### 使用方法
+
+```bash
+# 启动服务（自动启动 llama.cpp + LiteLLM）
+./run_qwen2.5-coder32b_api.sh
+
+# 测试 OpenCode
+opencode run -m llama.cpp/qwen2.5-coder-32b "用Python写一个快速排序"
+```
+
+### 手动启动 LiteLLM（可选）
+
+如果需要单独启动：
+
+```bash
+# 设置 API Key（任意值即可）
+export OPENAI_API_KEY=dummy
+
+# 启动 LiteLLM 代理
+litellm --model openai/qwen2.5-coder --api_base http://localhost:11434/v1 --port 4000
+```
+
+### 重要：必须加 --jinja 参数
+
+llama.cpp 启动时必须加 `--jinja` 参数启用 Jinja 模板，否则模型无法正确处理工具调用。
+
+脚本已自动添加此参数：
+```bash
+llama-server ... --jinja
+```
+
+### 架构图
+
+```
+OpenCode (localhost:4000)
+       ↓
+   LiteLLM Proxy (转换协议)
+       ↓
+llama.cpp (localhost:11434) --jinja
+       ↓
+Qwen2.5-Coder-32B GGUF
+```
+

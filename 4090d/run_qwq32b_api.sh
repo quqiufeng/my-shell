@@ -27,7 +27,8 @@ $LLAMA_SERVER \
   --top-p 0.95 \
   --min-p 0.05 \
   --repeat-penalty 1.0 \
-  --log-disable &
+  --log-disable \
+  --jinja &
 
 sleep 40
 
