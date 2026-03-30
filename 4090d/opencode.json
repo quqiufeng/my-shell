@@ -9,10 +9,18 @@
       "models": {
         "qwen2.5-coder-32b": {
           "name": "openai/qwen2.5-coder",
-          "maxContextWindow": 65536,
+          "maxContextWindow": 32768,
           "maxOutputTokens": 16384,
           "options": {
-            "num_ctx": 65536
+            "num_ctx": 32768
+          }
+        },
+        "qwen2.5-coder-32b-exl2": {
+          "name": "openai/qwen2.5-coder-32b-exl2",
+          "maxContextWindow": 32768,
+          "maxOutputTokens": 8192,
+          "options": {
+            "num_ctx": 32768
           }
         }
       }

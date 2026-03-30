@@ -103,15 +103,16 @@ async def list_models():
 async def chat_completions(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
+    tools = data.get("tools", [])
     model_name = data.get("model", "qwen2.5-coder-32b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
     
-    print(f"[REQUEST] stream={stream}, messages count={len(messages)}")
+    print(f"[REQUEST] stream={stream}, messages count={len(messages)}, tools={len(tools)}")
     if messages:
         print(f"[REQUEST] last msg: {messages[-1].get('content', '')[:100]}")
     
-    prompt = build_prompt(messages)
+    prompt = build_prompt(messages, tools)
 
     input_ids = tokenizer.encode(prompt)
     if isinstance(input_ids, tuple):
@@ -120,8 +121,11 @@ async def chat_completions(request: Request):
     if stream:
         def generate():
             import json
+            import time
             eos = False
             generated = 0
+            full_output = ""
+            tool_calls_sent = False
             generator.begin_stream(input_ids, settings)
             
             while generated < max_tokens:
@@ -133,14 +137,45 @@ async def chat_completions(request: Request):
                 if chunk:
                     gen_tokens = tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
                     generated += gen_tokens
+                    full_output += chunk
+                    
+                    if not tool_calls_sent:
+                        try:
+                            data = json.loads(full_output.strip())
+                            if isinstance(data, dict) and "name" in data and "arguments" in data:
+                                tool_call = [{
+                                    "id": f"call_{int(time.time()*1000)}",
+                                    "type": "function",
+                                    "function": {
+                                        "name": data["name"],
+                                        "arguments": json.dumps(data["arguments"]) if isinstance(data["arguments"], dict) else str(data["arguments"])
+                                    }
+                                }]
+                                data = {"choices": [{"delta": {"role": "assistant", "tool_calls": tool_call}, "finish_reason": "tool_calls"}]}
+                                yield f"data: {json.dumps(data)}\n\n"
+                                tool_calls_sent = True
+                                continue
+                        except:
+                            pass
+                    
                     data = {"choices": [{"delta": {"content": chunk}, "finish_reason": None}], "usage": {"prompt_tokens": input_ids.shape[-1], "completion_tokens": generated}}
                     yield f"data: {json.dumps(data)}\n\n"
                 
                 if eos:
+                    if not tool_calls_sent:
+                        tool_calls = parse_tool_calls(full_output) if 'parse_tool_calls' in globals() else None
+                        if tool_calls:
+                            data = {"choices": [{"delta": {"role": "assistant", "tool_calls": tool_call}, "finish_reason": "tool_calls"}]}
+                            yield f"data: {json.dumps(data)}\n\n"
                     yield "data: [DONE]\n\n"
                     break
             
             if not eos:
+                if not tool_calls_sent:
+                    tool_calls = parse_tool_calls(full_output) if 'parse_tool_calls' in globals() else None
+                    if tool_calls:
+                        data = {"choices": [{"delta": {"role": "assistant", "tool_calls": tool_calls}, "finish_reason": "tool_calls"}]}
+                        yield f"data: {json.dumps(data)}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
@@ -166,30 +201,81 @@ async def chat_completions(request: Request):
         
         import json
         import time
-        return {
-            "id": f"chatcmpl-{int(time.time()*1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": model_name,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": full_text},
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "prompt_tokens": input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids),
-                "completion_tokens": generated,
-                "total_tokens": len(input_ids) + generated
+        
+        def parse_tool_calls(text):
+            try:
+                data = json.loads(text.strip())
+                if isinstance(data, dict) and "name" in data and "arguments" in data:
+                    return [{
+                        "id": f"call_{int(time.time()*1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": data["name"],
+                            "arguments": json.dumps(data["arguments"]) if isinstance(data["arguments"], dict) else str(data["arguments"])
+                        }
+                    }]
+            except:
+                pass
+            return None
+        
+        tool_calls = parse_tool_calls(full_text)
+        
+        if tool_calls:
+            response = {
+                "id": f"chatcmpl-{int(time.time()*1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model_name,
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "tool_calls": tool_calls},
+                    "finish_reason": "tool_calls"
+                }],
+                "usage": {
+                    "prompt_tokens": input_ids.shape[-1],
+                    "completion_tokens": generated,
+                    "total_tokens": input_ids.shape[-1] + generated
+                }
             }
-        }
+        else:
+            response = {
+                "id": f"chatcmpl-{int(time.time()*1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model_name,
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": full_text},
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids),
+                    "completion_tokens": generated,
+                    "total_tokens": (input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids)) + generated
+                }
+            }
+        
+        return response
 
 
-def build_prompt(messages):
+def build_prompt(messages, tools=None):
+    if tools is None:
+        tools = []
     if not messages:
         return ""
     
     system_msg = ""
     last_user_content = ""
+    
+    tools_def = ""
+    if tools:
+        tools_def = "\n\nYou have access to functions:\n\n"
+        for tool in tools:
+            name = tool.get("function", {}).get("name", "")
+            desc = tool.get("function", {}).get("description", "")
+            params = tool.get("function", {}).get("parameters", {})
+            tools_def += f"function {name}\n{desc}\n\nParameters: {params}\n\n"
+        tools_def += "If you need to call a function, output in JSON format: {\"name\": \"function_name\", \"arguments\": {...}}\n"
     
     for msg in messages:
         role = msg.get("role", "user")
@@ -204,12 +290,28 @@ def build_prompt(messages):
     
     prompt = ""
     if system_msg:
-        prompt += f"<|im_start|>system\n{system_msg}<|im_end|>\n"
+        prompt += f"<|im_start|>system\n{system_msg}{tools_def}<|im_end|>\n"
+    else:
+        prompt += f"<|im_start|>system\nYou are a helpful coding assistant.{tools_def}<|im_end|>\n"
     prompt += f"<|im_start|>user\n{last_user_content}<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
     return prompt
 
 if __name__ == "__main__":
+    import threading
+    
+    def start_litellm():
+        import os
+        os.environ["OPENAI_API_KEY"] = "dummy"
+        import subprocess
+        subprocess.Popen([
+            "litellm",
+            "--model", "openai/qwen2.5-coder-32b-exl2",
+            "--api_base", "http://localhost:11434/v1",
+            "--port", "4000"
+        ])
+    
+    threading.Thread(target=start_litellm, daemon=True).start()
     uvicorn.run(app, host="0.0.0.0", port=PORT)
 
 

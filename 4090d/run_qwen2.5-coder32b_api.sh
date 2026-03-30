@@ -46,6 +46,7 @@ $LLAMA_SERVER \
   --no-mmap \
   --mlock \
   --jinja \
+  --temp 0 \
   2>&1 | tee /opt/my-shell/4090d/qwen_api.log &
 
 sleep 40
