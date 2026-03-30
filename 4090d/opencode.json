@@ -1,25 +1,26 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "qwen2.5-coder-32b-gguf",
+  "model": "llama.cpp/qwen2.5-coder-32b",
   "provider": {
     "llama.cpp": {
-      "name": "llama-server (local)",
       "options": {
         "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "qwen2.5-coder-32b-gguf": {
-          "name": "Qwen2.5-Coder-32B-GGUF",
-          "limit": {
-            "context": 65536,
-            "output": 8192
+        "qwen2.5-coder-32b": {
+          "name": "qwen2.5-coder-32b-instruct-q4_k_m.gguf",
+          "maxContextWindow": 65536,
+          "maxOutputTokens": 16384,
+          "options": {
+            "num_ctx": 65536
           }
         },
         "qwen2.5-coder-32b-exl2": {
-          "name": "Qwen2.5-Coder-32B-ExLlamaV2",
-          "limit": {
-            "context": 32768,
-            "output": 8192
+          "name": "qwen2.5-coder-32b-exl2",
+          "maxContextWindow": 32768,
+          "maxOutputTokens": 8192,
+          "options": {
+            "num_ctx": 32768
           }
         }
       }

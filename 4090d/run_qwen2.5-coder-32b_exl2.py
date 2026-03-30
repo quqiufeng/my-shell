@@ -89,11 +89,15 @@ sys.stdout.flush()
 async def chat_completions(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
-    prompt = messages[-1]["content"] if messages else ""
+    model_name = data.get("model", "qwen2.5-coder-32b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
     
+    prompt = build_prompt(messages)
+
     input_ids = tokenizer.encode(prompt)
+    if isinstance(input_ids, tuple):
+        input_ids = input_ids[0]
 
     if stream:
         def generate():
@@ -108,7 +112,7 @@ async def chat_completions(request: Request):
                 tokens = result['chunk_token_ids']
                 
                 if chunk:
-                    generated += tokens.shape[1]
+                    generated += tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
                     yield f"data: {{\"choices\": [ {{\"delta\": {{\"content\": \"{chunk}\"}}, \"finish_reason\": null}} ] }}\n\n"
                 
                 if eos:
@@ -133,13 +137,34 @@ async def chat_completions(request: Request):
             
             if chunk:
                 full_text += chunk
-                generated += tokens.shape[1]
+                generated += tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
             
             if eos:
                 break
         
         import json
-        return {"choices": [{"message": {"content": full_text}, "finish_reason": "stop"}]}
+        return {
+            "model": model_name,
+            "choices": [{"message": {"content": full_text}, "finish_reason": "stop"}]
+        }
+
+
+def build_prompt(messages):
+    if not messages:
+        return ""
+    
+    prompt = ""
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            prompt += f"<|im_start|>system\n{content}<|im_end|>\n"
+        elif role == "user":
+            prompt += f"<|im_start|>user\n{content}<|im_end|>\n"
+        elif role == "assistant":
+            prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
+    prompt += "<|im_start|>assistant\n"
+    return prompt
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
