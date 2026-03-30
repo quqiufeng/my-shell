@@ -4,15 +4,20 @@
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "ExLlamaV2 (local)",
+      "name": "Local Models",
       "options": {
         "baseURL": "http://localhost:11434/v1",
         "apiKey": "dummy"
       },
       "models": {
         "qwen2.5-coder-32b-exl2": {
-          "name": "Qwen2.5-Coder-32B-EXL2",
+          "name": "Qwen2.5-Coder-32B-EXL2 (ExLlamaV2)",
           "maxContextWindow": 32768,
+          "maxOutputTokens": 8192
+        },
+        "qwen2.5-coder-32b-gguf": {
+          "name": "Qwen2.5-Coder-32B-GGUF (llama.cpp)",
+          "maxContextWindow": 65536,
           "maxOutputTokens": 8192
         }
       }
