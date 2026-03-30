@@ -17,7 +17,7 @@ $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port 11434 \
   --n-gpu-layers 99 \
-  --ctx-size 32768 \
+  --ctx-size 65536 \
   --batch-size 4096 \
   --flash-attn on \
   --cache-type-k q4_0 \

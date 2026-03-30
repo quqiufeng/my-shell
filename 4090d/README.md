@@ -79,7 +79,7 @@ ExLLamaV2 是一个高效的 LLM 推理框架，基于 EXL2 量化格式：
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | `--n-gpu-layers` | 99 | GPU 层数 |
-| `--ctx-size` | 32768 | 上下文大小 |
+| `--ctx-size` | 65536 | 上下文大小 |
 | `--batch-size` | 4096 | 批处理大小 |
 | `--flash-attn` | on | Flash Attention |
 | `--cache-type-k/v` | q4_0 | KV 缓存量化 |
