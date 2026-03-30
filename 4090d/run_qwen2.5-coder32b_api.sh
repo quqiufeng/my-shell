@@ -30,8 +30,7 @@ echo "GPU层数: 80"
 echo "=============================="
 
 # 启动 llama-server
-# 关键参数:
-# --jinja: 启用 Jinja 模板，正确处理工具调用
+# 注意: 不使用 --jinja，避免自动工具调用处理导致循环
 # --temp 0: 降低温度，防止随机性导致 JSON 解析失败
 $LLAMA_SERVER \
   -m "$MODEL_DIR" \
@@ -47,7 +46,6 @@ $LLAMA_SERVER \
   --threads 14 \
   --no-mmap \
   --mlock \
-  --jinja \
   --temp 0 \
   2>&1 | tee "$LOG_FILE" &
 
@@ -110,7 +108,6 @@ echo "  上下文: $CTX_SIZE"
 echo "  GPU层数: 80"
 echo "  KV缓存: $KV_CACHE"
 echo "  Flash Attention: on"
-echo "  Jinja模板: on"
 echo "  Temperature: 0"
 
 # 保存 PID 到文件
