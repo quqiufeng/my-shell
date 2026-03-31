@@ -21,16 +21,16 @@ export CXX=/usr/bin/g++-12
 
 # RTX 3080 架构 (8.6)
 export FLASH_ATTN_CUDA_ARCHS="86"
-export MAX_JOBS=4
+export MAX_JOBS=2
 
 echo "CUDA_HOME: $CUDA_HOME"
 echo "GCC: $CC"
 
 echo "=== 开始编译并安装 ==="
-python setup.py install 2>&1 | tee /root/flash_build.log
+/home/dministrator/anaconda3/envs/dl/bin/python setup.py install 2>&1 | tee /root/flash_build.log
 
 echo "=== 验证安装 ==="
 cd ~
-python3 -c "import torch; import flash_attn; print(f'FlashAttention 版本: {flash_attn.__version__}')"
+/home/dministrator/anaconda3/envs/dl/bin/python -c "import torch; import flash_attn; print(f'FlashAttention 版本: {flash_attn.__version__}')"
 
 echo "=== 编译完成 ==="
