@@ -59,8 +59,8 @@ rm -rf ~/.cache/torch_extensions/exllamav2_ext 2>/dev/null || true
 # PyTorch 使用 CUDA 12.1, 需要用 CUDA 12 版本的 nvcc
 # CUDA 12.0 和 12.1 兼容，但需要正确的 PTX 生成标志
 echo "编译 exllamav2 (CUDA 12.0 for PyTorch 12.1, sm_86)..."
-export CUDA_HOME=/usr/lib/nvidia-cuda-toolkit
-export PATH=/usr/lib/nvidia-cuda-toolkit/bin:$PATH
+export CUDA_HOME=/opt/cuda12.1
+export PATH=/opt/cuda12.1/bin:$PATH
 export CUDA_ARCHITECTURES=86
 export TORCH_CUDA_ARCH_LIST="8.6"
 export NVCCFLAGS="-gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86"
