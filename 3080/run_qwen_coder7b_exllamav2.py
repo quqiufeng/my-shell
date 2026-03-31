@@ -51,7 +51,7 @@ app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-7B-Instruct-exl2"
 
-MAX_SEQ_LEN = 8192  # 7B model can handle larger context on 3080
+MAX_SEQ_LEN = 16384  # 16k context - 7B模型可以充分利用更大context
 PORT = 11435
 
 print("Loading main model...")
