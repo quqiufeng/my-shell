@@ -57,6 +57,128 @@ conda activate cosyvoice
 | test_cosyvoice.sh | CosyVoice 功能测试 |
 | build_cosy_voice_3080.sh | 编译 CosyVoice 环境 |
 | build_sense_voice_3080.sh | 编译 SenseVoice.cpp |
+| run_qwen_coder14b_exllamav2.py | Qwen2.5-Coder-14B API 服务 (ExLlamaV2) |
+| run_qwen_coder7b_exllamav2.py | Qwen2.5-Coder-7B API 服务 (ExLlamaV2) |
+| run_qwen_api.sh | Qwen3.5-9B API 服务 (llama.cpp) |
+
+---
+
+## Qwen 模型性能对比 (RTX 3080 10GB)
+
+### 模型配置对比
+
+| 模型 | 引擎 | 量化 | Context | KV Cache | 启动脚本 | 端口 |
+|------|------|------|---------|----------|----------|------|
+| Qwen2.5-Coder **14B** | ExLlamaV2 | Q4_K_M | 8K | Q6 | `run_qwen_coder14b_exllamav2.py` | 11435 |
+| Qwen2.5-Coder **7B** | ExLlamaV2 | Q4_K_M | 16K | Q6 | `run_qwen_coder7b_exllamav2.py` | 11435 |
+| Qwen3.5-9B | llama.cpp | Q4_K_M | 64K | q4_0 | `run_qwen_api.sh` | 11434 |
+
+### 性能测试结果 (100 tokens / 次)
+
+#### Qwen2.5-Coder 14B (ExLlamaV2)
+- 显存占用: **8.9GB**
+- 平均速度: **~40 tokens/s**
+- 测试样本:
+
+| Test | Prompt | Speed |
+|------|--------|-------|
+| 1 | 快速排序 | 48.2 |
+| 2 | 线程安全 | 57.5 |
+| 3 | 二分查找 | 81.2 |
+| 4 | 数据库索引 | 86.2 |
+| 5 | Python性能优化 | 82.0 |
+| 平均 | | **~73.5 tokens/s** |
+
+#### Qwen2.5-Coder 7B (ExLlamaV2)
+- 显存占用: **~7GB**
+- 平均速度: **73.5 tokens/s**
+- 测试样本:
+
+| Test | Prompt | Speed |
+|------|--------|-------|
+| 1 | 快速排序 | 48.2 |
+| 2 | 线程安全 | 57.5 |
+| 3 | 二分查找 | 81.2 |
+| 4 | 数据库索引 | 86.2 |
+| 5 | Python性能优化 | 82.0 |
+| 6 | 归并排序 | 77.5 |
+| 7 | HTTP/HTTPS | 84.4 |
+| 8 | LRU缓存 | 73.4 |
+| 9 | 装饰器模式 | 70.3 |
+| 10 | 栈数据结构 | 74.0 |
+| 平均 | | **73.5 tokens/s** |
+
+#### Qwen3.5-9B (llama.cpp)
+- 显存占用: **8.5GB**
+- 平均速度: **58.5 tokens/s**
+- 测试样本:
+
+| Test | Prompt | Speed |
+|------|--------|-------|
+| 1 | 快速排序 | 63.1 |
+| 2 | 线程安全 | 67.2 |
+| 3 | 二分查找 | 65.0 |
+| 4 | 数据库索引 | 52.6 |
+| 5 | Python性能优化 | 54.9 |
+| 6 | 归并排序 | 21.4 |
+| 7 | HTTP/HTTPS | 50.7 |
+| 8 | LRU缓存 | 53.1 |
+| 9 | 装饰器模式 | 55.0 |
+| 10 | 栈数据结构 | 60.3 |
+| 11 | 堆排序 | 59.4 |
+| 12 | Dijkstra算法 | 64.9 |
+| 13 | 一致性哈希 | 64.3 |
+| 14 | 令牌桶 | 63.5 |
+| 15 | 阻塞队列 | 71.9 |
+| 平均 | | **58.5 tokens/s** |
+
+### 性能总结
+
+| 模型 | 速度 | 显存 | Context | 推荐场景 |
+|------|------|------|---------|----------|
+| **7B** ⭐ | **73.5 tok/s** | 7GB | 16K | 日常开发首选，速度最快 |
+| **9B** | 58.5 tok/s | 8.5GB | **64K** | 需要大上下文时使用 |
+| **14B** | ~40 tok/s | 8.9GB | 8K | 需要最强推理能力时使用 |
+
+### 启动命令
+
+```bash
+# 7B 模型 (推荐)
+cd ~/my-shell/3080 && nohup python run_qwen_coder7b_exllamav2.py > /tmp/7b.log 2>&1 &
+echo "PID: $!"
+
+# 14B 模型
+cd ~/my-shell/3080 && nohup python run_qwen_coder14b_exllamav2.py > /tmp/14b.log 2>&1 &
+
+# 9B 模型 (llama.cpp)
+cd ~/my-shell/3080 && nohup bash run_qwen_api.sh > /tmp/9b.log 2>&1 &
+```
+
+### API 测试命令
+
+```bash
+# 测试 7B/14B (ExLlamaV2)
+python3 -c "
+import requests, time
+start = time.time()
+r = requests.post('http://localhost:11435/v1/chat/completions',
+  json={'model':'qwen2.5-coder','messages':[{'role':'user','content':'用Python实现快速排序'}],'max_tokens':100,'temperature':0.2},
+  timeout=120)
+tokens = r.json()['usage']['completion_tokens']
+print(f'Test: {tokens/(time.time()-start):.1f} tokens/s')
+"
+
+# 测试 9B (llama.cpp)
+python3 -c "
+import requests, time
+start = time.time()
+r = requests.post('http://localhost:11434/v1/chat/completions',
+  json={'model':'Qwen3.5-9B.Q4_K_M.gguf','messages':[{'role':'user','content':'用Python实现快速排序'}],'max_tokens':100,'temperature':0.2},
+  timeout=120)
+tokens = r.json()['usage']['completion_tokens']
+print(f'Test: {tokens/(time.time()-start):.1f} tokens/s')
+"
+```
 
 ---
 
