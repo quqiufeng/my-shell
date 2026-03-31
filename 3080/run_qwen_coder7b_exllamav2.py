@@ -52,7 +52,7 @@ app = FastAPI()
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-7B-Instruct-exl2"
 
 MAX_SEQ_LEN = 65536  # 64k context - 测试极限
-PORT = 11435
+PORT = 11434
 
 print("Loading main model...")
 

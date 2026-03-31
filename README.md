@@ -59,7 +59,7 @@ conda activate cosyvoice
 | build_sense_voice_3080.sh | 编译 SenseVoice.cpp |
 | run_qwen_coder14b_exllamav2.py | Qwen2.5-Coder-14B API 服务 (ExLlamaV2) |
 | run_qwen_coder7b_exllamav2.py | Qwen2.5-Coder-7B API 服务 (ExLlamaV2) |
-| run_qwen_api.sh | Qwen3.5-9B API 服务 (llama.cpp) |
+| run_qwen3.5-9b.sh | Qwen3.5-9B API 服务 (llama.cpp) |
 
 ---
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import requests
 import time
+import sys
 
-URL = "http://localhost:11435/v1/chat/completions"
-MODEL = "qwen2.5-coder"
+PORT = sys.argv[1] if len(sys.argv) > 1 else "11434"
+MODEL = sys.argv[2] if len(sys.argv) > 2 else "qwen2.5-coder"
+URL = f"http://localhost:{PORT}/v1/chat/completions"
 
 TESTS = [
     ("快速排序", "用Python实现快速排序"),
