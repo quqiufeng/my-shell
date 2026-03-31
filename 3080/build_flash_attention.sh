@@ -15,15 +15,17 @@ free -h
 TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
 echo "总内存: ${TOTAL_MEM}MB"
 
-# FlashAttention 编译内存优化配置 (高性能模式)
-# CPU: 6核 | 内存: 24GB - 最大化性能配置
+# FlashAttention 编译内存优化配置 (极限模式)
+# 72个CUDA文件 | CPU: 6核 | 内存: 24GB
+# 激进配置: 3个并行任务 x 6线程 = 18并发
 export NVCC_THREADS=6
-export MAX_JOBS=2
-echo "=== 编译配置 (高性能模式) ==="
-echo "NVCC_THREADS=6 (最大化单任务并行度)"
-echo "MAX_JOBS=2 (2个并行编译任务)"
-echo "总并行线程: 12 | 内存预算: ~24GB"
-echo "预计编译时间: 5-8分钟 ⚡"
+export MAX_JOBS=3
+echo "=== 编译配置 (极限模式) ==="
+echo "NVCC_THREADS=6 (每个任务6线程)"
+echo "MAX_JOBS=3 (3个并行编译任务)"
+echo "总并行: 18线程 | 风险: 内存可能不足"
+echo "预计时间: 3-5分钟 (72文件÷3任务≈24轮)"
+echo "⚠️ 如果OOM崩溃，请改回 MAX_JOBS=2"
 
 echo "=== 清理旧 build ==="
 rm -rf build dist *.egg-info
