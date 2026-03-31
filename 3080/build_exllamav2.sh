@@ -51,8 +51,8 @@ cd /opt/exllamav2
 
 # 3. 清理旧的 build
 echo "清理旧的 build..."
-rm -rf build exllamav2.egg-info
-rm -f /home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/exllamav2/*.so
+sudo rm -rf build exllamav2.egg-info
+sudo rm -f /home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/exllamav2/*.so
 rm -rf ~/.cache/torch_extensions/exllamav2_ext 2>/dev/null || true
 
 # 4. 设置 CUDA 12 编译器并编译
