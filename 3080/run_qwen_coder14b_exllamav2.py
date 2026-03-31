@@ -5,6 +5,13 @@ import time
 import socket
 import os
 import json
+
+# Fix for missing PyTorch libraries
+os.environ["LD_LIBRARY_PATH"] = (
+    "/home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/torch/lib:"
+    + os.environ.get("LD_LIBRARY_PATH", "")
+)
+
 import torch
 import uvicorn
 from fastapi import FastAPI, Request
@@ -22,7 +29,7 @@ app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2"
 
-MAX_SEQ_LEN = 8192
+MAX_SEQ_LEN = 16384  # 16k context for OpenCode (3080 10GB optimized)
 PORT = 11435
 
 print("Loading main model...")
@@ -32,6 +39,7 @@ config.max_seq_len = MAX_SEQ_LEN
 config.no_flash_attn = False
 config.no_sdpa = False
 config.no_xformers = False
+config.no_cuda_graph = True  # Disable CUDA Graph to prevent JIT hang
 model = ExLlamaV2(config)
 cache = ExLlamaV2Cache_Q4(model, lazy=True)
 model.load_autosplit(cache)
@@ -45,8 +53,9 @@ generator = ExLlamaV2StreamingGenerator(
 )
 
 settings = ExLlamaV2Sampler.Settings()
-settings.temperature = 0.0
-settings.token_repetition_penalty = 1.0
+settings.temperature = 0.2  # Low temp for code stability with 3.5 BPW
+settings.top_p = 0.9  # Nucleus sampling
+settings.token_repetition_penalty = 1.05  # Prevent looping in code generation
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
 sys.stdout.flush()
