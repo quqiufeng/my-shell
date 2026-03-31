@@ -41,7 +41,7 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import (
     ExLlamaV2,
     ExLlamaV2Config,
-    ExLlamaV2Cache_Q4,
+    ExLlamaV2Cache_Q6,  # Q6 提供更好的质量/速度平衡
     ExLlamaV2Tokenizer,
     ExLlamaV2Cache,
 )
@@ -63,7 +63,7 @@ config.no_sdpa = False
 config.no_xformers = False
 config.no_cuda_graph = True  # Disable CUDA Graph to prevent JIT hang
 model = ExLlamaV2(config)
-cache = ExLlamaV2Cache_Q4(model, lazy=True)
+cache = ExLlamaV2Cache_Q6(model, lazy=True)
 model.load_autosplit(cache)
 
 tokenizer = ExLlamaV2Tokenizer(config)
