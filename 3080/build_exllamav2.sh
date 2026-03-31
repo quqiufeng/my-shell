@@ -57,12 +57,13 @@ rm -rf ~/.cache/torch_extensions/exllamav2_ext 2>/dev/null || true
 
 # 4. 设置 CUDA 12 编译器并编译
 # PyTorch 使用 CUDA 12.1, 需要用 CUDA 12 版本的 nvcc
-# 注意: CUDA_HOME 必须指向 CUDA 12, 不能用 /usr (那是 CUDA 11.8)
-echo "编译 exllamav2 (CUDA 12.0, sm_86)..."
+# CUDA 12.0 和 12.1 兼容，但需要正确的 PTX 生成标志
+echo "编译 exllamav2 (CUDA 12.0 for PyTorch 12.1, sm_86)..."
 export CUDA_HOME=/usr/lib/nvidia-cuda-toolkit
 export PATH=/usr/lib/nvidia-cuda-toolkit/bin:$PATH
 export CUDA_ARCHITECTURES=86
 export TORCH_CUDA_ARCH_LIST="8.6"
+export NVCCFLAGS="-gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86"
 export MAKEFLAGS="-j2"
 /home/dministrator/anaconda3/envs/dl/bin/python setup.py build
 
