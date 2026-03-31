@@ -60,6 +60,7 @@ conda activate cosyvoice
 | run_qwen_coder14b_exllamav2.py | Qwen2.5-Coder-14B API 服务 (ExLlamaV2) |
 | run_qwen_coder7b_exllamav2.py | Qwen2.5-Coder-7B API 服务 (ExLlamaV2) |
 | run_qwen3.5-9b.sh | Qwen3.5-9B API 服务 (llama.cpp) |
+| run_koboldcpp_9b.sh | Qwen3.5-9B API 服务 (KoboldCpp) |
 
 ---
 
@@ -69,9 +70,10 @@ conda activate cosyvoice
 
 | 模型 | 引擎 | 量化 | Context | KV Cache | 启动脚本 | 端口 |
 |------|------|------|---------|----------|----------|------|
-| Qwen2.5-Coder **14B** | ExLlamaV2 | Q4_K_M | 8K | Q6 | `run_qwen_coder14b_exllamav2.py` | 11435 |
-| Qwen2.5-Coder **7B** | ExLlamaV2 | Q4_K_M | 16K | Q6 | `run_qwen_coder7b_exllamav2.py` | 11435 |
-| Qwen3.5-9B | llama.cpp | Q4_K_M | 64K | q4_0 | `run_qwen_api.sh` | 11434 |
+| Qwen2.5-Coder **14B** | ExLlamaV2 | Q4_K_M | 8K | Q6 | `run_qwen_coder14b_exllamav2.py` | 11434 |
+| Qwen2.5-Coder **7B** | ExLlamaV2 | Q4_K_M | 64K | Q6 | `run_qwen_coder7b_exllamav2.py` | 11434 |
+| Qwen3.5-9B | llama.cpp | Q4_K_M | 64K | q4_0 | `run_qwen3.5-9b.sh` | 11434 |
+| Qwen3.5-9B | KoboldCpp | Q4_K_M | 64K | - | `run_koboldcpp_9b.sh` | 11434 |
 
 ### 性能测试结果 (100 tokens / 次)
 
@@ -132,13 +134,38 @@ conda activate cosyvoice
 | 15 | 阻塞队列 | 71.9 |
 | 平均 | | **58.5 tokens/s** |
 
+#### Qwen3.5-9B (KoboldCpp)
+- 显存占用: **8.0GB**
+- 平均速度: **60.8 tokens/s**
+- 测试样本:
+
+| Test | Prompt | Speed |
+|------|--------|-------|
+| 1 | 快速排序 | 57.9 |
+| 2 | 线程安全 | 59.3 |
+| 3 | 二分查找 | 62.2 |
+| 4 | 数据库索引 | 56.8 |
+| 5 | Python性能优化 | 61.0 |
+| 6 | 归并排序 | 60.1 |
+| 7 | HTTP/HTTPS | 64.1 |
+| 8 | LRU缓存 | 60.6 |
+| 9 | 堆排序 | 61.0 |
+| 10 | Dijkstra算法 | 61.5 |
+| 11 | 一致性哈希 | 64.2 |
+| 12 | 令牌桶 | 65.2 |
+| 13 | 阻塞队列 | 65.0 |
+| 14 | 红黑树 | 58.5 |
+| 15 | B+树 | 64.3 |
+| 平均 | | **60.8 tokens/s** |
+
 ### 性能总结
 
-| 模型 | 速度 | 显存 | Context | 推荐场景 |
-|------|------|------|---------|----------|
-| **7B** ⭐ | **73.5 tok/s** | 7GB | 16K | 日常开发首选，速度最快 |
-| **9B** | 58.5 tok/s | 8.5GB | **64K** | 需要大上下文时使用 |
-| **14B** | ~40 tok/s | 8.9GB | 8K | 需要最强推理能力时使用 |
+| 模型 | 引擎 | 速度 | 显存 | Context | 推荐场景 |
+|------|------|------|------|---------|----------|
+| **7B** ⭐ | ExLlamaV2 | **80 tok/s** | 8.3GB | 64K | 日常开发首选，速度最快 |
+| **9B** | KoboldCpp | 60.8 tok/s | 8.0GB | 64K | 显存最优 |
+| **9B** | llama.cpp | 58.5 tok/s | 8.5GB | 64K | 兼容性最好 |
+| **14B** | ExLlamaV2 | ~40 tok/s | 8.9GB | 8K | 需要最强推理能力时使用 |
 
 ### 启动命令
 
@@ -151,7 +178,10 @@ echo "PID: $!"
 cd ~/my-shell/3080 && nohup python run_qwen_coder14b_exllamav2.py > /tmp/14b.log 2>&1 &
 
 # 9B 模型 (llama.cpp)
-cd ~/my-shell/3080 && nohup bash run_qwen_api.sh > /tmp/9b.log 2>&1 &
+cd ~/my-shell/3080 && nohup bash run_qwen3.5-9b.sh > /tmp/9b.log 2>&1 &
+
+# 9B 模型 (KoboldCpp)
+cd ~/my-shell/3080 && nohup bash run_koboldcpp_9b.sh > /tmp/koboldcpp.log 2>&1 &
 ```
 
 ### API 测试命令
