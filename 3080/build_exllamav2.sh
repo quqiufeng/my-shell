@@ -7,12 +7,12 @@
 #
 # 1. PyTorch CUDA 版本 vs 系统 nvcc 版本必须匹配
 #    - PyTorch: CUDA 12.1 (cu121) - 来自 pip 安装的 torch 2.4.1+cu121
-#    - 系统 nvcc: /usr/bin/nvcc 是 CUDA 12.0 版本
+#    - 系统 CUDA: /usr/lib/nvidia-cuda-toolkit 是 CUDA 12.0 版本 (PyTorch 12.1 兼容)
 #    - /usr/local/cuda (默认) 是 CUDA 11.8，不能用！会导致 _Float32 错误
 #
 # 2. 正确的编译环境变量
-#    - CUDA_HOME=/usr  (指向 /usr/include/cuda_runtime.h 等 CUDA 12 头文件)
-#    - PATH=/usr/bin:$PATH  (让 nvcc 使用 /usr/bin/nvcc 而非 /usr/local/cuda/bin/nvcc)
+#    - CUDA_HOME=/usr/lib/nvidia-cuda-toolkit  (CUDA 12 路径)
+#    - PATH=/usr/lib/nvidia-cuda-toolkit/bin:$PATH  (使用 CUDA 12 的 nvcc)
 #    - CUDA_ARCHITECTURES=86  (RTX 3080 的 compute capability)
 #
 # 3. 常见错误
@@ -57,9 +57,10 @@ rm -rf ~/.cache/torch_extensions/exllamav2_ext 2>/dev/null || true
 
 # 4. 设置 CUDA 12 编译器并编译
 # PyTorch 使用 CUDA 12.1, 需要用 CUDA 12 版本的 nvcc
+# 注意: CUDA_HOME 必须指向 CUDA 12, 不能用 /usr (那是 CUDA 11.8)
 echo "编译 exllamav2 (CUDA 12.0, sm_86)..."
-export CUDA_HOME=/usr
-export PATH=/usr/bin:$PATH
+export CUDA_HOME=/usr/lib/nvidia-cuda-toolkit
+export PATH=/usr/lib/nvidia-cuda-toolkit/bin:$PATH
 export CUDA_ARCHITECTURES=86
 export TORCH_CUDA_ARCH_LIST="8.6"
 export MAKEFLAGS="-j2"
@@ -69,7 +70,19 @@ export MAKEFLAGS="-j2"
 echo "安装 exllamav2..."
 /home/dministrator/anaconda3/envs/dl/bin/pip install .
 
+# 6. 复制编译好的 .so 文件到 site-packages (关键步骤: pip install 不会自动复制)
+# 并修复权限问题
+echo "复制编译好的 .so 文件..."
+if [ -f "build/lib.linux-x86_64-cpython-310/exllamav2_ext.cpython-310-x86_64-linux-gnu.so" ]; then
+    cp build/lib.linux-x86_64-cpython-310/exllamav2_ext.cpython-310-x86_64-linux-gnu.so /home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/exllamav2/
+    chown dministrator:dministrator /home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/exllamav2/*.so
+    echo "✓ .so 文件已复制到 site-packages 并修复权限"
+else
+    echo "✗ 未找到编译好的 .so 文件"
+    exit 1
+fi
+
 echo "=== exllamav2 安装完成 ==="
 echo ""
-echo "测试导入:"
+echo "测试导入 (CUDA 12 编译, sm_86):"
 /home/dministrator/anaconda3/envs/dl/bin/python -c "from exllamav2.model import ExLlamaV2; print('OK')"
