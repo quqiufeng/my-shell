@@ -29,7 +29,7 @@ app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2"
 
-MAX_SEQ_LEN = 16384  # 16k context - testing with optimized Q4 cache and flash attention
+MAX_SEQ_LEN = 8192  # 8k context - reduced for lower VRAM usage (~4GB saved)
 PORT = 11435
 
 print("Loading main model...")
