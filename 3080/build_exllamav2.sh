@@ -61,6 +61,8 @@ rm -rf ~/.cache/torch_extensions/exllamav2_ext 2>/dev/null || true
 echo "编译 exllamav2 (CUDA 12.0 for PyTorch 12.1, sm_86)..."
 export CUDA_HOME=/opt/cuda12.1
 export PATH=/opt/cuda12.1/bin:$PATH
+export CC=/usr/bin/gcc-12
+export CXX=/usr/bin/g++-12
 export CUDA_ARCHITECTURES=86
 export TORCH_CUDA_ARCH_LIST="8.6"
 export NVCCFLAGS="-gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86"
