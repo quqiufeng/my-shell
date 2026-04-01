@@ -25,7 +25,7 @@ from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/3_5"
-MAX_SEQ_LEN = 4096  # Reduced from 65k for speed
+MAX_SEQ_LEN = 32768  # 32k context for long code files
 PORT = 11435
 
 print("Loading Qwen2.5-Coder-14B model...")
@@ -71,7 +71,7 @@ print(f"模型: 14B EXL2 (3.5bpw)")
 print(f"对内地址: http://localhost:{PORT}")
 print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
 print("=" * 60)
-print("预期速度: 100-130 tok/s (4090D limit)")
+print("预期速度: 60-70 tok/s (32k ctx, 4090D limit)")
 print("=" * 60)
 sys.stdout.flush()
 
