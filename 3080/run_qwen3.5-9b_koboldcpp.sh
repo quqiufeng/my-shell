@@ -34,12 +34,12 @@ python koboldcpp.py \
   --port 11434 \
   --host 0.0.0.0 \
   --gpulayers 35 \
-  --contextsize 65536 \
+  --contextsize 81920 \
   --flashattention \
   --quiet
 
 # 参数说明:
 # --gpulayers 35: GPU 层数
-# --contextsize 65536: 上下文长度 (64K)
+# --contextsize 81920: 上下文长度 (80K)
 # --flashattention: 启用 Flash Attention
 # --quiet: 减少日志输出
