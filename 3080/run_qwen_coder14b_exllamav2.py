@@ -19,7 +19,7 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import (
     ExLlamaV2,
     ExLlamaV2Config,
-    ExLlamaV2Cache_Q4,  # Q4 for speculative decoding speed
+    ExLlamaV2Cache_Q6,  # Q6 for code generation (60 tok/s > 投机解码的 20 tok/s)
     ExLlamaV2Tokenizer,
     ExLlamaV2Cache,
 )
@@ -28,11 +28,11 @@ from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2/3_5"
-DRAFT_MODEL_DIR = "/opt/image/Qwen2.5-Coder-0.5B-Instruct-exl2"
+# DRAFT_MODEL_DIR = "/opt/image/Qwen2.5-Coder-0.5B-Instruct-exl2"  # 注释掉: 投机解码不适合代码生成
 
 MAX_SEQ_LEN = 12288  # 12k context - utilize more memory
 PORT = 11434
-NUM_SPECULATIVE_TOKENS = 6  # 投机解码: 草稿token数量
+# NUM_SPECULATIVE_TOKENS = 6  # 注释掉: 投机解码对长提示词(prefill)无效, 代码生成速度反而从60降到20 tok/s
 
 print("Loading main model...")
 
@@ -42,29 +42,29 @@ config.no_flash_attn = False
 config.no_sdpa = False
 config.no_xformers = False
 model = ExLlamaV2(config)
-# 使用 Q4 压缩 KV Cache (投机解码需要速度优先)
-cache = ExLlamaV2Cache_Q4(model, lazy=True)  # Q4 cache for speculative decoding
+# 使用 Q6 压缩 KV Cache (代码生成场景60 tok/s vs 投机解码20 tok/s)
+cache = ExLlamaV2Cache_Q6(model, lazy=True)  # Q6 for code generation quality
 model.load_autosplit(cache)
 
-print("Loading draft model...")
-
-draft_config = ExLlamaV2Config(DRAFT_MODEL_DIR)
-draft_config.max_seq_len = MAX_SEQ_LEN
-draft_config.no_flash_attn = False
-draft_config.no_sdpa = False
-draft_model = ExLlamaV2(draft_config)
-draft_cache = ExLlamaV2Cache(draft_model)  # 草稿模型用默认cache
-draft_model.load_autosplit(draft_cache)
-
 tokenizer = ExLlamaV2Tokenizer(config)
+
+# 禁用投机解码: 测试证明对代码生成无效
+# - 简单对话("hi"): 170 tok/s (投机解码优势)
+# - 代码生成("用Python实现快速排序"): 20 tok/s (比60 tok/s还慢)
+# 原因: 长提示词prefill阶段耗时占主导, 投机解码无法加速
+# draft_config = ExLlamaV2Config(DRAFT_MODEL_DIR)
+# draft_model = ExLlamaV2(draft_config)
+# draft_cache = ExLlamaV2Cache(draft_model)
+# draft_model.load_autosplit(draft_cache)
 
 generator = ExLlamaV2StreamingGenerator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
-    draft_model=draft_model,
-    draft_cache=draft_cache,
-    num_speculative_tokens=NUM_SPECULATIVE_TOKENS,
+    # 投机解码参数已注释掉
+    # draft_model=draft_model,
+    # draft_cache=draft_cache,
+    # num_speculative_tokens=NUM_SPECULATIVE_TOKENS,
 )
 
 settings = ExLlamaV2Sampler.Settings()
@@ -84,10 +84,11 @@ print("")
 print("==============================")
 print("ExLlamaV2 服务已启动! (3080)")
 print("==============================")
-print(f"主模型: Qwen2.5-Coder-14B-Instruct-exl2 (3.5 bpw)")
-print(f"草稿模型: Qwen2.5-Coder-0.5B-Instruct-exl2")
-print(f"投机解码: {NUM_SPECULATIVE_TOKENS} tokens")
-print(f"预期速度: 90-110 tok/s (speculative)")
+print(f"模型: Qwen2.5-Coder-14B-Instruct-exl2")
+print(f"位宽: 3.5 bpw")
+print(f"缓存: Q6 (代码生成最优)")
+print(f"预期速度: 50-60 tok/s")
+print(f"说明: 投机解码已禁用 - 对代码生成长提示词无效")
 print(f"对内地址: http://localhost:{PORT}")
 print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
 print(f"IP: {ip}")
