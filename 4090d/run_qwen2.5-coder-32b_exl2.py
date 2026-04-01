@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
 
 # =============================================================================
-# 性能测试数据 (2026-04-01, branch.py):
-# - 测试配置: 30个高难度提示词, max_tokens=200
-# - 平均速度: 51.0 tokens/s
-# - 速度范围: 33.1 - 73.0 tokens/s
-# - 最快测试: 字典树(73.0), 拓扑排序(65.8), 双指针(62.1)
-# - 最慢测试: 数据库索引(33.1), 快速排序(39.2), B+树(39.0)
+# 【优化配置】RTX 4090D 最佳设置
+# - 主模型: 32B EXL2 4.0bpw + Q4 KV Cache
+# - 草稿模型: 0.5B EXL2 (投机解码)
+# - 上下文: 32k (平衡长文本与显存)
+# - 投机Token: 6 (最优值，8反而会降速)
+# - FlashAttention: 启用
+#
+# 【性能测试数据】(2026-04-01, branch.py, RTX 4090D)
+# - 平均速度: 51.1 tokens/s
+# - 速度范围: 33.1 - 73.6 tokens/s
+# - 最快测试: 阻塞队列(73.6), 字典树(69.1), 拓扑排序(66.6)
+# - 显存占用: ~20-22GB / 24GB
+#
+# 【优化尝试记录】
+# 1. 8个投机token: 46.3 tok/s (降速，草稿模型质量限制)
+# 2. 16k+FP16 Cache: 52.0 tok/s (+1.8%)，但显存满载(22.8GB)，不稳定
+# 3. 最终选择: 32k+Q4 Cache = 51.1 tok/s，显存安全，上下文充足 ✅
+#
+# 【对比数据】
+# - 14B 3.5bpw: 88.5 tok/s (速度优先)
+# - 14B 4.25bpw: 82.6 tok/s (质量优先)
+# - 32B: 51.1 tok/s (最高质量，适合复杂算法)
 #
 # 使用方法:
-#   1. 启动模型: nohup python3 run_qwen2.5-coder-32b_exl2.py > /tmp/model.log 2>&1 &
-#   2. 等待加载: curl http://localhost:11434/v1/models
-#   3. 性能测试: cd /opt/my-shell && python3 branch.py 11434 qwen2.5-coder-32b-exl2 200
-#   4. 关闭模型: pkill -f run_qwen2.5-coder-32b_exl2.py
+#   1. 启动: nohup python3 run_qwen2.5-coder-32b_exl2.py > /tmp/model.log 2>&1 &
+#   2. 测试: cd /opt/my-shell && python3 branch.py 11434 qwen2.5-coder-32b-exl2 200
+#   3. 关闭: pkill -f run_qwen2.5-coder-32b_exl2.py
 #
-# 注意: 32B速度最慢但质量最高，适合需要高质量代码的场景
+# 注意: 32B模型质量最高，适合复杂算法设计和高质量代码生成
 # =============================================================================
 
 # =============================================================================
@@ -45,9 +60,9 @@ app = FastAPI()
 MAIN_MODEL_DIR = "/opt/gguf/exl2_4_0"
 DRAFT_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-0.5B-exl2"
 
-MAX_SEQ_LEN = 32768
+MAX_SEQ_LEN = 32768  # 32k上下文：平衡长文本能力与显存占用
 PORT = 11434
-NUM_SPECULATIVE_TOKENS = 6  # 最优配置: 8投机反而下降
+NUM_SPECULATIVE_TOKENS = 6  # 恢复：6是最优值
 
 print("Loading main model...")
 
@@ -57,7 +72,7 @@ config.no_flash_attn = False  # 确保启用FlashAttention
 config.no_sdpa = False         # 禁用SDPA，强制用FlashAttention
 config.no_xformers = False     # 禁用xformers
 model = ExLlamaV2(config)
-cache = ExLlamaV2Cache_Q4(model, lazy=True)  # Q4 KV Cache (速度最快)
+cache = ExLlamaV2Cache_Q4(model, lazy=True)  # Q4 KV Cache：平衡速度与显存
 model.load_autosplit(cache)
 
 print("Loading draft model...")
