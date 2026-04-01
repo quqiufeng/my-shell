@@ -68,120 +68,123 @@ conda activate cosyvoice
 
 ### 模型配置对比
 
-| 模型 | 引擎 | 量化 | Context | KV Cache | 启动脚本 | 端口 |
-|------|------|------|---------|----------|----------|------|
-| Qwen2.5-Coder **14B** | ExLlamaV2 | Q4_K_M | 8K | Q6 | `run_qwen_coder14b_exllamav2.py` | 11434 |
-| Qwen2.5-Coder **7B** | ExLlamaV2 | Q4_K_M | 64K | Q6 | `run_qwen_coder7b_exllamav2.py` | 11434 |
-| Qwen3.5-9B | llama.cpp | Q4_K_M | 64K | q4_0 | `run_qwen3.5-9b.sh` | 11434 |
-| Qwen3.5-9B | KoboldCpp | Q4_K_M | 64K | - | `run_koboldcpp_9b.sh` | 11434 |
+| 模型 | 引擎 | 量化 | Context | KV Cache | 启动脚本 | 端口 | 显存占用 |
+|------|------|------|---------|----------|----------|------|----------|
+| **Qwen2.5-Coder 7B** | ExLlamaV2 | Q4_K_M | **64K** | Q6 | `run_qwen_coder7b_exllamav2.py` | 11434 | ~8GB |
+| **Qwen2.5-Coder 14B** | ExLlamaV2 | Q4_K_M | **12K** | Q6 | `run_qwen_coder14b_exllamav2.py` | 11434 | ~10GB |
+| **Qwen3.5-9B** | llama.cpp | Q4_K_M | **64K** | q4_0 | `run_qwen3.5-9b_llama.sh` | 11434 | ~6GB |
+| **Qwen3.5-9B** | KoboldCpp | Q4_K_M | **80K** | q4_0 | `run_qwen3.5-9b_koboldcpp.sh` | 11434 | ~6GB |
 
-### 性能测试结果 (100 tokens / 次)
+### 性能测试结果 (30个高难度提示词，200 tokens/次)
 
-#### Qwen2.5-Coder 14B (ExLlamaV2)
-- 显存占用: **8.9GB**
-- 平均速度: **~40 tokens/s**
-- 测试样本:
+**测试方法**: `cd /home/dministrator/my-shell && python3 branch.py 11434 <模型名> 200`
 
-| Test | Prompt | Speed |
-|------|--------|-------|
-| 1 | 快速排序 | 48.2 |
-| 2 | 线程安全 | 57.5 |
-| 3 | 二分查找 | 81.2 |
-| 4 | 数据库索引 | 86.2 |
-| 5 | Python性能优化 | 82.0 |
-| 平均 | | **~73.5 tokens/s** |
+#### 1. Qwen2.5-Coder 7B (ExLlamaV2) ⭐ 推荐
+- **显存占用**: ~8GB
+- **平均速度**: **78.4 tokens/s**
+- **最快**: 二分查找 92.5 tokens/s
+- **最慢**: 快速排序 46.2 tokens/s (首次加载)
+- **典型速度**: 70-90 tokens/s
 
-#### Qwen2.5-Coder 7B (ExLlamaV2)
-- 显存占用: **~7GB**
-- 平均速度: **73.5 tokens/s**
-- 测试样本:
+**特点**:
+- ✅ **速度最快** - 比 9B 模型快 20-30%
+- ✅ **上下文大** - 64K 可处理长代码文件
+- ✅ **代码专用** - 针对代码生成优化
+- ⚠️ 参数量较少，复杂推理能力略逊于 14B
 
-| Test | Prompt | Speed |
-|------|--------|-------|
-| 1 | 快速排序 | 48.2 |
-| 2 | 线程安全 | 57.5 |
-| 3 | 二分查找 | 81.2 |
-| 4 | 数据库索引 | 86.2 |
-| 5 | Python性能优化 | 82.0 |
-| 6 | 归并排序 | 77.5 |
-| 7 | HTTP/HTTPS | 84.4 |
-| 8 | LRU缓存 | 73.4 |
-| 9 | 装饰器模式 | 70.3 |
-| 10 | 栈数据结构 | 74.0 |
-| 平均 | | **73.5 tokens/s** |
+**适用场景**: 日常开发、快速代码补全、长文件处理
 
-#### Qwen3.5-9B (llama.cpp)
-- 显存占用: **8.5GB**
-- 平均速度: **58.5 tokens/s**
-- 测试样本:
+#### 2. Qwen2.5-Coder 14B (ExLlamaV2)
+- **显存占用**: ~10GB
+- **平均速度**: **53.4 tokens/s**
+- **最快**: 红黑树 59.0 tokens/s
+- **最慢**: 最长公共子序列 40.4 tokens/s
+- **典型速度**: 50-58 tokens/s
 
-| Test | Prompt | Speed |
-|------|--------|-------|
-| 1 | 快速排序 | 63.1 |
-| 2 | 线程安全 | 67.2 |
-| 3 | 二分查找 | 65.0 |
-| 4 | 数据库索引 | 52.6 |
-| 5 | Python性能优化 | 54.9 |
-| 6 | 归并排序 | 21.4 |
-| 7 | HTTP/HTTPS | 50.7 |
-| 8 | LRU缓存 | 53.1 |
-| 9 | 装饰器模式 | 55.0 |
-| 10 | 栈数据结构 | 60.3 |
-| 11 | 堆排序 | 59.4 |
-| 12 | Dijkstra算法 | 64.9 |
-| 13 | 一致性哈希 | 64.3 |
-| 14 | 令牌桶 | 63.5 |
-| 15 | 阻塞队列 | 71.9 |
-| 平均 | | **58.5 tokens/s** |
+**特点**:
+- ✅ **代码能力最强** - 14B 参数量，推理能力最佳
+- ✅ 专业代码模型，代码质量高
+- ⚠️ **速度较慢** - 比 7B 慢 47%
+- ⚠️ **上下文小** - 仅 12K，长文件处理受限
+- ⚠️ 显存占用高，接近 3080 上限
 
-#### Qwen3.5-9B (KoboldCpp)
-- 显存占用: **8.0GB**
-- 平均速度: **60.8 tokens/s**
-- 测试样本:
+**适用场景**: 复杂算法实现、代码审查、需要高质量代码时
 
-| Test | Prompt | Speed |
-|------|--------|-------|
-| 1 | 快速排序 | 57.9 |
-| 2 | 线程安全 | 59.3 |
-| 3 | 二分查找 | 62.2 |
-| 4 | 数据库索引 | 56.8 |
-| 5 | Python性能优化 | 61.0 |
-| 6 | 归并排序 | 60.1 |
-| 7 | HTTP/HTTPS | 64.1 |
-| 8 | LRU缓存 | 60.6 |
-| 9 | 堆排序 | 61.0 |
-| 10 | Dijkstra算法 | 61.5 |
-| 11 | 一致性哈希 | 64.2 |
-| 12 | 令牌桶 | 65.2 |
-| 13 | 阻塞队列 | 65.0 |
-| 14 | 红黑树 | 58.5 |
-| 15 | B+树 | 64.3 |
-| 平均 | | **60.8 tokens/s** |
+#### 3. Qwen3.5-9B (llama.cpp)
+- **显存占用**: ~6GB
+- **平均速度**: **67.5 tokens/s**
+- **最快**: Dijkstra算法 77.2 tokens/s
+- **最慢**: 快速排序 53.0 tokens/s
+- **典型速度**: 65-75 tokens/s
 
-### 性能总结
+**特点**:
+- ✅ **兼容性好** - llama.cpp 生态完善
+- ✅ **显存友好** - 仅 6GB，可与其他程序共存
+- ✅ **通用能力强** - 不仅是代码，对话、推理也不错
+- ⚠️ 速度比 ExLlamaV2 7B 慢
 
-| 模型 | 引擎 | 速度 | 显存 | Context | 推荐场景 |
-|------|------|------|------|---------|----------|
-| **7B** ⭐ | ExLlamaV2 | **80 tok/s** | 8.3GB | 64K | 日常开发首选，速度最快 |
-| **9B** | KoboldCpp | 60.8 tok/s | 8.0GB | 64K | 显存最优 |
-| **9B** | llama.cpp | 58.5 tok/s | 8.5GB | 64K | 兼容性最好 |
-| **14B** | ExLlamaV2 | ~40 tok/s | 8.9GB | 8K | 需要最强推理能力时使用 |
+**适用场景**: 通用对话、代码生成、显存紧张时
+
+#### 4. Qwen3.5-9B (KoboldCpp)
+- **显存占用**: ~6GB
+- **平均速度**: **62.0 tokens/s**
+- **最快**: 最长公共子序列 67.8 tokens/s
+- **最慢**: 阻塞队列 46.2 tokens/s
+- **典型速度**: 60-65 tokens/s
+
+**特点**:
+- ✅ **最省内存** - KoboldCpp 内存优化最好
+- ✅ **功能丰富** - 支持 Web UI、多模态
+- ✅ **上下文最大** - 80K，可处理超长文本
+- ⚠️ 速度略逊于 llama.cpp
+
+**适用场景**: 长文本处理、需要 Web UI、多模态任务
+
+### 性能总结对比
+
+| 模型 | 引擎 | 速度 | 显存 | Context | 代码能力 | 推荐场景 |
+|------|------|------|------|---------|----------|----------|
+| **7B** ⭐ | ExLlamaV2 | **78.4** tok/s | 8GB | 64K | ★★★☆ | **日常开发首选** |
+| **9B** | llama.cpp | 67.5 tok/s | 6GB | 64K | ★★★☆ | 通用对话 |
+| **9B** | KoboldCpp | 62.0 tok/s | 6GB | **80K** | ★★★☆ | 长文本处理 |
+| **14B** | ExLlamaV2 | 53.4 tok/s | 10GB | 12K | ★★★★ | 高质量代码 |
+
+### 选择建议
+
+1. **日常开发 (推荐)**: Qwen2.5-Coder 7B + ExLlamaV2
+   - 速度最快，代码质量好，上下文够用
+
+2. **显存紧张**: Qwen3.5-9B + KoboldCpp
+   - 仅 6GB 显存，可与其他程序共存
+
+3. **长文本处理**: Qwen3.5-9B + KoboldCpp (80K)
+   - 上下文最大，适合处理长代码文件
+
+4. **高质量代码**: Qwen2.5-Coder 14B + ExLlamaV2
+   - 代码能力最强，但速度慢、上下文小
 
 ### 启动命令
 
 ```bash
-# 7B 模型 (推荐)
+# 1. Qwen2.5-Coder 7B (推荐日常开发)
 cd ~/my-shell/3080 && nohup python run_qwen_coder7b_exllamav2.py > /tmp/7b.log 2>&1 &
 echo "PID: $!"
+# 测试: python3 branch.py 11434 "qwen2.5-coder-7b-exl2" 200
 
-# 14B 模型
+# 2. Qwen2.5-Coder 14B (高质量代码)
 cd ~/my-shell/3080 && nohup python run_qwen_coder14b_exllamav2.py > /tmp/14b.log 2>&1 &
+echo "PID: $!"
+# 测试: python3 branch.py 11434 "qwen2.5-coder-14b-exl2" 200
 
-# 9B 模型 (llama.cpp)
-cd ~/my-shell/3080 && nohup bash run_qwen3.5-9b.sh > /tmp/9b.log 2>&1 &
+# 3. Qwen3.5-9B (llama.cpp - 通用对话)
+cd ~/my-shell/3080 && nohup bash run_qwen3.5-9b_llama.sh > /tmp/llama_9b.log 2>&1 &
+echo "PID: $!"
+# 测试: python3 branch.py 11434 "Qwen3.5-9B.Q4_K_M.gguf" 200
 
-# 9B 模型 (KoboldCpp)
-cd ~/my-shell/3080 && nohup bash run_koboldcpp_9b.sh > /tmp/koboldcpp.log 2>&1 &
+# 4. Qwen3.5-9B (KoboldCpp - 长文本/省内存)
+cd ~/my-shell/3080 && nohup bash run_qwen3.5-9b_koboldcpp.sh > /tmp/koboldcpp_9b.log 2>&1 &
+echo "PID: $!"
+# 测试: python3 branch.py 11434 "koboldcpp/Qwen3.5-9B.Q4_K_M" 200
 ```
 
 ### API 测试命令
