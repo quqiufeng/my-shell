@@ -34,8 +34,8 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import ExLlamaV2, ExLlamaV2Config, ExLlamaV2Cache_Q4, ExLlamaV2Tokenizer, ExLlamaV2Cache
 from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 
-# 导入共享库
-sys.path.insert(0, os.path.dirname(__file__))
+# 导入共享库（从上级目录）
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api_handlers import (
     parse_tool_calls,
     build_prompt,
