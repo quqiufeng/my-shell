@@ -1,79 +1,62 @@
 #!/usr/bin/env python3
 
+# =============================================================================
+# 依赖安装 (首次运行前执行)
+# =============================================================================
+# ⚠️ 重要: 安装 FlashAttention 可提升 50%+ 速度
+# 编译安装 (针对 RTX 3080):
+#   bash /opt/my-shell/3080/build_flash_attention.sh
+#
+# 验证安装:
+# python3 -c "import flash_attn; print(flash_attn.__version__)"
+# =============================================================================
+
 import sys
 import time
 import socket
 import os
 import json
-
-# Fix for missing PyTorch libraries
-os.environ["LD_LIBRARY_PATH"] = (
-    "/home/dministrator/anaconda3/envs/dl/lib/python3.10/site-packages/torch/lib:"
-    + os.environ.get("LD_LIBRARY_PATH", "")
-)
-
 import torch
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
-from exllamav2 import (
-    ExLlamaV2,
-    ExLlamaV2Config,
-    ExLlamaV2Cache_Q6,  # Q6 for code generation (60 tok/s > 投机解码的 20 tok/s)
-    ExLlamaV2Tokenizer,
-    ExLlamaV2Cache,
-)
+from exllamav2 import ExLlamaV2, ExLlamaV2Config, ExLlamaV2Cache_Q4, ExLlamaV2Tokenizer
 from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 
 app = FastAPI()
 
+# 3080 配置 - 16GB 显存，只加载主模型
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2/3_5"
-# DRAFT_MODEL_DIR = "/opt/image/Qwen2.5-Coder-0.5B-Instruct-exl2"  # 注释掉: 投机解码不适合代码生成
 
-MAX_SEQ_LEN = 12288  # 12k context - utilize more memory
+MAX_SEQ_LEN = 12288  # 12k context - 适合 16GB 显存
 PORT = 11434
-# NUM_SPECULATIVE_TOKENS = 6  # 注释掉: 投机解码对长提示词(prefill)无效, 代码生成速度反而从60降到20 tok/s
 
-print("Loading main model...")
+print("Loading model...")
 
 config = ExLlamaV2Config(MAIN_MODEL_DIR)
 config.max_seq_len = MAX_SEQ_LEN
-config.no_flash_attn = False
-config.no_sdpa = False
-config.no_xformers = False
+config.no_flash_attn = False  # 确保启用FlashAttention
+config.no_sdpa = False  # 禁用SDPA，强制用FlashAttention
+config.no_xformers = False  # 禁用xformers
 model = ExLlamaV2(config)
-# 使用 Q6 压缩 KV Cache (代码生成场景60 tok/s vs 投机解码20 tok/s)
-cache = ExLlamaV2Cache_Q6(model, lazy=True)  # Q6 for code generation quality
+cache = ExLlamaV2Cache_Q4(model, lazy=True)  # Q4 KV Cache (省显存)
 model.load_autosplit(cache)
 
 tokenizer = ExLlamaV2Tokenizer(config)
-
-# 禁用投机解码: 测试证明对代码生成无效
-# - 简单对话("hi"): 170 tok/s (投机解码优势)
-# - 代码生成("用Python实现快速排序"): 20 tok/s (比60 tok/s还慢)
-# 原因: 长提示词prefill阶段耗时占主导, 投机解码无法加速
-# draft_config = ExLlamaV2Config(DRAFT_MODEL_DIR)
-# draft_model = ExLlamaV2(draft_config)
-# draft_cache = ExLlamaV2Cache(draft_model)
-# draft_model.load_autosplit(draft_cache)
 
 generator = ExLlamaV2StreamingGenerator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
-    # 投机解码参数已注释掉
-    # draft_model=draft_model,
-    # draft_cache=draft_cache,
-    # num_speculative_tokens=NUM_SPECULATIVE_TOKENS,
 )
 
 settings = ExLlamaV2Sampler.Settings()
-settings.temperature = 0.2  # Low temp for code stability
-settings.top_p = 0.9  # Nucleus sampling
-settings.token_repetition_penalty = 1.05  # Prevent looping in code generation
+settings.temperature = 0.0
+settings.token_repetition_penalty = 1.0
 
-total_vram = torch.cuda.memory_allocated() / 1024**3
-print(f"VRAM: {total_vram:.2f} GB")
+print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+import sys
+
 sys.stdout.flush()
 
 hostname = socket.gethostname()
@@ -82,13 +65,8 @@ ip = socket.gethostbyname(hostname)
 
 print("")
 print("==============================")
-print("ExLlamaV2 服务已启动! (3080)")
+print("服务已启动!")
 print("==============================")
-print(f"模型: Qwen2.5-Coder-14B-Instruct-exl2")
-print(f"位宽: 3.5 bpw")
-print(f"缓存: Q6 (代码生成最优)")
-print(f"预期速度: 50-60 tok/s")
-print(f"说明: 投机解码已禁用 - 对代码生成长提示词无效")
 print(f"对内地址: http://localhost:{PORT}")
 print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
 print(f"IP: {ip}")
@@ -115,8 +93,10 @@ async def list_models():
 
 @app.post("/v1/responses")
 async def responses(request: Request):
+    """OpenAI Responses API - 非流式响应"""
     data = await request.json()
 
+    # 转换 input 为 messages
     messages = []
     input_data = data.get("input", "")
     if isinstance(input_data, str):
@@ -124,6 +104,7 @@ async def responses(request: Request):
     elif isinstance(input_data, list):
         messages = input_data
 
+    # 构建 chat.completions 请求
     tools = data.get("tools", [])
     chat_data = {
         "model": data.get("model", "qwen2.5-coder-14b-exl2"),
@@ -134,12 +115,15 @@ async def responses(request: Request):
         "stream": False,
     }
 
+    # 调用生成逻辑
     result = await generate_completion(chat_data)
 
+    # 检查是否是 tool_calls
     message = result.get("choices", [{}])[0].get("message", {})
     content = message.get("content", "")
     tool_calls = message.get("tool_calls", [])
 
+    # 构建 output
     output = []
     if tool_calls:
         for tc in tool_calls:
@@ -175,6 +159,7 @@ async def responses(request: Request):
 
 
 async def generate_completion(data):
+    """核心生成逻辑"""
     messages = data.get("messages", [])
     tools = data.get("tools", [])
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
@@ -188,6 +173,20 @@ async def generate_completion(data):
     input_ids = tokenizer.encode(prompt)
     if isinstance(input_ids, tuple):
         input_ids = input_ids[0]
+
+    # 截断超长输入，保留最后 MAX_SEQ_LEN - max_tokens 个 token
+    max_input_len = MAX_SEQ_LEN - max_tokens - 256  # 留 256 token 缓冲
+    if hasattr(input_ids, 'shape'):
+        current_len = input_ids.shape[-1]
+    else:
+        current_len = len(input_ids)
+
+    if current_len > max_input_len:
+        print(f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}")
+        if hasattr(input_ids, 'shape'):
+            input_ids = input_ids[:, -max_input_len:]
+        else:
+            input_ids = input_ids[-max_input_len:]
 
     full_text = ""
     eos = False
@@ -208,6 +207,7 @@ async def generate_completion(data):
         if eos:
             break
 
+    # 检查是否是 tool call
     def parse_tool_calls(text):
         try:
             data = json.loads(text.strip())
@@ -288,6 +288,7 @@ async def generate_completion(data):
 async def chat_completions(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
+    # 支持工具调用
     tools = data.get("tools", [])
     model_name = data.get("model", "qwen2.5-coder-14b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
@@ -304,6 +305,20 @@ async def chat_completions(request: Request):
     input_ids = tokenizer.encode(prompt)
     if isinstance(input_ids, tuple):
         input_ids = input_ids[0]
+
+    # 截断超长输入，保留最后 MAX_SEQ_LEN - max_tokens 个 token
+    max_input_len = MAX_SEQ_LEN - max_tokens - 256  # 留 256 token 缓冲
+    if hasattr(input_ids, 'shape'):
+        current_len = input_ids.shape[-1]
+    else:
+        current_len = len(input_ids)
+
+    if current_len > max_input_len:
+        print(f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}")
+        if hasattr(input_ids, 'shape'):
+            input_ids = input_ids[:, -max_input_len:]
+        else:
+            input_ids = input_ids[-max_input_len:]
 
     if stream:
 
@@ -380,26 +395,48 @@ async def chat_completions(request: Request):
                         yield f"data: {json.dumps(data)}\n\n"
 
                 if eos:
+                    # 发送带有 finish_reason 的最终消息
                     if not tool_calls_sent:
-                        tool_calls = (
-                            parse_tool_calls(full_output)
-                            if "parse_tool_calls" in globals()
-                            else None
-                        )
-                        if tool_calls:
-                            data = {
-                                "choices": [
+                        # 检查是否是 tool call
+                        try:
+                            parsed = json.loads(full_output.strip())
+                            if (
+                                isinstance(parsed, dict)
+                                and "name" in parsed
+                                and "arguments" in parsed
+                            ):
+                                tool_calls = [
                                     {
-                                        "delta": {
-                                            "role": "assistant",
-                                            "tool_calls": tool_call,
+                                        "id": f"call_{int(time.time() * 1000)}",
+                                        "type": "function",
+                                        "function": {
+                                            "name": parsed["name"],
+                                            "arguments": json.dumps(parsed["arguments"])
+                                            if isinstance(parsed["arguments"], dict)
+                                            else str(parsed["arguments"]),
                                         },
-                                        "finish_reason": "tool_calls",
                                     }
                                 ]
-                            }
-                            yield f"data: {json.dumps(data)}\n\n"
-                        else:
+                                data = {
+                                    "choices": [
+                                        {
+                                            "delta": {
+                                                "role": "assistant",
+                                                "tool_calls": tool_calls,
+                                            },
+                                            "finish_reason": "tool_calls",
+                                        }
+                                    ]
+                                }
+                                yield f"data: {json.dumps(data)}\n\n"
+                            else:
+                                # 普通回复，发送 finish_reason: stop (OpenAI 格式要求 delta 为空对象)
+                                data = {
+                                    "choices": [{"delta": {}, "finish_reason": "stop"}]
+                                }
+                                yield f"data: {json.dumps(data)}\n\n"
+                        except:
+                            # 普通回复
                             data = {"choices": [{"delta": {}, "finish_reason": "stop"}]}
                             yield f"data: {json.dumps(data)}\n\n"
                     yield "data: [DONE]\n\n"
@@ -407,24 +444,39 @@ async def chat_completions(request: Request):
 
             if not eos:
                 if not tool_calls_sent:
-                    tool_calls = (
-                        parse_tool_calls(full_output)
-                        if "parse_tool_calls" in globals()
-                        else None
-                    )
-                    if tool_calls:
-                        data = {
-                            "choices": [
+                    try:
+                        parsed = json.loads(full_output.strip())
+                        if (
+                            isinstance(parsed, dict)
+                            and "name" in parsed
+                            and "arguments" in parsed
+                        ):
+                            tool_calls = [
                                 {
-                                    "delta": {
-                                        "role": "assistant",
-                                        "tool_calls": tool_calls,
+                                    "id": f"call_{int(time.time() * 1000)}",
+                                    "type": "function",
+                                    "function": {
+                                        "name": parsed["name"],
+                                        "arguments": json.dumps(parsed["arguments"])
+                                        if isinstance(parsed["arguments"], dict)
+                                        else str(parsed["arguments"]),
                                     },
-                                    "finish_reason": "tool_calls",
                                 }
                             ]
-                        }
-                        yield f"data: {json.dumps(data)}\n\n"
+                            data = {
+                                "choices": [
+                                    {
+                                        "delta": {
+                                            "role": "assistant",
+                                            "tool_calls": tool_calls,
+                                        },
+                                        "finish_reason": "tool_calls",
+                                    }
+                                ]
+                            }
+                            yield f"data: {json.dumps(data)}\n\n"
+                    except:
+                        pass
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
@@ -530,6 +582,7 @@ def build_prompt(messages, tools=None):
     if not messages:
         return ""
 
+    # Qwen2.5 工具调用格式
     tools_def = ""
     if tools:
         tools_def = "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n"
@@ -553,9 +606,11 @@ def build_prompt(messages, tools=None):
         elif role == "user":
             prompt += f"<|im_start|>user\n{content}<|im_end|>\n"
         elif role == "assistant":
+            # 处理 assistant 消息，可能是字符串或列表
             if isinstance(content, str):
                 prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
             elif isinstance(content, list):
+                # 处理 content 是列表的情况 (如 OpenAI 格式)
                 text_content = ""
                 for item in content:
                     if isinstance(item, dict):
@@ -566,12 +621,14 @@ def build_prompt(messages, tools=None):
                 if text_content:
                     prompt += f"<|im_start|>assistant\n{text_content}<|im_end|>\n"
 
+    # 如果没有 system 消息，添加默认的（包含明确的停止指令）
     if not system_set:
         system_msg = """You are a helpful coding assistant.
 
 IMPORTANT: When you finish answering the user's question, do NOT ask follow-up questions or suggest next steps. Simply end your response. The conversation should stop after your answer."""
         prompt = f"<|im_start|>system\n{system_msg}{tools_def}<|im_end|>\n" + prompt
 
+    # 添加最后的 assistant 标记
     prompt += "<|im_start|>assistant\n"
     return prompt
 
