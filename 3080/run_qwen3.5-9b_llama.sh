@@ -1,4 +1,26 @@
 #!/bin/bash
+#
+# 【模型信息】
+# 模型: Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled (GGUF Q4_K_M)
+# 框架: llama.cpp
+# 显存占用: ~6GB (RTX 3080 10GB)
+# 上下文: 64K (262144 tokens, 实际可用 ~64K)
+#
+# 【性能测试数据 - 30个高难度提示词】
+# 平均速度: 67.5 tokens/s
+# 最快: Dijkstra算法 77.2 tokens/s
+# 最慢: 快速排序 53.0 tokens/s (首次加载)
+# 典型速度: 65-75 tokens/s
+#
+# 【测试方法】
+# cd /home/dministrator/my-shell
+# python3 branch.py 11434 "Qwen3.5-9B.Q4_K_M.gguf" 200
+#
+# 【对比其他框架】
+# llama.cpp: 67.5 tokens/s (当前)
+# KoboldCpp: 60.2 tokens/s
+# ExLlamaV2 7B: 78.4 tokens/s
+#
 
 MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
 LLAMA_SERVER="$HOME/llama.cpp/build/bin/llama-server"

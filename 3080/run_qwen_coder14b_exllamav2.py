@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-
+#
+# 【模型信息】
+# 模型: Qwen2.5-Coder-14B-Instruct-exl2
+# 框架: ExLlamaV2
+# 显存占用: ~10GB (RTX 3080 10GB)
+# 上下文: 12K (12288 tokens)
+#
+# 【性能测试数据 - 30个高难度提示词】
+# 平均速度: 53.4 tokens/s
+# 最快: 红黑树 59.0 tokens/s
+# 最慢: 最长公共子序列 40.4 tokens/s
+# 典型速度: 50-58 tokens/s
+#
+# 【测试方法】
+# cd /home/dministrator/my-shell
+# python3 branch.py 11434 "qwen2.5-coder-14b-exl2" 200
+#
 # =============================================================================
 # 依赖安装 (首次运行前执行)
 # =============================================================================
@@ -176,14 +192,16 @@ async def generate_completion(data):
 
     # 截断超长输入，保留最后 MAX_SEQ_LEN - max_tokens 个 token
     max_input_len = MAX_SEQ_LEN - max_tokens - 256  # 留 256 token 缓冲
-    if hasattr(input_ids, 'shape'):
+    if hasattr(input_ids, "shape"):
         current_len = input_ids.shape[-1]
     else:
         current_len = len(input_ids)
 
     if current_len > max_input_len:
-        print(f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}")
-        if hasattr(input_ids, 'shape'):
+        print(
+            f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}"
+        )
+        if hasattr(input_ids, "shape"):
             input_ids = input_ids[:, -max_input_len:]
         else:
             input_ids = input_ids[-max_input_len:]
@@ -308,14 +326,16 @@ async def chat_completions(request: Request):
 
     # 截断超长输入，保留最后 MAX_SEQ_LEN - max_tokens 个 token
     max_input_len = MAX_SEQ_LEN - max_tokens - 256  # 留 256 token 缓冲
-    if hasattr(input_ids, 'shape'):
+    if hasattr(input_ids, "shape"):
         current_len = input_ids.shape[-1]
     else:
         current_len = len(input_ids)
 
     if current_len > max_input_len:
-        print(f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}")
-        if hasattr(input_ids, 'shape'):
+        print(
+            f"[WARNING] Input too long ({current_len}), truncating to {max_input_len}"
+        )
+        if hasattr(input_ids, "shape"):
             input_ids = input_ids[:, -max_input_len:]
         else:
             input_ids = input_ids[-max_input_len:]

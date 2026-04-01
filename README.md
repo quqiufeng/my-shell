@@ -2,6 +2,10 @@
 
 本地 AI 工具脚本集合，针对 **RTX 3080 10GB** 显存优化。
 
+## 📚 重要文档
+
+- **[OpenCode 本地大模型配置指南](opencode.md)** - 如何配置 OpenCode 连接本地部署的 Qwen 模型 API
+
 ## 环境要求
 
 - GPU: NVIDIA RTX 3080 10GB

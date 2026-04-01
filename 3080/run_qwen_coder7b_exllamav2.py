@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 #
+# 【模型信息】
+# 模型: Qwen2.5-Coder-7B-Instruct-exl2
+# 框架: ExLlamaV2
+# 显存占用: ~8GB (RTX 3080 10GB)
+# 上下文: 64K (65536 tokens)
+#
+# 【性能测试数据 - 30个高难度提示词】
+# 平均速度: 78.4 tokens/s
+# 最快: 二分查找 92.5 tokens/s
+# 最慢: 快速排序 46.2 tokens/s (首次加载)
+# 典型速度: 70-90 tokens/s
+#
+# 【测试方法】
+# cd /home/dministrator/my-shell
+# python3 branch.py 11434 "qwen2.5-coder-7b-exl2" 200
+#
 # 【环境版本要求 - 重要】
 #
 # GCC:    12.x  (GCC 13 不被 CUDA 12.1 支持)
@@ -104,12 +120,12 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                "id": "qwen2.5-coder-14b-exl2",
+                "id": "qwen2.5-coder-7b-exl2",
                 "object": "model",
                 "created": 1677610602,
                 "owned_by": "qwen",
                 "permission": [],
-                "root": "qwen2.5-coder-14b-exl2",
+                "root": "qwen2.5-coder-7b-exl2",
             }
         ],
     }
@@ -128,7 +144,7 @@ async def responses(request: Request):
 
     tools = data.get("tools", [])
     chat_data = {
-        "model": data.get("model", "qwen2.5-coder-14b-exl2"),
+        "model": data.get("model", "qwen2.5-coder-7b-exl2"),
         "messages": messages,
         "tools": tools,
         "tool_choice": "auto" if tools else None,
@@ -237,7 +253,7 @@ async def generate_completion(data):
             "id": f"chatcmpl-{int(time.time() * 1000)}",
             "object": "chat.completion",
             "created": int(time.time()),
-            "model": data.get("model", "qwen2.5-coder-14b-exl2"),
+            "model": data.get("model", "qwen2.5-coder-7b-exl2"),
             "choices": [
                 {
                     "index": 0,
@@ -263,7 +279,7 @@ async def generate_completion(data):
             "id": f"chatcmpl-{int(time.time() * 1000)}",
             "object": "chat.completion",
             "created": int(time.time()),
-            "model": data.get("model", "qwen2.5-coder-14b-exl2"),
+            "model": data.get("model", "qwen2.5-coder-7b-exl2"),
             "choices": [
                 {
                     "index": 0,
@@ -291,7 +307,7 @@ async def chat_completions(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
     tools = data.get("tools", [])
-    model_name = data.get("model", "qwen2.5-coder-14b-exl2")
+    model_name = data.get("model", "qwen2.5-coder-7b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
 
