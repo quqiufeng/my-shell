@@ -19,7 +19,7 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import (
     ExLlamaV2,
     ExLlamaV2Config,
-    ExLlamaV2Cache_Q6,  # Changed from Q4 to Q6 for better quality/size balance
+    ExLlamaV2Cache_Q6,  # Using Q6 for original performance
     ExLlamaV2Tokenizer,
     ExLlamaV2Cache,
 )
@@ -27,9 +27,9 @@ from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 
 app = FastAPI()
 
-MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2"
+MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-14B-Instruct-exl2/3_5"
 
-MAX_SEQ_LEN = 8192  # 8k context - reduced for lower VRAM usage (~4GB saved)
+MAX_SEQ_LEN = 12288  # 12k context - utilize more memory
 PORT = 11434
 
 print("Loading main model...")
@@ -39,11 +39,10 @@ config.max_seq_len = MAX_SEQ_LEN
 config.no_flash_attn = False
 config.no_sdpa = False
 config.no_xformers = False
-config.no_cuda_graph = True  # Disable CUDA Graph to prevent JIT hang
 model = ExLlamaV2(config)
 # 使用 Q6 压缩 KV Cache (6-bit量化，比Q4质量更高但显存占用略增)
 # 如需更激进压缩可改为 ExLlamaV2Cache_Q4
-cache = ExLlamaV2Cache_Q6(model, lazy=True)
+cache = ExLlamaV2Cache_Q6(model, lazy=True)  # Q6 cache - original configuration
 model.load_autosplit(cache)
 
 tokenizer = ExLlamaV2Tokenizer(config)
@@ -55,7 +54,7 @@ generator = ExLlamaV2StreamingGenerator(
 )
 
 settings = ExLlamaV2Sampler.Settings()
-settings.temperature = 0.2  # Low temp for code stability with 3.5 BPW
+settings.temperature = 0.2  # Low temp for code stability
 settings.top_p = 0.9  # Nucleus sampling
 settings.token_repetition_penalty = 1.05  # Prevent looping in code generation
 
