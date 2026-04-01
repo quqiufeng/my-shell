@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/qwen2.5-coder-32b-exl2",
+  "model": "openai/qwen2.5-coder-14b-exl2",
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
@@ -10,8 +10,13 @@
         "apiKey": "dummy"
       },
       "models": {
+        "qwen2.5-coder-14b-exl2": {
+          "name": "Qwen2.5-Coder-14B-EXL2 (本地3080)",
+          "maxContextWindow": 12288,
+          "maxOutputTokens": 4096
+        },
         "qwen2.5-coder-32b-exl2": {
-          "name": "Qwen2.5-Coder-32B-EXL2 (ExLlamaV2)",
+          "name": "Qwen2.5-Coder-32B-EXL2 (本地4090d)",
           "maxContextWindow": 32768,
           "maxOutputTokens": 8192
         },
