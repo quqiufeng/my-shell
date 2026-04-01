@@ -215,6 +215,36 @@ async def generate_completion(data):
     # 检查是否是 tool call
     def parse_tool_calls(text):
         try:
+            # 尝试解析 <tool_call> 格式
+            import re
+            tool_call_match = re.search(r'<tool_call>(.*?)</tool_call>', text, re.DOTALL)
+            if tool_call_match:
+                data = json.loads(tool_call_match.group(1).strip())
+                if isinstance(data, dict) and "name" in data and "arguments" in data:
+                    return [{
+                        "id": f"call_{int(time.time()*1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": data["name"],
+                            "arguments": json.dumps(data["arguments"]) if isinstance(data["arguments"], dict) else str(data["arguments"])
+                        }
+                    }]
+            
+            # 尝试解析 <tools> 格式
+            tools_match = re.search(r'<tools>(.*?)</tools>', text, re.DOTALL)
+            if tools_match:
+                data = json.loads(tools_match.group(1).strip())
+                if isinstance(data, dict) and "name" in data:
+                    return [{
+                        "id": f"call_{int(time.time()*1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": data["name"],
+                            "arguments": json.dumps(data.get("arguments", {})) if isinstance(data.get("arguments"), dict) else str(data.get("arguments", {}))
+                        }
+                    }]
+            
+            # 尝试直接解析 JSON
             data = json.loads(text.strip())
             if isinstance(data, dict) and "name" in data and "arguments" in data:
                 return [{

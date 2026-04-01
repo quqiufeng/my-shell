@@ -111,8 +111,7 @@ tar -xzf koboldcpp-linux-x64-cuda1210.tar.gz
 
 | 脚本 | 模型 | 路径 | 功能 | 性能 (RTX 4090D) |
 |------|------|------|------|------------------|
-| `run_qwen2.5-coder-14b-3.5_exl2.py` | **Qwen2.5-Coder 14B 3.5bpw** | `/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/3_5` | 代码生成/补全 (极速) | **~88.5 tok/s** ⭐ |
-| `run_qwen2.5-coder-14b-4.25_exl2.py` | **Qwen2.5-Coder 14B 4.25bpw** | `/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/4_5` | 代码生成 (高精度) | **~82.6 tok/s** |
+| `run_qwen2.5-coder-14b-4.25_exl2.py` | **Qwen2.5-Coder 14B 4.25bpw** | `/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/4_5` | 代码生成 (高精度) | **~82.6 tok/s** ⭐ |
 | `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B (ExLlamaV2)** | `/opt/gguf/exl2_4_0` | 代码生成 (投机解码+FlashAttention) | **~51 tok/s** |
 | `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B (llama.cpp) | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成 (GGUF格式) | **~42 tokens/s** |
 | `run_qwen3.5-9b_api.sh` | **Qwen3.5-9B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | **~110 tok/s** |
@@ -259,16 +258,14 @@ python3 run_qwen2.5-coder-32b_exl2.py
 
 | 模型 | 框架 | 加速技术 | 速度 | 显存 | 特点 |
 |------|------|----------|------|------|------|
-| **Qwen2.5-Coder-14B 3.5bpw** | ExLlamaV2 | FP16 Cache + CUDA Graph | **~88.5 tok/s** ⭐ | ~14.4GB | 🚀 **速度之王**，适合日常编码 |
-| **Qwen2.5-Coder-14B 4.25bpw** | ExLlamaV2 | FP16 Cache + CUDA Graph | **~82.6 tok/s** | ~15.5GB | 🎯 **质量优先**，精度更高 |
+| **Qwen2.5-Coder-14B 4.25bpw** | ExLlamaV2 | FP16 Cache + CUDA Graph | **~82.6 tok/s** ⭐ | ~15.5GB | 🎯 **质量与速度平衡**，推荐日常使用 |
 | Qwen3.5-9B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~113 tok/s | ~6GB | 速度快，代码+推理均衡 |
 | **Qwen2.5-Coder-32B** | ExLlamaV2 | 投机解码 (6 tokens) | **~51 tok/s** | ~20-22GB | 🏆 **代码能力最强**，适合复杂算法 |
 | Qwen2.5-Coder-32B | llama.cpp GGUF | 无 | ~42 tok/s | ~20GB | GGUF格式，通用性好 |
 | Qwen3.5-27B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~42 tok/s | ~18GB | 推理思维链强，代码一般 |
 
 **推荐策略**:
-- 🚀 **快速补全** → 14B 3.5bpw (88.5 tok/s)
-- 🎯 **均衡选择** → 14B 4.25bpw (82.6 tok/s, 更高精度)
+- 🎯 **日常使用** → 14B 4.25bpw (82.6 tok/s, 质量与速度平衡)
 - 🏆 **复杂算法** → 32B (51 tok/s, 最高代码质量)
 
 **⚠️ 重要：安装 FlashAttention (显著提升性能 50%+)**
