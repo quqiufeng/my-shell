@@ -25,7 +25,7 @@ from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/3_5"
-MAX_SEQ_LEN = 65536
+MAX_SEQ_LEN = 4096  # Reduced from 65k for speed
 PORT = 11435
 
 print("Loading Qwen2.5-Coder-14B model...")
@@ -37,7 +37,7 @@ config.max_seq_len = MAX_SEQ_LEN
 config.no_flash_attn = False
 config.no_sdpa = False
 config.no_xformers = False
-config.no_cuda_graph = True
+config.no_cuda_graph = False  # Enable CUDA Graph for speed
 
 model = ExLlamaV2(config)
 cache = ExLlamaV2Cache_Q4(model, lazy=True)
@@ -71,7 +71,7 @@ print(f"模型: 14B EXL2 (3.5bpw)")
 print(f"对内地址: http://localhost:{PORT}")
 print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
 print("=" * 60)
-print("预期速度: 150-200 tok/s")
+print("预期速度: 100-130 tok/s (4090D limit)")
 print("=" * 60)
 sys.stdout.flush()
 
@@ -101,7 +101,7 @@ async def chat_completions(request: Request):
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
     temperature = data.get("temperature", 0.0)
-    
+
     settings.temperature = temperature
 
     prompt = build_prompt(messages)
@@ -110,6 +110,7 @@ async def chat_completions(request: Request):
         input_ids = input_ids[0]
 
     if stream:
+
         def generate():
             eos = False
             generated = 0
