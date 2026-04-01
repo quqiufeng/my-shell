@@ -6,6 +6,7 @@ import sys
 PORT = sys.argv[1] if len(sys.argv) > 1 else "11434"
 MODEL = sys.argv[2] if len(sys.argv) > 2 else "qwen2.5-coder"
 URL = f"http://localhost:{PORT}/v1/chat/completions"
+MAX_TOKENS = int(sys.argv[3]) if len(sys.argv) > 3 else 100
 
 TESTS = [
     ("快速排序", "用Python实现快速排序"),
@@ -26,7 +27,7 @@ TESTS = [
 ]
 
 
-def test_speed(name, prompt, tokens=100):
+def test_speed(name, prompt, tokens=MAX_TOKENS):
     start = time.time()
     r = requests.post(
         URL,
@@ -48,9 +49,28 @@ def test_speed(name, prompt, tokens=100):
     return tps
 
 
+def print_usage():
+    print("Usage: python3 branch.py <port> <model_name> [max_tokens]")
+    print("  port: API端口 (默认: 11434)")
+    print("  model_name: 模型名称 (默认: qwen2.5-coder)")
+    print("  max_tokens: 生成token数 (默认: 100)")
+    print("")
+    print("示例:")
+    print("  python3 branch.py 11435 qwen2.5-coder-14b-exl2 500")
+    print("  python3 branch.py 11434 qwen2.5-coder-32b 100")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ["-h", "--help"]:
+        print_usage()
+        return
+
     print("=" * 60)
     print("API 性能测试")
+    print("=" * 60)
+    print(f"地址: {URL}")
+    print(f"模型: {MODEL}")
+    print(f"Max tokens: {MAX_TOKENS}")
     print("=" * 60)
     results = []
     for i, (name, prompt) in enumerate(TESTS, 1):
