@@ -48,7 +48,7 @@ app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/4_5"
 MAX_SEQ_LEN = 32768  # 优化：从64k降到32k，启用CUDA Graph
-PORT = 11436
+PORT = 11434
 
 print("Loading Qwen2.5-Coder-14B model...")
 print(f"Model: {MAIN_MODEL_DIR}")
