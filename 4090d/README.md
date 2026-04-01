@@ -96,7 +96,8 @@ tar -xzf koboldcpp-linux-x64-cuda1210.tar.gz
 |------|------|----------|------|
 | llama.cpp | ~42 tok/s | 20GB | 通用，兼容性好 |
 | **koboldcpp (48GB)** | **80-100+ tok/s** | **48GB** | **草稿模型加速** |
-| ExLlamaV2 | ~100-133 tok/s | 20GB | 最快，需 EXL2 格式 |
+| ExLlamaV2 (14B) | **~82-88 tok/s** | ~15GB | 最快，需 EXL2 格式 |
+| ExLlamaV2 (32B) | ~51 tok/s | ~22GB | 最高质量，投机解码 |
 
 **注意**: koboldcpp 需要 **48GB 显存** 才能发挥最佳性能（80层全GPU + 草稿模型）
 
@@ -108,10 +109,12 @@ tar -xzf koboldcpp-linux-x64-cuda1210.tar.gz
 
 ### 2. LLM 推理服务
 
-| 脚本 | 模型 | 路径 | 功能 | 性能 |
-|------|------|------|------|------|
-| `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B (llama.cpp) | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成/补全/调试 | **~42 tokens/s** |
-| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B (ExLlamaV2)** | `/opt/gguf/exl2_4_0` | 代码生成 (投机采样+FlashAttention) | **~100-230 tokens/s** |
+| 脚本 | 模型 | 路径 | 功能 | 性能 (RTX 4090D) |
+|------|------|------|------|------------------|
+| `run_qwen2.5-coder-14b-3.5_exl2.py` | **Qwen2.5-Coder 14B 3.5bpw** | `/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/3_5` | 代码生成/补全 (极速) | **~88.5 tok/s** ⭐ |
+| `run_qwen2.5-coder-14b-4.25_exl2.py` | **Qwen2.5-Coder 14B 4.25bpw** | `/opt/gguf/Qwen2.5-Coder-14B-Instruct-exl2/4_5` | 代码生成 (高精度) | **~82.6 tok/s** |
+| `run_qwen2.5-coder-32b_exl2.py` | **Qwen2.5-Coder 32B (ExLlamaV2)** | `/opt/gguf/exl2_4_0` | 代码生成 (投机解码+FlashAttention) | **~51 tok/s** |
+| `run_qwen2.5-coder32b_api.sh` | Qwen2.5-Coder 32B (llama.cpp) | `/opt/gguf/qwen2.5-coder-32b-instruct-q4_k_m.gguf` | 代码生成 (GGUF格式) | **~42 tokens/s** |
 | `run_qwen3.5-9b_api.sh` | **Qwen3.5-9B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | **~110 tok/s** |
 | `run_qwen3.5-27b-claude-46-opus_reasoning_api.sh` | **Qwen3.5-27B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUFF/Qwen3.5-27B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | ~41 tokens/s |
 
@@ -211,10 +214,11 @@ python3 run_qwen2.5-coder-32b_exl2.py
 | `no_sdpa` | False | 强制使用 FlashAttention |
 | `KV Cache` | Q4 | 量化缓存 |
 
-#### 性能表现
+#### 性能表现 (2026-04-01 实测)
 | 测试任务 | 时间 | 速度 |
 |----------|------|------|
-| 快速排序 | 6.11s | **~133 tok/s** |
+| 快速排序 | 4.96s | **~40.3 tok/s** |
+| 平均 (30项测试) | - | **~51.1 tok/s** |
 
 ---
 
@@ -251,16 +255,21 @@ python3 run_qwen2.5-coder-32b_exl2.py
 |----------|---------|------|------|
 | 快速排序 | 477 | 11.36s | **42.0 tok/s** |
 
-#### 性能对比 (4090D 实测)
+#### 性能对比 (4090D 实测, 2026-04-01)
 
-| 模型 | 框架 | 加速技术 | 速度 | 特点 |
-|------|------|----------|------|------|
-| Qwen3.5-9B-Claude-4.6-Opus | llama.cpp GGUF | 无 | **~113 tok/s** | 速度快，代码+推理均衡 |
-| Qwen2.5-Coder-32B | ExLlamaV2 | 投机解码 | **~133 tok/s** | 代码能力强，速度快 |
-| Qwen2.5-Coder-32B | llama.cpp GGUF | 无 | ~42 tok/s | 代码能力最强，但速度慢 |
-| Qwen3.5-27B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~42 tok/s | 推理思维链强，代码一般 |
+| 模型 | 框架 | 加速技术 | 速度 | 显存 | 特点 |
+|------|------|----------|------|------|------|
+| **Qwen2.5-Coder-14B 3.5bpw** | ExLlamaV2 | FP16 Cache + CUDA Graph | **~88.5 tok/s** ⭐ | ~14.4GB | 🚀 **速度之王**，适合日常编码 |
+| **Qwen2.5-Coder-14B 4.25bpw** | ExLlamaV2 | FP16 Cache + CUDA Graph | **~82.6 tok/s** | ~15.5GB | 🎯 **质量优先**，精度更高 |
+| Qwen3.5-9B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~113 tok/s | ~6GB | 速度快，代码+推理均衡 |
+| **Qwen2.5-Coder-32B** | ExLlamaV2 | 投机解码 (6 tokens) | **~51 tok/s** | ~20-22GB | 🏆 **代码能力最强**，适合复杂算法 |
+| Qwen2.5-Coder-32B | llama.cpp GGUF | 无 | ~42 tok/s | ~20GB | GGUF格式，通用性好 |
+| Qwen3.5-27B-Claude-4.6-Opus | llama.cpp GGUF | 无 | ~42 tok/s | ~18GB | 推理思维链强，代码一般 |
 
-**推荐**: 代码任务用 **ExLlamaV2**，日常对话用 **9B Opus**
+**推荐策略**:
+- 🚀 **快速补全** → 14B 3.5bpw (88.5 tok/s)
+- 🎯 **均衡选择** → 14B 4.25bpw (82.6 tok/s, 更高精度)
+- 🏆 **复杂算法** → 32B (51 tok/s, 最高代码质量)
 
 **⚠️ 重要：安装 FlashAttention (显著提升性能 50%+)**
 
@@ -367,7 +376,7 @@ curl -N -X POST http://localhost:11434/v1/chat/completions \
 | 优先级队列 | 79 |
 | 依赖注入容器 | 95 |
 
-**实测速度: ~133 tok/s (快速排序测试)**
+**实测速度: ~51 tok/s (平均), 最高 ~73 tok/s (阻塞队列测试)**
 
 #### 停止服务
 
