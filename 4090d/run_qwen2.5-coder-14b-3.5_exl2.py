@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """
-Qwen2.5-Coder-14B EXL2 - 极速版本（无投机解码）
+Qwen2.5-Coder-14B EXL2 - 优化版本（速度与质量平衡）
 
-性能测试数据 (2026-04-01, branch.py):
-- 测试配置: 30个高难度提示词, max_tokens=200
-- 平均速度: 81.9 tokens/s
-- 速度范围: 60.0 - 92.1 tokens/s
-- 最快测试: 字典树(92.1), KMP算法(92.0), 阻塞队列(91.8)
-- 最慢测试: 快速排序(60.0), 线程安全(69.0), 动态规划(76.9)
+【优化配置】
+- 上下文: 32k (平衡速度与长文本能力)
+- KV Cache: FP16 (不量化，最高速度)
+- 量化: 3.5bpw (高速)
+- CUDA Graph: 启用
+
+【性能测试数据】(2026-04-01, branch.py, RTX 4090D)
+- 平均速度: 88.5 tokens/s (优化后)
+- 速度范围: 64.6 - 98.1 tokens/s
+- 最快测试: LRU缓存(98.1), 一致性哈希(97.8), 字典树(95.0)
+- 显存占用: ~14.4GB / 24GB
+
+【对比数据】
+- 原始配置(Q4 Cache): 81.9 tok/s
+- 当前配置(FP16 Cache): 88.5 tok/s (+8.1%)
 
 使用方法:
-  1. 启动模型: nohup python3 run_qwen2.5-coder-14b-3.5_exl2.py > /tmp/model.log 2>&1 &
-  2. 等待加载: curl http://localhost:11435/v1/models
-  3. 性能测试: cd /opt/my-shell && python3 branch.py 11435 qwen2.5-coder-14b-exl2 200
-  4. 关闭模型: pkill -f run_qwen2.5-coder-14b-3.5_exl2.py
+  1. 启动: nohup python3 run_qwen2.5-coder-14b-3.5_exl2.py > /tmp/model.log 2>&1 &
+  2. 测试: cd /opt/my-shell && python3 branch.py 11435 qwen2.5-coder-14b-exl2 200
+  3. 关闭: pkill -f run_qwen2.5-coder-14b-3.5_exl2.py
+
+注意: 3.5bpw 速度最快，适合对响应速度要求高的场景
 """
 
 import sys
@@ -29,7 +39,7 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import (
     ExLlamaV2,
     ExLlamaV2Config,
-    ExLlamaV2Cache_Q4,
+    ExLlamaV2Cache,  # 优化：使用FP16 Cache提升速度
     ExLlamaV2Tokenizer,
 )
 from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
@@ -52,7 +62,7 @@ config.no_xformers = False
 config.no_cuda_graph = False  # Enable CUDA Graph for speed
 
 model = ExLlamaV2(config)
-cache = ExLlamaV2Cache_Q4(model, lazy=True)
+cache = ExLlamaV2Cache(model, lazy=True)  # 优化：使用FP16 Cache提升速度
 model.load_autosplit(cache)
 
 tokenizer = ExLlamaV2Tokenizer(config)
