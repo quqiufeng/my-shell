@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@tarquinen/opencode-dcp@latest"],
+  "model": "openai/qwen2.5-coder-7b-exl2",
+  "mcp": {},
+  "provider": {
+    "openai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Models",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "dummy",
+        "timeout": 120000
+      },
+      "models": {
+        "qwen2.5-coder-7b-exl2": {
+          "name": "Qwen2.5-Coder-7B-EXL2 (本地3080)",
+          "maxContextWindow": 32768,
+          "maxOutputTokens": 4096,
+          "timeout": 120000
+        },
+        "koboldcpp/Qwen3.5-9B.Q4_K_M": {
+          "name": "Qwen3.5-9B-Claude (本地3080)",
+          "maxContextWindow": 81920,
+          "maxOutputTokens": 4096,
+          "timeout": 120000
+        }
+      }
+    }
+  }
+}
