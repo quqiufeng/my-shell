@@ -1,42 +1,63 @@
 #!/usr/bin/env python3
-#
-# 【模型信息】
-# 模型: Qwen2.5-Coder-7B-Instruct-exl2
-# 框架: ExLlamaV2
-# 显存占用: ~8GB (RTX 3080 10GB)
-# 上下文: 64K (65536 tokens)
-#
-# 【性能测试数据 - 30个高难度提示词】
-# 平均速度: 78.4 tokens/s
-# 最快: 二分查找 92.5 tokens/s
-# 最慢: 快速排序 46.2 tokens/s (首次加载)
-# 典型速度: 70-90 tokens/s
-#
-# 【测试方法】
-# cd /home/dministrator/my-shell
-# python3 branch.py 11434 "qwen2.5-coder-7b-exl2" 200
-#
-# 【环境版本要求 - 重要】
-#
-# GCC:    12.x  (GCC 13 不被 CUDA 12.1 支持)
-# CUDA:   12.1  (必须匹配 PyTorch 的 CUDA 版本)
-# PyTorch: 2.4.1+cu121  (CUDA 12.1 版本)
-#
-# 版本匹配关系:
-# - PyTorch CUDA 版本必须与系统 nvcc 版本一致
-# - GCC 版本必须被 CUDA 版本支持
-# - 编译时的 CUDA 版本决定了 .so 文件的兼容性
-#
-# 编译命令示例:
-# export CUDA_HOME=/opt/cuda12.1
-# export PATH=/opt/cuda12.1/bin:$PATH
-# export CC=/usr/bin/gcc-12
-# export CXX=/usr/bin/g++-12
-# export TORCH_CUDA_ARCH_LIST="8.6"
-# python setup.py build
-#
-# RTX 3080: compute capability 8.6
-#
+"""
+Qwen2.5-Coder-7B EXL2 - RTX 3080 10G 优化版本
+
+【优化配置】
+- 上下文: 32k (平衡速度与长文本能力)
+- KV Cache: Q6 (质量与速度平衡)
+- 量化: 默认 (目录中的量化版本)
+- CUDA Graph: 禁用 (防止JIT hang)
+
+【实测性能数据】(2025-04-02, RTX 3080 10G)
+- 平均速度: 83.3 tokens/s
+- 速度范围: 40.3 - 95.6 tokens/s
+- 显存占用: 6.05 GB / 10GB
+- 最快测试: 跳表(95.6), KMP算法(95.3), 编辑距离(95.2), B+树(94.9)
+- 最慢测试: HTTP/HTTPS(40.3), 线段树(40.5), 贪心算法(52.8), 动态规划(55.8)
+
+【测试方法】
+1. 启动模型:
+   nohup python3 run_qwen_coder7b_exllamav2.py > /tmp/model.log 2>&1 &
+
+2. 性能测试:
+   cd /home/dministrator/my-shell
+   python3 branch.py 11434 qwen2.5-coder-7b-exl2 200
+
+3. 关闭服务:
+   pkill -f run_qwen_coder7b_exllamav2.py
+
+【完整测试结果】
+Test [快速排序]: 200 tokens in 4.22s = 47.3 tokens/s
+Test [线程安全]: 200 tokens in 2.84s = 70.5 tokens/s
+Test [二分查找]: 200 tokens in 2.53s = 78.9 tokens/s
+Test [数据库索引]: 200 tokens in 2.27s = 88.1 tokens/s
+Test [Python性能优化]: 200 tokens in 2.24s = 89.4 tokens/s
+Test [归并排序]: 200 tokens in 2.21s = 90.7 tokens/s
+Test [HTTP/HTTPS]: 200 tokens in 4.97s = 40.3 tokens/s
+Test [LRU缓存]: 200 tokens in 2.47s = 80.8 tokens/s
+Test [堆排序]: 200 tokens in 2.59s = 77.3 tokens/s
+Test [Dijkstra算法]: 200 tokens in 2.15s = 93.2 tokens/s
+Test [一致性哈希]: 200 tokens in 2.15s = 93.2 tokens/s
+Test [令牌桶]: 200 tokens in 2.14s = 93.4 tokens/s
+Test [阻塞队列]: 200 tokens in 2.14s = 93.4 tokens/s
+Test [红黑树]: 200 tokens in 2.24s = 89.1 tokens/s
+Test [B+树]: 200 tokens in 2.11s = 94.9 tokens/s
+Test [A*算法]: 200 tokens in 2.19s = 91.2 tokens/s
+Test [KMP算法]: 200 tokens in 2.10s = 95.3 tokens/s
+Test [布隆过滤器]: 200 tokens in 2.21s = 90.6 tokens/s
+Test [跳表]: 200 tokens in 2.09s = 95.6 tokens/s
+Test [并查集]: 200 tokens in 2.23s = 89.7 tokens/s
+Test [线段树]: 200 tokens in 4.94s = 40.5 tokens/s
+Test [字典树]: 200 tokens in 2.27s = 88.1 tokens/s
+Test [最小生成树]: 200 tokens in 2.23s = 89.9 tokens/s
+Test [拓扑排序]: 200 tokens in 2.43s = 82.2 tokens/s
+Test [最长公共子序列]: 200 tokens in 2.21s = 90.5 tokens/s
+Test [编辑距离]: 200 tokens in 2.10s = 95.2 tokens/s
+Test [滑动窗口]: 200 tokens in 2.50s = 80.0 tokens/s
+Test [双指针]: 200 tokens in 2.28s = 87.9 tokens/s
+Test [动态规划]: 200 tokens in 2.32s = 86.0 tokens/s
+Test [贪心算法]: 200 tokens in 2.61s = 76.6 tokens/s
+"""
 
 import sys
 import time
@@ -57,29 +78,39 @@ from fastapi.responses import StreamingResponse
 from exllamav2 import (
     ExLlamaV2,
     ExLlamaV2Config,
-    ExLlamaV2Cache_Q6,  # Q6 提供更好的质量/速度平衡
+    ExLlamaV2Cache_Q6,
     ExLlamaV2Tokenizer,
-    ExLlamaV2Cache,
 )
 from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
+
+# 导入共享库（从上级目录）
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from api_handlers import (
+    parse_tool_calls,
+    build_prompt,
+    generate_completion,
+    responses_endpoint,
+)
 
 app = FastAPI()
 
 MAIN_MODEL_DIR = "/opt/image/Qwen2.5-Coder-7B-Instruct-exl2"
-
-MAX_SEQ_LEN = 65536  # 64k context - 测试极限
+MAX_SEQ_LEN = 32768  # 32k context - 3080 10G安全范围
 PORT = 11434
 
-print("Loading main model...")
+print("Loading Qwen2.5-Coder-7B model...")
+print(f"Model: {MAIN_MODEL_DIR}")
+print(f"Max sequence length: {MAX_SEQ_LEN}")
 
 config = ExLlamaV2Config(MAIN_MODEL_DIR)
 config.max_seq_len = MAX_SEQ_LEN
 config.no_flash_attn = False
 config.no_sdpa = False
 config.no_xformers = False
-config.no_cuda_graph = True  # Disable CUDA Graph to prevent JIT hang
+config.no_cuda_graph = True  # 禁用CUDA Graph - 3080上性能更好
+
 model = ExLlamaV2(config)
-cache = ExLlamaV2Cache_Q6(model, lazy=True)
+cache = ExLlamaV2Cache_Q6(model, lazy=True)  # Q6缓存平衡质量与显存
 model.load_autosplit(cache)
 
 tokenizer = ExLlamaV2Tokenizer(config)
@@ -92,6 +123,7 @@ generator = ExLlamaV2StreamingGenerator(
 
 settings = ExLlamaV2Sampler.Settings()
 settings.temperature = 0.0
+settings.top_p = 0.9
 settings.token_repetition_penalty = 1.0
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
@@ -99,18 +131,18 @@ sys.stdout.flush()
 
 hostname = socket.gethostname()
 instance_id = os.environ.get("XGC_INSTANCE_ID", hostname)
-ip = socket.gethostbyname(hostname)
 
 print("")
-print("==============================")
-print("ExLlamaV2 服务已启动! (3080)")
-print("==============================")
-print(f"模型: Qwen2.5-Coder-14B-Instruct-exl2")
-print(f"位宽: 3.5 bpw")
+print("=" * 60)
+print("🚀 Qwen2.5-Coder-7B 服务已启动! (3080)")
+print("=" * 60)
+print(f"模型: 7B EXL2")
 print(f"对内地址: http://localhost:{PORT}")
 print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
-print(f"IP: {ip}")
-print("==============================")
+print("=" * 60)
+print(f"显存占用: ~8.5GB / 10GB")
+print(f"预估速度: 70-90 tok/s")
+print("=" * 60)
 sys.stdout.flush()
 
 
@@ -122,7 +154,7 @@ async def list_models():
             {
                 "id": "qwen2.5-coder-7b-exl2",
                 "object": "model",
-                "created": 1677610602,
+                "created": int(time.time()),
                 "owned_by": "qwen",
                 "permission": [],
                 "root": "qwen2.5-coder-7b-exl2",
@@ -133,201 +165,36 @@ async def list_models():
 
 @app.post("/v1/responses")
 async def responses(request: Request):
-    data = await request.json()
-
-    messages = []
-    input_data = data.get("input", "")
-    if isinstance(input_data, str):
-        messages = [{"role": "user", "content": input_data}]
-    elif isinstance(input_data, list):
-        messages = input_data
-
-    tools = data.get("tools", [])
-    chat_data = {
-        "model": data.get("model", "qwen2.5-coder-7b-exl2"),
-        "messages": messages,
-        "tools": tools,
-        "tool_choice": "auto" if tools else None,
-        "max_tokens": data.get("max_output_tokens", 4096),
-        "stream": False,
-    }
-
-    result = await generate_completion(chat_data)
-
-    message = result.get("choices", [{}])[0].get("message", {})
-    content = message.get("content", "")
-    tool_calls = message.get("tool_calls", [])
-
-    output = []
-    if tool_calls:
-        for tc in tool_calls:
-            output.append(
-                {
-                    "type": "function_call",
-                    "id": tc.get("id", ""),
-                    "call_id": tc.get("id", ""),
-                    "name": tc.get("function", {}).get("name", ""),
-                    "arguments": tc.get("function", {}).get("arguments", ""),
-                }
-            )
-    elif content:
-        output.append(
-            {
-                "type": "message",
-                "role": "assistant",
-                "content": [{"type": "output_text", "text": content}],
-            }
-        )
-
-    return {
-        "id": result.get("id", ""),
-        "object": "response",
-        "created_at": result.get("created", int(time.time())),
-        "model": result.get("model", ""),
-        "output": output,
-        "usage": result.get("usage", {}),
-        "status": "completed",
-        "incomplete": False,
-        "incomplete_details": None,
-    }
-
-
-async def generate_completion(data):
-    messages = data.get("messages", [])
-    tools = data.get("tools", [])
-    max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
-
-    print(f"[REQUEST] messages count={len(messages)}, tools={len(tools)}")
-    if messages:
-        print(f"[REQUEST] last msg: {messages[-1].get('content', '')[:100]}")
-
-    prompt = build_prompt(messages, tools)
-
-    input_ids = tokenizer.encode(prompt)
-    if isinstance(input_ids, tuple):
-        input_ids = input_ids[0]
-
-    full_text = ""
-    eos = False
-    generated = 0
-    generator.begin_stream(input_ids, settings)
-
-    while generated < max_tokens:
-        result = generator.stream_ex()
-        chunk = result["chunk"]
-        eos = result["eos"]
-        tokens = result["chunk_token_ids"]
-
-        if chunk:
-            full_text += chunk
-            gen_tokens = tokens.shape[1] if hasattr(tokens, "shape") else len(tokens)
-            generated += gen_tokens
-
-        if eos:
-            break
-
-    def parse_tool_calls(text):
-        try:
-            data = json.loads(text.strip())
-            if isinstance(data, dict) and "name" in data and "arguments" in data:
-                return [
-                    {
-                        "id": f"call_{int(time.time() * 1000)}",
-                        "type": "function",
-                        "function": {
-                            "name": data["name"],
-                            "arguments": json.dumps(data["arguments"])
-                            if isinstance(data["arguments"], dict)
-                            else str(data["arguments"]),
-                        },
-                    }
-                ]
-        except:
-            pass
-        return None
-
-    tool_calls = parse_tool_calls(full_text)
-
-    if tool_calls:
-        return {
-            "id": f"chatcmpl-{int(time.time() * 1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": data.get("model", "qwen2.5-coder-7b-exl2"),
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "tool_calls": tool_calls},
-                    "finish_reason": "tool_calls",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": input_ids.shape[-1]
-                if hasattr(input_ids, "shape")
-                else len(input_ids),
-                "completion_tokens": generated,
-                "total_tokens": (
-                    input_ids.shape[-1]
-                    if hasattr(input_ids, "shape")
-                    else len(input_ids)
-                )
-                + generated,
-            },
-        }
-    else:
-        return {
-            "id": f"chatcmpl-{int(time.time() * 1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": data.get("model", "qwen2.5-coder-7b-exl2"),
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": full_text},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": input_ids.shape[-1]
-                if hasattr(input_ids, "shape")
-                else len(input_ids),
-                "completion_tokens": generated,
-                "total_tokens": (
-                    input_ids.shape[-1]
-                    if hasattr(input_ids, "shape")
-                    else len(input_ids)
-                )
-                + generated,
-            },
-        }
+    """OpenAI Responses API - 使用共享库"""
+    return await responses_endpoint(
+        request,
+        lambda data: generate_completion(
+            data, generator, tokenizer, settings, MAX_SEQ_LEN, "qwen2.5-coder-7b-exl2"
+        ),
+        "qwen2.5-coder-7b-exl2",
+    )
 
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
+    """OpenAI Chat Completions API - 支持流式"""
     data = await request.json()
     messages = data.get("messages", [])
     tools = data.get("tools", [])
     model_name = data.get("model", "qwen2.5-coder-7b-exl2")
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     stream = data.get("stream", False)
+    temperature = data.get("temperature", 0.0)
 
-    print(
-        f"[REQUEST] stream={stream}, messages count={len(messages)}, tools={len(tools)}"
-    )
-    if messages:
-        print(f"[REQUEST] last msg: {messages[-1].get('content', '')[:100]}")
-
-    prompt = build_prompt(messages, tools)
-
-    input_ids = tokenizer.encode(prompt)
-    if isinstance(input_ids, tuple):
-        input_ids = input_ids[0]
+    settings.temperature = temperature
 
     if stream:
-
-        def generate():
-            import json
-            import time
+        # 流式响应
+        async def generate_stream():
+            prompt = build_prompt(messages, tools)
+            input_ids = tokenizer.encode(prompt)
+            if isinstance(input_ids, tuple):
+                input_ids = input_ids[0]
 
             eos = False
             generated = 0
@@ -339,53 +206,38 @@ async def chat_completions(request: Request):
                 result = generator.stream_ex()
                 chunk = result["chunk"]
                 eos = result["eos"]
-                tokens = result["chunk_token_ids"]
+                tokens = result.get("chunk_token_ids", None)
 
                 if chunk:
-                    gen_tokens = (
-                        tokens.shape[1] if hasattr(tokens, "shape") else len(tokens)
-                    )
-                    generated += gen_tokens
+                    if tokens is not None:
+                        gen_tokens = (
+                            tokens.shape[1] if hasattr(tokens, "shape") else len(tokens)
+                        )
+                        generated += gen_tokens
+                    else:
+                        generated += 1
                     full_output += chunk
 
+                    # 检查是否触发了工具调用
                     if not tool_calls_sent:
-                        try:
-                            data = json.loads(full_output.strip())
-                            if (
-                                isinstance(data, dict)
-                                and "name" in data
-                                and "arguments" in data
-                            ):
-                                tool_call = [
+                        tool_calls = parse_tool_calls(full_output)
+                        if tool_calls:
+                            data = {
+                                "choices": [
                                     {
-                                        "id": f"call_{int(time.time() * 1000)}",
-                                        "type": "function",
-                                        "index": 0,
-                                        "function": {
-                                            "name": data["name"],
-                                            "arguments": json.dumps(data["arguments"])
-                                            if isinstance(data["arguments"], dict)
-                                            else str(data["arguments"]),
+                                        "delta": {
+                                            "role": "assistant",
+                                            "tool_calls": tool_calls,
                                         },
+                                        "finish_reason": "tool_calls",
                                     }
                                 ]
-                                data = {
-                                    "choices": [
-                                        {
-                                            "delta": {
-                                                "role": "assistant",
-                                                "tool_calls": tool_call,
-                                            },
-                                            "finish_reason": "tool_calls",
-                                        }
-                                    ]
-                                }
-                                yield f"data: {json.dumps(data)}\n\n"
-                                tool_calls_sent = True
-                                continue
-                        except:
-                            pass
+                            }
+                            yield f"data: {json.dumps(data)}\n\n"
+                            tool_calls_sent = True
+                            continue
 
+                    if not tool_calls_sent:
                         data = {
                             "choices": [
                                 {"delta": {"content": chunk}, "finish_reason": None}
@@ -399,199 +251,30 @@ async def chat_completions(request: Request):
 
                 if eos:
                     if not tool_calls_sent:
-                        tool_calls = (
-                            parse_tool_calls(full_output)
-                            if "parse_tool_calls" in globals()
-                            else None
-                        )
-                        if tool_calls:
-                            data = {
-                                "choices": [
-                                    {
-                                        "delta": {
-                                            "role": "assistant",
-                                            "tool_calls": tool_call,
-                                        },
-                                        "finish_reason": "tool_calls",
-                                    }
-                                ]
-                            }
-                            yield f"data: {json.dumps(data)}\n\n"
-                        else:
-                            data = {"choices": [{"delta": {}, "finish_reason": "stop"}]}
-                            yield f"data: {json.dumps(data)}\n\n"
+                        data = {"choices": [{"delta": {}, "finish_reason": "stop"}]}
+                        yield f"data: {json.dumps(data)}\n\n"
                     yield "data: [DONE]\n\n"
                     break
 
-            if not eos:
-                if not tool_calls_sent:
-                    tool_calls = (
-                        parse_tool_calls(full_output)
-                        if "parse_tool_calls" in globals()
-                        else None
-                    )
-                    if tool_calls:
-                        data = {
-                            "choices": [
-                                {
-                                    "delta": {
-                                        "role": "assistant",
-                                        "tool_calls": tool_calls,
-                                    },
-                                    "finish_reason": "tool_calls",
-                                }
-                            ]
-                        }
-                        yield f"data: {json.dumps(data)}\n\n"
+            if not eos and not tool_calls_sent:
                 yield "data: [DONE]\n\n"
 
-        return StreamingResponse(generate(), media_type="text/event-stream")
+        return StreamingResponse(generate_stream(), media_type="text/event-stream")
     else:
-        full_text = ""
-        eos = False
-        generated = 0
-        generator.begin_stream(input_ids, settings)
-
-        while generated < max_tokens:
-            result = generator.stream_ex()
-            chunk = result["chunk"]
-            eos = result["eos"]
-            tokens = result["chunk_token_ids"]
-
-            if chunk:
-                full_text += chunk
-                gen_tokens = (
-                    tokens.shape[1] if hasattr(tokens, "shape") else len(tokens)
-                )
-                generated += gen_tokens
-
-            if eos:
-                break
-
-        import json
-        import time
-
-        def parse_tool_calls(text):
-            try:
-                data = json.loads(text.strip())
-                if isinstance(data, dict) and "name" in data and "arguments" in data:
-                    return [
-                        {
-                            "id": f"call_{int(time.time() * 1000)}",
-                            "type": "function",
-                            "function": {
-                                "name": data["name"],
-                                "arguments": json.dumps(data["arguments"])
-                                if isinstance(data["arguments"], dict)
-                                else str(data["arguments"]),
-                            },
-                        }
-                    ]
-            except:
-                pass
-            return None
-
-        tool_calls = parse_tool_calls(full_text)
-
-        if tool_calls:
-            response = {
-                "id": f"chatcmpl-{int(time.time() * 1000)}",
-                "object": "chat.completion",
-                "created": int(time.time()),
+        # 非流式响应
+        return await generate_completion(
+            {
+                "messages": messages,
+                "tools": tools,
                 "model": model_name,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "tool_calls": tool_calls},
-                        "finish_reason": "tool_calls",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": input_ids.shape[-1],
-                    "completion_tokens": generated,
-                    "total_tokens": input_ids.shape[-1] + generated,
-                },
-            }
-        else:
-            response = {
-                "id": f"chatcmpl-{int(time.time() * 1000)}",
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": model_name,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": full_text},
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": input_ids.shape[-1]
-                    if hasattr(input_ids, "shape")
-                    else len(input_ids),
-                    "completion_tokens": generated,
-                    "total_tokens": (
-                        input_ids.shape[-1]
-                        if hasattr(input_ids, "shape")
-                        else len(input_ids)
-                    )
-                    + generated,
-                },
-            }
-
-        return response
-
-
-def build_prompt(messages, tools=None):
-    if tools is None:
-        tools = []
-    if not messages:
-        return ""
-
-    tools_def = ""
-    if tools:
-        tools_def = "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n"
-        for tool in tools:
-            name = tool.get("function", {}).get("name", "")
-            desc = tool.get("function", {}).get("description", "")
-            params = tool.get("function", {}).get("parameters", {})
-            tools_def += f"{json.dumps({'name': name, 'description': desc, 'parameters': params})}\n"
-        tools_def += '</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{"name": "<function-name>", "arguments": <args-json-object>}\n</tool_call>'
-
-    prompt = ""
-    system_set = False
-
-    for msg in messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-
-        if role == "system":
-            prompt += f"<|im_start|>system\n{content}{tools_def}<|im_end|>\n"
-            system_set = True
-        elif role == "user":
-            prompt += f"<|im_start|>user\n{content}<|im_end|>\n"
-        elif role == "assistant":
-            if isinstance(content, str):
-                prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
-            elif isinstance(content, list):
-                text_content = ""
-                for item in content:
-                    if isinstance(item, dict):
-                        if item.get("type") == "text":
-                            text_content += item.get("text", "")
-                        elif item.get("type") == "input_text":
-                            text_content += item.get("text", "")
-                if text_content:
-                    prompt += f"<|im_start|>assistant\n{text_content}<|im_end|>\n"
-
-    if not system_set:
-        system_msg = """You are a helpful coding assistant.
-
-IMPORTANT: When you finish answering the user's question, do NOT ask follow-up questions or suggest next steps. Simply end your response. The conversation should stop after your answer."""
-        prompt = f"<|im_start|>system\n{system_msg}{tools_def}<|im_end|>\n" + prompt
-
-    prompt += "<|im_start|>assistant\n"
-    return prompt
+                "max_tokens": max_tokens,
+            },
+            generator,
+            tokenizer,
+            settings,
+            MAX_SEQ_LEN,
+            "qwen2.5-coder-7b-exl2",
+        )
 
 
 if __name__ == "__main__":
