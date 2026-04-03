@@ -26,7 +26,7 @@
 # - 支持更多功能（Web UI、多模态）
 # - 速度接近 llama.cpp
 
-MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
+MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q5_K_S.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
@@ -34,7 +34,7 @@ export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 echo "=============================="
 echo "启动 Qwen3.5-9B-Claude (KoboldCpp)"
 echo "地址: http://0.0.0.0:11434"
-echo "模型: Qwen3.5-9B.Q4_K_M.gguf"
+echo "模型: Qwen3.5-9B.Q5_K_S.gguf"
 echo "框架: KoboldCpp (比 llama.cpp 更省内存)"
 echo "=============================="
 echo ""
