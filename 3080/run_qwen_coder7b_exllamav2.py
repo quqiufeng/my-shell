@@ -221,7 +221,7 @@ async def chat_completions(request: Request):
 
                     # 检查是否触发了工具调用
                     if not tool_calls_sent:
-                        tool_calls = parse_tool_calls(full_output)
+                        tool_calls = parse_tool_calls(full_output, tools)
                         if tool_calls:
                             data = {
                                 "choices": [
