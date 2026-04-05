@@ -14,6 +14,7 @@
 #
 # 【测试方法】
 # cd /home/dministrator/my-shell
+# nohup ./run_qwen3.5-9b_llama.sh > /tmp/llama_server.log 2>&1 &
 # python3 branch.py 11434 "Qwen3.5-9B.Q4_K_M.gguf" 200
 #
 # 【对比其他框架】
@@ -22,7 +23,7 @@
 # ExLlamaV2 7B: 78.4 tokens/s
 #
 
-MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q5_K_S.gguf"
+MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
 LLAMA_SERVER="$HOME/llama.cpp/build/bin/llama-server"
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
@@ -30,7 +31,7 @@ export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 echo "=============================="
 echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务 (3080)"
 echo "地址: http://0.0.0.0:11434"
-echo "模型: Qwen3.5-9B-Q5_K_S.gguf"
+echo "模型: Qwen3.5-9B-Q4_K_M.gguf"
 echo "上下文参数: -c 262144"
 echo "实际上下文: ~64K"
 echo "GPU层数: 35"
@@ -65,19 +66,32 @@ $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port 11434 \
-  -ngl 35 \
-  -c 262144 \
+  -ngl 55 \
+  -c 65536  \
   --batch-size 256 \
   --flash-attn on \
-  --cache-type-k q4_0 \
-  --cache-type-v q4_0 \
-  --threads 12 \
+  #--cache-type-k q4_0 \
+  #--cache-type-v q4_0 \
+  --threads 6 \
   --parallel 1 \
   --n-predict 4096 \
   --no-mmap \
   --mlock \
+  --stop "<|im_end|>" \
+  --stop "<|im_start|>" \
+  --stop "</tool_call>" \
   --jinja \
-  --temp 0
+  --chat-template-file ../qwen35-chat-template-corrected.jinja  \
+ 
+    --temp 0.6 \
+    --top-p 0.95 \
+    --top-k 20 \
+    --min-p 0.00 \
+    --cache-type-k bf16 --cache-type-v bf16 \
+    --flash-attn on \
+    --context-shift \
+    --metrics \
+    --chat-template-kwargs '{"enable_thinking":false}'
 
 # =============================================================================
 # 性能测试代码 - 用于评估模型推理性能
