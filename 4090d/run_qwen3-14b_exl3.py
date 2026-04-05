@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 """
 Qwen3-14B EXL3 启动脚本 - 基于 exllamav3 examples
+
+性能测试数据 (14B @ 4bpw, 4090D 24GB):
+  - Cache: 16384 tokens
+  - 速度: ~67 tok/s
+  - VRAM: ~12GB
+
+测试用例:
+  ("快速排序", "用Python实现快速排序，要求支持自定义比较函数，并添加详细注释说明时间复杂度和空间复杂度"),
+  ("线程安全", "解释什么是线程安全，用Python示例说明竞态条件和死锁问题，并提供解决方案"),
+  ("二分查找", "写一个通用的二分查找函数，支持查找第一个/最后一个匹配元素，处理边界情况"),
+  ("数据库索引", "解释B+树索引原理，对比哈希索引和全文索引的适用场景，分析索引失效情况"),
+  ("Python性能优化", "详细分析Python代码性能瓶颈，介绍Cython、Numba、多进程等优化方案并给出示例"),
+  ("归并排序", "用Python实现归并排序，要求支持链表排序，分析递归和迭代的实现差异"),
+  ("HTTP/HTTPS", "详细解释HTTP与HTTPS的区别，包括TLS握手过程、证书验证机制、中间人攻击防护"),
+  ("LRU缓存", "用Python实现线程安全的LRU缓存，使用OrderedDict和双向链表两种方法，分析时间复杂度"),
+  ("堆排序", "用Python实现堆排序，包括构建堆、调整堆的详细过程，分析不稳定排序的原因"),
+  ("Dijkstra算法", "用Python实现Dijkstra最短路径算法，支持优先队列优化，处理负权边情况"),
 """
 
 import sys
@@ -41,6 +58,8 @@ generator = Generator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
+    max_batch_size=32,
+    max_chunk_size=512,
 )
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")

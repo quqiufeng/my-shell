@@ -10,7 +10,6 @@ import urllib.request
 import urllib.error
 
 API_URL = "http://localhost:11434/v1/chat/completions"
-MODEL = "qwen3-14b-exl3"
 MAX_TOKENS = 200
 
 TESTS = [
@@ -59,7 +58,6 @@ def count_tokens(text):
 def call_api(prompt, max_tokens=MAX_TOKENS):
     """调用 API"""
     data = {
-        "model": MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "stream": False,
@@ -93,7 +91,6 @@ def main():
     print("API 性能测试")
     print("=" * 60)
     print(f"地址: {API_URL}")
-    print(f"模型: {MODEL}")
     print(f"Max tokens: {MAX_TOKENS}")
     print("=" * 60)
     print()
