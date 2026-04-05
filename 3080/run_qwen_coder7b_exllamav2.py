@@ -192,7 +192,7 @@ async def chat_completions(request: Request):
     if stream:
         # 流式响应
         async def generate_stream():
-            prompt = build_prompt_from_jinja(messages, tools)
+            prompt = build_prompt(messages, tools)
             input_ids = tokenizer.encode(prompt)
             if isinstance(input_ids, tuple):
                 input_ids = input_ids[0]

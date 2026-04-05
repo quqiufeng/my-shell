@@ -28,7 +28,6 @@ class JinjaTemplateRenderer:
     _environment = SandboxedEnvironment(
         trim_blocks=True,
         lstrip_blocks=True,
-        enable_async=True,
         extensions=[loopcontrols],
     )
 
@@ -110,6 +109,126 @@ def build_prompt_from_jinja(
 def parse_tool_calls(text: str) -> Optional[List[Dict]]:
     """解析工具调用，支持多种格式"""
     try:
+        # Qwen2.5 的 <response>{JSON}</response> 格式
+        response_json_match = re.search(
+            r"<response>\s*(\{.*?\})\s*</response>", text, re.DOTALL
+        )
+        if response_json_match:
+            data = json.loads(response_json_match.group(1))
+            if isinstance(data, dict) and "name" in data and "arguments" in data:
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": data["name"],
+                            "arguments": json.dumps(data["arguments"])
+                            if isinstance(data["arguments"], dict)
+                            else str(data["arguments"]),
+                        },
+                    }
+                ]
+
+        # Qwen2.5 的 <response><function-call> 格式
+        response_match = re.search(
+            r"<response>\s*<function-call>\s*<name>(\w+)</name>\s*<arguments>(.*?)</arguments>\s*</function-call>\s*</response>",
+            text,
+            re.DOTALL,
+        )
+        if response_match:
+            func_name = response_match.group(1)
+            arguments_str = response_match.group(2)
+            arguments = {}
+            for arg_match in re.finditer(
+                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+            ):
+                arg_name = arg_match.group(1)
+                arg_value = arg_match.group(2).strip()
+                try:
+                    arguments[arg_name] = json.loads(arg_value)
+                except:
+                    arguments[arg_name] = arg_value
+            return [
+                {
+                    "id": f"call_{int(time.time() * 1000)}",
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": json.dumps(arguments),
+                    },
+                }
+            ]
+
+        # Qwen2.5 的 <xml><function-call> 格式
+        xml_match = re.search(
+            r"<xml>\s*<function-call>\s*<name>(\w+)</name>\s*<arguments>(.*?)</arguments>\s*</function-call>\s*</xml>",
+            text,
+            re.DOTALL,
+        )
+        if xml_match:
+            func_name = xml_match.group(1)
+            arguments_str = xml_match.group(2)
+            arguments = {}
+            for arg_match in re.finditer(
+                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+            ):
+                arg_name = arg_match.group(1)
+                arg_value = arg_match.group(2).strip()
+                try:
+                    arguments[arg_name] = json.loads(arg_value)
+                except:
+                    arguments[arg_name] = arg_value
+            return [
+                {
+                    "id": f"call_{int(time.time() * 1000)}",
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": json.dumps(arguments),
+                    },
+                }
+            ]
+
+        # Qwen2.5 的 <xml>{JSON}</xml> 格式
+        xml_json_match = re.search(r"<xml>\s*(\{.*?\})\s*</xml>", text, re.DOTALL)
+        if xml_json_match:
+            data = json.loads(xml_json_match.group(1))
+            if isinstance(data, dict) and "name" in data and "arguments" in data:
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": data["name"],
+                            "arguments": json.dumps(data["arguments"])
+                            if isinstance(data["arguments"], dict)
+                            else str(data["arguments"]),
+                        },
+                    }
+                ]
+            func_name = xml_match.group(1)
+            arguments_str = xml_match.group(2)
+            arguments = {}
+            for arg_match in re.finditer(
+                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+            ):
+                arg_name = arg_match.group(1)
+                arg_value = arg_match.group(2).strip()
+                try:
+                    arguments[arg_name] = json.loads(arg_value)
+                except:
+                    arguments[arg_name] = arg_value
+            return [
+                {
+                    "id": f"call_{int(time.time() * 1000)}",
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": json.dumps(arguments),
+                    },
+                }
+            ]
+
         # 尝试解析 <tool_call> 格式
         tool_call_match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
         if tool_call_match:
@@ -236,17 +355,14 @@ async def generate_completion(
     """
     核心生成逻辑 - 支持工具调用
 
-    使用 build_prompt_from_jinja() 渲染模板。
-    模板文件: qwen35-chat-template-corrected.jinja
-
-    注意: Qwen2.5 模型也可以使用此函数（jinja 模板兼容 Qwen2.5 格式），
-    因为 jinja 模板内部使用的是 <|im_start|>/<|im_end|> 格式，与 Qwen2.5 原生格式一致。
+    使用 build_prompt() 手动拼接（适用于 Qwen2.5 原生格式）。
+    Qwen3.5 需要使用 generate_completion_jinja() + jinja 模板。
     """
     messages = data.get("messages", [])
     tools = data.get("tools", [])
     max_tokens = data.get("max_tokens", max_seq_len - 1024)
 
-    prompt = build_prompt_from_jinja(messages, tools)
+    prompt = build_prompt(messages, tools)
 
     input_ids = tokenizer.encode(prompt)
     if isinstance(input_ids, tuple):
