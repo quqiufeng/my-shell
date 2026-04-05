@@ -2,10 +2,21 @@
 """
 Qwen3-32B EXL3 启动脚本 - 基于 exllamav3 examples
 
-性能测试数据 (32B @ 4bpw, 4090D 24GB):
-  - Cache: 8192 tokens
-  - 速度: ~43 tok/s
-  - VRAM: ~17GB
+性能测试数据 (32B @ 3.5bpw, 4090D 24GB):
+  - Cache: max_num_tokens=8192, Q4 KV cache (k_bits=4, v_bits=4)
+  - max_batch_size=1, max_chunk_size=256
+  - 速度: ~40 tok/s (无 speculative decoding)
+  - VRAM: ~13.86 GB
+
+测试方法:
+  curl -X POST http://localhost:11434/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"messages":[{"role":"user","content":"写一个Python快速排序"}],"max_tokens":200}'
+
+Speculative Decoding 说明:
+  - Draft model: Qwen3-0.6B-exl3 (已注释)
+  - 原因: 0.6B 与 32B 接受率太低，导致负优化 (14-22 tok/s)
+  - 如需启用: 取消注释 draft model 相关代码，设置 num_draft_tokens
 
 测试用例:
   ("快速排序", "用Python实现快速排序，要求支持自定义比较函数，并添加详细注释说明时间复杂度和空间复杂度"),
@@ -30,7 +41,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from exllamav3 import Model, Config, Cache, Tokenizer, Generator
-from exllamav3.cache import CacheLayer_fp16
+from exllamav3.cache import CacheLayer_fp16, CacheLayer_quant
 from exllamav3.generator.sampler import ComboSampler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -38,19 +49,28 @@ from api_handlers import parse_tool_calls
 
 app = FastAPI()
 
-MODEL_DIR = "/opt/gguf/Qwen3-32B-exl3"
+MODEL_DIR = "/opt/gguf/Qwen3-32B-exl3/3_5"
+DRAFT_MODEL_DIR = "/opt/gguf/Qwen3-0.6B-exl3"
 MAX_SEQ_LEN = 32768
 PORT = 11434
-CACHE_TOKENS = 8192
+CACHE_TOKENS = 2048
+NUM_SPECULATIVE_TOKENS = 4
 
 print(f"Loading Qwen3-32B model from {MODEL_DIR}...")
 
 config = Config.from_directory(MODEL_DIR)
 model = Model.from_config(config)
-cache = Cache(model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
+cache = Cache(model, max_num_tokens=8192, layer_type=CacheLayer_quant, k_bits=4, v_bits=4)
 tokenizer = Tokenizer.from_config(config)
 
-print("Loading model...")
+# print("Loading draft model first...")
+# draft_config = Config.from_directory(DRAFT_MODEL_DIR)
+# draft_model = Model.from_config(draft_config)
+# draft_cache = Cache(draft_model, max_num_tokens=8192, layer_type=CacheLayer_quant, k_bits=4, v_bits=4)
+# draft_model.load(progressbar=True)
+# torch.cuda.empty_cache()
+
+print("Loading main model...")
 model.load(progressbar=True)
 
 print("Creating generator...")
@@ -58,8 +78,11 @@ generator = Generator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
-    max_batch_size=32,
-    max_chunk_size=512,
+    max_batch_size=1,
+    max_chunk_size=256,
+    # draft_model=draft_model,
+    # draft_cache=draft_cache,
+    # num_draft_tokens=NUM_SPECULATIVE_TOKENS,
 )
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
