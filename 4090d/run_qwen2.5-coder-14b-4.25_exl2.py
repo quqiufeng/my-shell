@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api_handlers import (
     parse_tool_calls,
     build_prompt,
+    build_prompt_from_jinja,
     generate_completion,
     responses_endpoint
 )
@@ -145,7 +146,7 @@ async def chat_completions(request: Request):
     if stream:
         # 流式响应
         async def generate_stream():
-            prompt = build_prompt(messages, tools)
+            prompt = build_prompt_from_jinja(messages, tools, template_name="qwen25-chat-template")
             input_ids = tokenizer.encode(prompt)
             if isinstance(input_ids, tuple):
                 input_ids = input_ids[0]
@@ -195,11 +196,70 @@ async def chat_completions(request: Request):
         
         return StreamingResponse(generate_stream(), media_type="text/event-stream")
     else:
-        # 非流式响应
-        return await generate_completion(
-            {"messages": messages, "tools": tools, "model": model_name, "max_tokens": max_tokens},
-            generator, tokenizer, settings, MAX_SEQ_LEN, "qwen2.5-coder-14b-exl2"
-        )
+        # 非流式响应 - 使用 jinja 模板
+        prompt = build_prompt_from_jinja(messages, tools, template_name="qwen25-chat-template")
+        input_ids = tokenizer.encode(prompt)
+        if isinstance(input_ids, tuple):
+            input_ids = input_ids[0]
+        
+        full_text = ""
+        eos = False
+        generated = 0
+        generator.begin_stream(input_ids, settings)
+        
+        while generated < max_tokens:
+            result = generator.stream_ex()
+            chunk = result['chunk']
+            eos = result['eos']
+            tokens = result.get('chunk_token_ids', None)
+            
+            if chunk:
+                full_text += chunk
+                if tokens is not None:
+                    gen_tokens = tokens.shape[1] if hasattr(tokens, 'shape') else len(tokens)
+                    generated += gen_tokens
+                else:
+                    generated += 1
+            
+            if eos:
+                break
+        
+        tool_calls = parse_tool_calls(full_text, tools)
+        
+        if tool_calls:
+            return {
+                "id": f"chatcmpl-{int(time.time()*1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model_name,
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "tool_calls": tool_calls},
+                    "finish_reason": "tool_calls"
+                }],
+                "usage": {
+                    "prompt_tokens": input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids),
+                    "completion_tokens": generated,
+                    "total_tokens": (input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids)) + generated
+                }
+            }
+        else:
+            return {
+                "id": f"chatcmpl-{int(time.time()*1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model_name,
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": full_text},
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids),
+                    "completion_tokens": generated,
+                    "total_tokens": (input_ids.shape[-1] if hasattr(input_ids, 'shape') else len(input_ids)) + generated
+                }
+            }
 
 
 if __name__ == "__main__":

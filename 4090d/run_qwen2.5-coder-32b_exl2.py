@@ -38,7 +38,7 @@ from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api_handlers import (
     parse_tool_calls,
-    build_prompt,
+    build_prompt_from_jinja,
     responses_endpoint
 )
 
@@ -129,7 +129,7 @@ async def generate_completion_32b(data):
     tools = data.get("tools", [])
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     
-    prompt = build_prompt(messages, tools)
+    prompt = build_prompt_from_jinja(messages, tools, template_name="qwen35-chat-template-corrected")
     
     input_ids = tokenizer.encode(prompt)
     if isinstance(input_ids, tuple):
@@ -218,7 +218,7 @@ async def chat_completions(request: Request):
     if stream:
         # 流式响应
         async def generate_stream():
-            prompt = build_prompt(messages, tools)
+            prompt = build_prompt_from_jinja(messages, tools, template_name="qwen35-chat-template-corrected")
             input_ids = tokenizer.encode(prompt)
             if isinstance(input_ids, tuple):
                 input_ids = input_ids[0]

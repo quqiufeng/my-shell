@@ -250,6 +250,32 @@ def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[D
                 }
             ]
 
+        # 尝试解析 <function=NAME><parameter=KEY>VALUE</parameter>...</function> 格式
+        func_match = re.search(r"<function=(\w+)>(.*?)</function>", text, re.DOTALL)
+        if func_match:
+            func_name = func_match.group(1)
+            if is_valid_call(func_name):
+                arguments_str = func_match.group(2)
+                arguments = {}
+                for arg_match in re.finditer(r"<parameter=(\w+)>(.*?)</parameter>", arguments_str, re.DOTALL):
+                    arg_name = arg_match.group(1)
+                    arg_value = arg_match.group(2).strip()
+                    try:
+                        arguments[arg_name] = json.loads(arg_value)
+                    except:
+                        arguments[arg_name] = arg_value
+                if arguments:
+                    return [
+                        {
+                            "id": f"call_{int(time.time() * 1000)}",
+                            "type": "function",
+                            "function": {
+                                "name": func_name,
+                                "arguments": json.dumps(arguments),
+                            },
+                        }
+                    ]
+
         # 尝试解析 <tool_call> 格式
         tool_call_match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
         if tool_call_match:
