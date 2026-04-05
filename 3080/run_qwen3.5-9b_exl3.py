@@ -3,14 +3,11 @@
 Qwen3.5-9B EXL3 启动脚本 - RTX 3080 10GB
 
 性能优化 (9B @ 4bpw, RTX 3080 10GB):
-  - Cache: 8192 tokens (FP16)
+  - Cache: 65536 tokens (Q4 4bit)
   - max_batch_size=1, max_chunk_size=2048
-  - max_seq_len: 8192
+  - max_seq_len: 131072 (128k)
   - flash_attn: True
-  - VRAM: ~5GB 模型 + 缓存
-  - 目标: 100+ tok/s
-
-无 Speculative Decoding (VRAM 限制)
+  - VRAM: ~9.4GB 模型 + 缓存
 """
 
 import sys
@@ -41,15 +38,10 @@ print(f"Loading Qwen3.5-9B model from {MODEL_DIR}...")
 config = Config.from_directory(MODEL_DIR)
 config.flash_attn = True
 model = Model.from_config(config)
-cache = Cache(model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
+cache = Cache(
+    model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_quant, k_bits=4, v_bits=4
+)
 tokenizer = Tokenizer.from_config(config)
-
-# print("Loading draft model first...")
-# draft_config = Config.from_directory(DRAFT_MODEL_DIR)
-# draft_model = Model.from_config(draft_config)
-# draft_cache = Cache(draft_model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
-# draft_model.load(progressbar=True)
-# torch.cuda.empty_cache()
 
 print("Loading main model...")
 model.load(progressbar=True)
