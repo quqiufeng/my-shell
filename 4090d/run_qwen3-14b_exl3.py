@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Qwen3-14B EXL3 启动脚本 (基于 exllamav3 examples)
+Qwen3-14B EXL3 启动脚本 - 基于 exllamav3 examples
 """
 
 import sys
@@ -14,15 +14,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from exllamav3 import Model, Config, Cache, Tokenizer, Generator
 from exllamav3.cache import CacheLayer_fp16
-from exllamav3.generator import Job
 from exllamav3.generator.sampler import ComboSampler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from api_handlers import (
-    parse_tool_calls,
-    build_prompt_from_jinja,
-    responses_endpoint
-)
+from api_handlers import parse_tool_calls
 
 app = FastAPI()
 
@@ -46,8 +41,6 @@ generator = Generator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
-    max_batch_size=16,
-    max_chunk_size=512,
 )
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
@@ -82,61 +75,42 @@ async def list_models():
     }
 
 
-def format_prompt_chatml(messages, system_prompt="You are a helpful AI assistant."):
-    """ChatML format for Qwen"""
-    context = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-    for msg in messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role == "user":
-            context += f"<|im_start|>user\n{content}<|im_end|>\n"
-        elif role == "assistant":
-            context += f"<|im_start|>assistant\n{content}<|im_end|>\n"
-        elif role == "system":
-            context += f"<|im_start|>system\n{content}<|im_end|>\n"
-    context += "<|im_start|>assistant\n"
-    return context
+SYSTEM_PROMPT = "You are a helpful assistant. Do not think step by step. Answer directly and concisely."
+
+def format_prompt(messages):
+    """Use tokenizer's built-in template with thinking disabled"""
+    # Add system message to disable thinking
+    system_msg = {"role": "system", "content": SYSTEM_PROMPT}
+    all_messages = [system_msg] + messages
+    return tokenizer.hf_render_chat_template(
+        all_messages, 
+        add_generation_prompt=True,
+        think=False
+    )
 
 
 def generate_text(prompt, max_new_tokens=1024, temperature=0.0):
-    """Generate text using exllamav3"""
-    input_ids = tokenizer.encode(prompt, add_bos=False)
-    
+    """Generate using generator.generate() like official example"""
     sampler = ComboSampler(
-        rep_p=1.0,
-        pres_p=0.0,
-        freq_p=0.0,
-        rep_sustain_range=1024,
-        rep_decay_range=1024,
         temperature=temperature,
+        top_p=0.9,
         min_p=0.0,
         top_k=0,
-        top_p=0.9,
-        temp_last=True,
-        adaptive_target=1.0,
-        adaptive_decay=0.9,
+        rep_p=1.0,
+        rep_decay_range=1024,
     )
     
-    stop_tokens = [tokenizer.eos_token_id, tokenizer.single_id("<|im_end|>")]
+    stop_conditions = ["<|im_end|>", "<|im_start|>"]
     
-    job = Job(
-        input_ids=input_ids,
+    response = generator.generate(
+        prompt=prompt,
         max_new_tokens=max_new_tokens,
         sampler=sampler,
-        stop_conditions=stop_tokens,
+        stop_conditions=stop_conditions,
+        completion_only=True,
+        add_bos=False,
     )
-    
-    generator.enqueue(job)
-    
-    full_text = ""
-    while generator.num_remaining_jobs():
-        for r in generator.iterate():
-            if r["stage"] == "streaming":
-                full_text += r.get("text", "")
-            if r.get("eos"):
-                return full_text
-    
-    return full_text
+    return response
 
 
 async def generate_completion(data):
@@ -145,9 +119,7 @@ async def generate_completion(data):
     tools = data.get("tools", [])
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     
-    # 使用 ChatML 格式（简单，不会触发 thinking）
-    prompt = format_prompt_chatml(messages)
-    
+    prompt = format_prompt(messages)
     full_text = generate_text(prompt, max_new_tokens=max_tokens)
     tool_calls = parse_tool_calls(full_text, tools)
     
@@ -190,16 +162,6 @@ async def generate_completion(data):
         }
 
 
-@app.post("/v1/responses")
-async def responses(request: Request):
-    """OpenAI Responses API"""
-    return await responses_endpoint(
-        request,
-        generate_completion,
-        "qwen3-14b-exl3"
-    )
-
-
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
     """OpenAI Chat Completions API"""
@@ -213,31 +175,25 @@ async def chat_completions(request: Request):
     
     if stream:
         async def generate_stream():
-            prompt = format_prompt_chatml(messages)
-            input_ids = tokenizer.encode(prompt, add_bos=False)
+            prompt = format_prompt(messages)
             
             sampler = ComboSampler(
-                rep_p=1.0,
-                pres_p=0.0,
-                freq_p=0.0,
-                rep_sustain_range=1024,
-                rep_decay_range=1024,
                 temperature=temperature,
+                top_p=0.9,
                 min_p=0.0,
                 top_k=0,
-                top_p=0.9,
-                temp_last=True,
-                adaptive_target=1.0,
-                adaptive_decay=0.9,
+                rep_p=1.0,
+                rep_decay_range=1024,
             )
             
-            stop_tokens = [tokenizer.eos_token_id, tokenizer.single_id("<|im_end|>")]
+            input_ids = tokenizer.encode(prompt, add_bos=False)
             
+            from exllamav3.generator import Job
             job = Job(
                 input_ids=input_ids,
                 max_new_tokens=max_tokens,
                 sampler=sampler,
-                stop_conditions=stop_tokens,
+                stop_conditions=["<|im_end|>", "<|im_start|>"],
             )
             
             generator.enqueue(job)
@@ -253,13 +209,11 @@ async def chat_completions(request: Request):
                         if not tool_calls_sent:
                             tc = parse_tool_calls(full_output)
                             if tc:
-                                data = {"choices": [{"delta": {"role": "assistant", "tool_calls": tc}, "finish_reason": "tool_calls"}]}
-                                yield f"data: {json.dumps(data)}\n\n"
+                                yield f"data: {json.dumps({'choices': [{'delta': {'role': 'assistant', 'tool_calls': tc}, 'finish_reason': 'tool_calls'}]})}\n\n"
                                 tool_calls_sent = True
                                 continue
                         
-                        data = {"choices": [{"delta": {"content": chunk}, "finish_reason": None}]}
-                        yield f"data: {json.dumps(data)}\n\n"
+                        yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk}, 'finish_reason': None}]})}\n\n"
                     
                     if r.get("eos"):
                         if not tool_calls_sent:
