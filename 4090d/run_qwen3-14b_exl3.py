@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """
-Qwen3-14B EXL3 启动脚本
-
-使用方法:
-  1. 启动: nohup python3 run_qwen3-14b_exl3.py > /tmp/model_14b.log 2>&1 &
-  2. 测试: curl http://localhost:11434/v1/models
-  3. 关闭: pkill -f run_qwen3-14b_exl3.py
+Qwen3-14B EXL3 启动脚本 (基于 exllamav3 examples)
 """
 
 import sys
@@ -40,10 +35,7 @@ print(f"Loading Qwen3-14B model from {MODEL_DIR}...")
 
 config = Config.from_directory(MODEL_DIR)
 model = Model.from_config(config)
-
-from exllamav3.cache import CacheLayer_quant
-cache = Cache(model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_quant, k_bits=8, v_bits=8)
-
+cache = Cache(model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
 tokenizer = Tokenizer.from_config(config)
 
 print("Loading model...")
@@ -69,7 +61,6 @@ print("🚀 Qwen3-14B 服务已启动!")
 print("=" * 60)
 print(f"模型: Qwen3-14B EXL3")
 print(f"对内地址: http://localhost:{PORT}")
-print(f"对外地址: http://{instance_id}-{PORT}.container.x-gpu.com/v1/chat/completions")
 print("=" * 60)
 sys.stdout.flush()
 
@@ -91,6 +82,22 @@ async def list_models():
     }
 
 
+def format_prompt_chatml(messages, system_prompt="You are a helpful AI assistant."):
+    """ChatML format for Qwen"""
+    context = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "user":
+            context += f"<|im_start|>user\n{content}<|im_end|>\n"
+        elif role == "assistant":
+            context += f"<|im_start|>assistant\n{content}<|im_end|>\n"
+        elif role == "system":
+            context += f"<|im_start|>system\n{content}<|im_end|>\n"
+    context += "<|im_start|>assistant\n"
+    return context
+
+
 def generate_text(prompt, max_new_tokens=1024, temperature=0.0):
     """Generate text using exllamav3"""
     input_ids = tokenizer.encode(prompt, add_bos=False)
@@ -110,10 +117,13 @@ def generate_text(prompt, max_new_tokens=1024, temperature=0.0):
         adaptive_decay=0.9,
     )
     
+    stop_tokens = [tokenizer.eos_token_id, tokenizer.single_id("<|im_end|>")]
+    
     job = Job(
         input_ids=input_ids,
         max_new_tokens=max_new_tokens,
         sampler=sampler,
+        stop_conditions=stop_tokens,
     )
     
     generator.enqueue(job)
@@ -135,7 +145,8 @@ async def generate_completion(data):
     tools = data.get("tools", [])
     max_tokens = data.get("max_tokens", MAX_SEQ_LEN - 1024)
     
-    prompt = build_prompt_from_jinja(messages, tools, template_name="qwen35-chat-template-corrected")
+    # 使用 ChatML 格式（简单，不会触发 thinking）
+    prompt = format_prompt_chatml(messages)
     
     full_text = generate_text(prompt, max_new_tokens=max_tokens)
     tool_calls = parse_tool_calls(full_text, tools)
@@ -202,7 +213,7 @@ async def chat_completions(request: Request):
     
     if stream:
         async def generate_stream():
-            prompt = build_prompt_from_jinja(messages, tools, template_name="qwen35-chat-template-corrected")
+            prompt = format_prompt_chatml(messages)
             input_ids = tokenizer.encode(prompt, add_bos=False)
             
             sampler = ComboSampler(
@@ -220,10 +231,13 @@ async def chat_completions(request: Request):
                 adaptive_decay=0.9,
             )
             
+            stop_tokens = [tokenizer.eos_token_id, tokenizer.single_id("<|im_end|>")]
+            
             job = Job(
                 input_ids=input_ids,
                 max_new_tokens=max_tokens,
                 sampler=sampler,
+                stop_conditions=stop_tokens,
             )
             
             generator.enqueue(job)
