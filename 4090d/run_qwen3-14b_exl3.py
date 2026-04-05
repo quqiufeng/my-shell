@@ -3,9 +3,14 @@
 Qwen3-14B EXL3 启动脚本 - 基于 exllamav3 examples
 
 性能测试数据 (14B @ 4bpw, 4090D 24GB):
-  - Cache: 16384 tokens
+  - Cache: 24576 tokens (FP16)
+  - max_batch_size=64, max_chunk_size=1024
   - 速度: ~67 tok/s
   - VRAM: ~12GB
+
+Speculative Decoding:
+  - Draft model: Qwen3-0.6B-exl3
+  - num_draft_tokens=4
 
 测试用例:
   ("快速排序", "用Python实现快速排序，要求支持自定义比较函数，并添加详细注释说明时间复杂度和空间复杂度"),
@@ -30,7 +35,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from exllamav3 import Model, Config, Cache, Tokenizer, Generator
-from exllamav3.cache import CacheLayer_fp16
+from exllamav3.cache import CacheLayer_fp16, CacheLayer_quant
 from exllamav3.generator.sampler import ComboSampler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -39,9 +44,11 @@ from api_handlers import parse_tool_calls
 app = FastAPI()
 
 MODEL_DIR = "/opt/gguf/Qwen3-14B-exl3"
-MAX_SEQ_LEN = 32768
+DRAFT_MODEL_DIR = "/opt/gguf/Qwen3-0.6B-exl3"
+MAX_SEQ_LEN = 65536
 PORT = 11434
-CACHE_TOKENS = 65536
+CACHE_TOKENS = 24576
+NUM_SPECULATIVE_TOKENS = 4
 
 print(f"Loading Qwen3-14B model from {MODEL_DIR}...")
 
@@ -50,7 +57,14 @@ model = Model.from_config(config)
 cache = Cache(model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
 tokenizer = Tokenizer.from_config(config)
 
-print("Loading model...")
+# print("Loading draft model first...")
+# draft_config = Config.from_directory(DRAFT_MODEL_DIR)
+# draft_model = Model.from_config(draft_config)
+# draft_cache = Cache(draft_model, max_num_tokens=CACHE_TOKENS, layer_type=CacheLayer_fp16)
+# draft_model.load(progressbar=True)
+# torch.cuda.empty_cache()
+
+print("Loading main model...")
 model.load(progressbar=True)
 
 print("Creating generator...")
@@ -58,8 +72,11 @@ generator = Generator(
     model=model,
     cache=cache,
     tokenizer=tokenizer,
-    max_batch_size=32,
-    max_chunk_size=512,
+    max_batch_size=64,
+    max_chunk_size=1024,
+    # draft_model=draft_model,
+    # draft_cache=draft_cache,
+    # num_draft_tokens=NUM_SPECULATIVE_TOKENS,
 )
 
 print(f"VRAM: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")

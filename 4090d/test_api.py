@@ -10,7 +10,7 @@ import urllib.request
 import urllib.error
 
 API_URL = "http://localhost:11434/v1/chat/completions"
-MAX_TOKENS = 200
+MAX_TOKENS = 1024
 
 TESTS = [
     ("快速排序", "用Python实现快速排序，要求支持自定义比较函数，并添加详细注释说明时间复杂度和空间复杂度"),
