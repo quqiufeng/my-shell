@@ -106,8 +106,25 @@ def build_prompt_from_jinja(
     return JinjaTemplateRenderer.render(template_name, **template_vars)
 
 
-def parse_tool_calls(text: str) -> Optional[List[Dict]]:
-    """解析工具调用，支持多种格式"""
+def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[Dict]]:
+    """
+    解析工具调用，支持多种格式
+
+    Args:
+        text: 模型输出的文本
+        tools: 工具定义列表，用于验证函数名是否匹配
+    """
+    if tools is None:
+        tools = []
+
+    tool_names = {t.get("function", {}).get("name") for t in tools}
+
+    def is_valid_call(func_name: str) -> bool:
+        """如果提供了 tools 列表，则验证函数名是否在列表中"""
+        if not tool_names:
+            return True
+        return func_name in tool_names
+
     try:
         # Qwen2.5 的 <response>{JSON}</response> 格式
         response_json_match = re.search(
@@ -116,18 +133,19 @@ def parse_tool_calls(text: str) -> Optional[List[Dict]]:
         if response_json_match:
             data = json.loads(response_json_match.group(1))
             if isinstance(data, dict) and "name" in data and "arguments" in data:
-                return [
-                    {
-                        "id": f"call_{int(time.time() * 1000)}",
-                        "type": "function",
-                        "function": {
-                            "name": data["name"],
-                            "arguments": json.dumps(data["arguments"])
-                            if isinstance(data["arguments"], dict)
-                            else str(data["arguments"]),
-                        },
-                    }
-                ]
+                if is_valid_call(data["name"]):
+                    return [
+                        {
+                            "id": f"call_{int(time.time() * 1000)}",
+                            "type": "function",
+                            "function": {
+                                "name": data["name"],
+                                "arguments": json.dumps(data["arguments"])
+                                if isinstance(data["arguments"], dict)
+                                else str(data["arguments"]),
+                            },
+                        }
+                    ]
 
         # Qwen2.5 的 <response><function-call> 格式
         response_match = re.search(
@@ -137,27 +155,28 @@ def parse_tool_calls(text: str) -> Optional[List[Dict]]:
         )
         if response_match:
             func_name = response_match.group(1)
-            arguments_str = response_match.group(2)
-            arguments = {}
-            for arg_match in re.finditer(
-                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
-            ):
-                arg_name = arg_match.group(1)
-                arg_value = arg_match.group(2).strip()
-                try:
-                    arguments[arg_name] = json.loads(arg_value)
-                except:
-                    arguments[arg_name] = arg_value
-            return [
-                {
-                    "id": f"call_{int(time.time() * 1000)}",
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": json.dumps(arguments),
-                    },
-                }
-            ]
+            if is_valid_call(func_name):
+                arguments_str = response_match.group(2)
+                arguments = {}
+                for arg_match in re.finditer(
+                    r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+                ):
+                    arg_name = arg_match.group(1)
+                    arg_value = arg_match.group(2).strip()
+                    try:
+                        arguments[arg_name] = json.loads(arg_value)
+                    except:
+                        arguments[arg_name] = arg_value
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": func_name,
+                            "arguments": json.dumps(arguments),
+                        },
+                    }
+                ]
 
         # Qwen2.5 的 <xml><function-call> 格式
         xml_match = re.search(
@@ -167,45 +186,47 @@ def parse_tool_calls(text: str) -> Optional[List[Dict]]:
         )
         if xml_match:
             func_name = xml_match.group(1)
-            arguments_str = xml_match.group(2)
-            arguments = {}
-            for arg_match in re.finditer(
-                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
-            ):
-                arg_name = arg_match.group(1)
-                arg_value = arg_match.group(2).strip()
-                try:
-                    arguments[arg_name] = json.loads(arg_value)
-                except:
-                    arguments[arg_name] = arg_value
-            return [
-                {
-                    "id": f"call_{int(time.time() * 1000)}",
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": json.dumps(arguments),
-                    },
-                }
-            ]
+            if is_valid_call(func_name):
+                arguments_str = xml_match.group(2)
+                arguments = {}
+                for arg_match in re.finditer(
+                    r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+                ):
+                    arg_name = arg_match.group(1)
+                    arg_value = arg_match.group(2).strip()
+                    try:
+                        arguments[arg_name] = json.loads(arg_value)
+                    except:
+                        arguments[arg_name] = arg_value
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": func_name,
+                            "arguments": json.dumps(arguments),
+                        },
+                    }
+                ]
 
         # Qwen2.5 的 <xml>{JSON}</xml> 格式
         xml_json_match = re.search(r"<xml>\s*(\{.*?\})\s*</xml>", text, re.DOTALL)
         if xml_json_match:
             data = json.loads(xml_json_match.group(1))
             if isinstance(data, dict) and "name" in data and "arguments" in data:
-                return [
-                    {
-                        "id": f"call_{int(time.time() * 1000)}",
-                        "type": "function",
-                        "function": {
-                            "name": data["name"],
-                            "arguments": json.dumps(data["arguments"])
-                            if isinstance(data["arguments"], dict)
-                            else str(data["arguments"]),
-                        },
-                    }
-                ]
+                if is_valid_call(data["name"]):
+                    return [
+                        {
+                            "id": f"call_{int(time.time() * 1000)}",
+                            "type": "function",
+                            "function": {
+                                "name": data["name"],
+                                "arguments": json.dumps(data["arguments"])
+                                if isinstance(data["arguments"], dict)
+                                else str(data["arguments"]),
+                            },
+                        }
+                    ]
             func_name = xml_match.group(1)
             arguments_str = xml_match.group(2)
             arguments = {}
@@ -252,34 +273,37 @@ def parse_tool_calls(text: str) -> Optional[List[Dict]]:
         if tools_match:
             data = json.loads(tools_match.group(1).strip())
             if isinstance(data, dict) and "name" in data:
-                return [
-                    {
-                        "id": f"call_{int(time.time() * 1000)}",
-                        "type": "function",
-                        "function": {
-                            "name": data["name"],
-                            "arguments": json.dumps(data.get("arguments", {}))
-                            if isinstance(data.get("arguments"), dict)
-                            else str(data.get("arguments", {})),
-                        },
-                    }
-                ]
+                if is_valid_call(data["name"]):
+                    return [
+                        {
+                            "id": f"call_{int(time.time() * 1000)}",
+                            "type": "function",
+                            "function": {
+                                "name": data["name"],
+                                "arguments": json.dumps(data.get("arguments", {}))
+                                if isinstance(data.get("arguments"), dict)
+                                else str(data.get("arguments", {})),
+                            },
+                        }
+                    ]
 
-        # 尝试直接解析 JSON
-        data = json.loads(text.strip())
-        if isinstance(data, dict) and "name" in data and "arguments" in data:
-            return [
-                {
-                    "id": f"call_{int(time.time() * 1000)}",
-                    "type": "function",
-                    "function": {
-                        "name": data["name"],
-                        "arguments": json.dumps(data["arguments"])
-                        if isinstance(data["arguments"], dict)
-                        else str(data["arguments"]),
-                    },
-                }
-            ]
+        # 尝试直接解析 JSON（需要有 tools 定义才处理）
+        if tool_names and text.strip().startswith("{"):
+            data = json.loads(text.strip())
+            if isinstance(data, dict) and "name" in data and "arguments" in data:
+                if is_valid_call(data["name"]):
+                    return [
+                        {
+                            "id": f"call_{int(time.time() * 1000)}",
+                            "type": "function",
+                            "function": {
+                                "name": data["name"],
+                                "arguments": json.dumps(data["arguments"])
+                                if isinstance(data["arguments"], dict)
+                                else str(data["arguments"]),
+                            },
+                        }
+                    ]
     except:
         pass
     return None
@@ -392,7 +416,7 @@ async def generate_completion(
         if eos:
             break
 
-    tool_calls = parse_tool_calls(full_text)
+    tool_calls = parse_tool_calls(full_text, tools)
 
     if tool_calls:
         return {
