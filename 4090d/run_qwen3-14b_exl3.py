@@ -41,7 +41,7 @@ app = FastAPI()
 MODEL_DIR = "/opt/gguf/Qwen3-14B-exl3"
 MAX_SEQ_LEN = 32768
 PORT = 11434
-CACHE_TOKENS = 16384
+CACHE_TOKENS = 65536
 
 print(f"Loading Qwen3-14B model from {MODEL_DIR}...")
 
