@@ -24,7 +24,7 @@ app = FastAPI()
 MODEL_DIR = "/opt/gguf/Qwen3-14B-exl3"
 MAX_SEQ_LEN = 32768
 PORT = 11434
-CACHE_TOKENS = 8192
+CACHE_TOKENS = 16384
 
 print(f"Loading Qwen3-14B model from {MODEL_DIR}...")
 
@@ -123,8 +123,17 @@ async def generate_completion(data):
     full_text = generate_text(prompt, max_new_tokens=max_tokens)
     tool_calls = parse_tool_calls(full_text, tools)
     
-    input_len = len(tokenizer.encode(prompt))
-    output_len = len(tokenizer.encode(full_text))
+    def get_token_len(ids):
+        if isinstance(ids, torch.Tensor):
+            return ids.shape[-1] if ids.dim() > 0 else 1
+        elif isinstance(ids, tuple):
+            return ids[0].shape[-1] if hasattr(ids[0], 'shape') and ids[0].dim() > 0 else len(ids[0])
+        return len(ids) if hasattr(ids, '__len__') else 1
+    
+    input_ids = tokenizer.encode(prompt)
+    output_ids = tokenizer.encode(full_text)
+    input_len = get_token_len(input_ids)
+    output_len = get_token_len(output_ids)
     
     if tool_calls:
         return {

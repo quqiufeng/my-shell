@@ -46,6 +46,16 @@ TESTS = [
     ("贪心算法", "通过实例详解贪心算法，证明正确性，分析与动态规划的区别"),
 ]
 
+def count_tokens(text):
+    """用tokenizer计算token数"""
+    import sys
+    sys.path.insert(0, '/opt/exllamav3')
+    from exllamav3 import Config, Tokenizer
+    c = Config.from_directory("/opt/gguf/Qwen3-14B-exl3")
+    t = Tokenizer.from_config(c)
+    ids = t.encode(text)
+    return len(ids) if hasattr(ids, '__len__') else 1
+
 def call_api(prompt, max_tokens=MAX_TOKENS):
     """调用 API"""
     data = {
@@ -70,7 +80,9 @@ def call_api(prompt, max_tokens=MAX_TOKENS):
             
             if result.get("choices") and len(result["choices"]) > 0:
                 content = result["choices"][0].get("message", {}).get("content", "")
-                tokens = len(content)
+                # 直接用 API 返回的 usage
+                usage = result.get("usage", {})
+                tokens = usage.get("completion_tokens", 0)
                 return elapsed, tokens, content
             return elapsed, 0, ""
     except Exception as e:
