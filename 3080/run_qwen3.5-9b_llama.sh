@@ -7,10 +7,10 @@
 # 上下文: 64K (262144 tokens, 实际可用 ~64K)
 #
 # 【性能测试数据 - 30个高难度提示词】
-# 平均速度: 67.5 tokens/s
-# 最快: Dijkstra算法 77.2 tokens/s
-# 最慢: 快速排序 53.0 tokens/s (首次加载)
-# 典型速度: 65-75 tokens/s
+# 平均速度: 66.8 tokens/s
+# 最快: 线程安全 78.3 tokens/s
+# 最慢: 跳表 57.1 tokens/s
+# 典型速度: 60-75 tokens/s
 #
 # 【测试方法】
 # cd /home/dministrator/my-shell
