@@ -9,6 +9,12 @@ Llama.cpp 返回的工具调用格式：
 - 每个工具调用包含 `id`, `type`, `function` (含 `name` 和 `arguments`)
 - `arguments` 是 JSON 字符串
 
+### 重要发现
+
+1. **模型不总是生成 tool_calls**：即使提供了 tools，模型也可能返回纯文本内容
+2. **简单请求更容易触发 tool_calls**：短请求如 "Save hello to /tmp/h.py" 比长请求更容易成功
+3. **content 字段**：`content` 为空字符串 `""` 时表示有 tool_calls
+
 ---
 
 ## 1. write_file（保存文件）
@@ -272,4 +278,27 @@ curl -X POST http://localhost:11434/v1/chat/completions \
     "tools": [{"type": "function", "function": {"name": "create_directory", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}],
     "max_tokens": 500
   }'
+```
+
+---
+
+## OpenCode 实际测试
+
+### 测试命令
+```bash
+opencode run "实现Python红黑树保存到 /home/dministrator/rb_test.py"
+```
+
+### 测试结果
+1. **简单请求**：可以正确返回 tool_calls
+2. **复杂请求**：可能超时或返回纯文本
+3. **权限提示**：OpenCode 会提示 `permission requested: external_directory`，需要用户手动授权
+
+### 响应特征
+- 成功：`"content": ""` + `"tool_calls": [...]`
+- 失败：`"content": "..."` (纯文本) 或超时
+
+### 文件创建结果
+- `/home/dministrator/red_black_tree.py` (238行) - 之前测试创建
+- `/home/dministrator/bubble_sort.py` - 测试创建
 ```
