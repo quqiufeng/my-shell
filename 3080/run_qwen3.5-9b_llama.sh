@@ -22,6 +22,40 @@
 # KoboldCpp: 60.2 tokens/s
 # ExLlamaV2 7B: 78.4 tokens/s
 #
+# 【OpenCode 配置】
+# 配置文件路径: ~/.opencode/opencode.json
+#
+# ```json
+# {
+#   "$schema": "https://opencode.ai/config.json",
+#   "model": "openai/qwen3.5-9b-exl3",
+#   "provider": {
+#     "openai": {
+#       "npm": "@ai-sdk/openai-compatible",
+#       "name": "Local Models",
+#       "options": {
+#         "baseURL": "http://localhost:11434/v1",
+#         "apiKey": "dummy"
+#       },
+#       "models": {
+#         "qwen3.5-9b-exl3": {
+#           "name": "Qwen3.5-9B-EXL3 (本地3080)",
+#           "maxContextWindow": 131072,
+#           "maxOutputTokens": 65536
+#         },
+#         "qwen3.5-9b-llama": {
+#           "name": "Qwen3.5-9B-llama.cpp (本地3080)",
+#           "maxContextWindow": 131072,
+#           "maxOutputTokens": 4096
+#         }
+#       }
+#     }
+#   }
+# }
+# ```
+#
+# 切换模型: 修改 "model" 字段为 "openai/qwen3.5-9b-exl3" 或 "openai/qwen3.5-9b-llama"
+#
 
 MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
 LLAMA_SERVER="$HOME/llama.cpp/build/bin/llama-server"

@@ -408,7 +408,11 @@ class Qwen35APIHandler:
                 "choices": [
                     {
                         "index": 0,
-                        "message": {"role": "assistant", "tool_calls": tool_calls},
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": tool_calls,
+                        },
                         "finish_reason": "tool_calls",
                     }
                 ],
@@ -499,7 +503,7 @@ class Qwen35APIHandler:
                     if not tool_calls_sent:
                         tc = parse_tool_calls(full_output)
                         if tc:
-                            yield f"data: {json.dumps({'choices': [{'delta': {'role': 'assistant', 'tool_calls': tc}, 'finish_reason': 'tool_calls'}]})}\n\n"
+                            yield f"data: {json.dumps({'choices': [{'delta': {'role': 'assistant', 'content': None, 'tool_calls': tc}, 'finish_reason': 'tool_calls'}]})}\n\n"
                             tool_calls_sent = True
                             continue
 
