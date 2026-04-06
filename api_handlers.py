@@ -1,109 +1,18 @@
 #!/usr/bin/env python3
 """
 API 处理函数共享库
-供 ExLlamaV2 模型脚本共用
+基于 Qwen35Chat 库 (exllamav3)
 
-TabbyAPI (ExLlamaV2 官方 API 服务器):
-- GitHub: https://github.com/theroyallab/tabbyAPI
-- 安装: git clone https://github.com/theroyallab/tabbyAPI.git
-       cd tabbyAPI && pip install -e .[cu121]
+提供 ExLlamaV3 模型脚本共用
 """
 
 import json
 import time
 import re
-import pathlib
-from typing import Dict, List, Optional, Any
-from jinja2 import Template, TemplateError
-from jinja2.sandbox import SandboxedEnvironment
-from jinja2.ext import loopcontrols
+from typing import Dict, List, Optional, Any, Callable
+from functools import partial
 
-# 模板目录 - 相对于 api_handlers.py 的位置
-TEMPLATE_DIR = pathlib.Path(__file__).parent
-
-
-class JinjaTemplateRenderer:
-    """Jinja 模板渲染器 - 支持 Qwen3.5 chat template"""
-
-    _environment = SandboxedEnvironment(
-        trim_blocks=True,
-        lstrip_blocks=True,
-        extensions=[loopcontrols],
-    )
-
-    _templates: Dict[str, Template] = {}
-
-    @classmethod
-    def _compile_template(cls, template_str: str) -> Template:
-        """编译模板字符串"""
-
-        def raise_exception(message):
-            raise TemplateError(message)
-
-        cls._environment.globals["raise_exception"] = raise_exception
-        return cls._environment.from_string(template_str)
-
-    @classmethod
-    def load_template(cls, template_name: str) -> Template:
-        """加载模板文件"""
-        if template_name in cls._templates:
-            return cls._templates[template_name]
-
-        template_path = TEMPLATE_DIR / f"{template_name}.jinja"
-        if not template_path.exists():
-            raise FileNotFoundError(f"Template not found: {template_path}")
-
-        with open(template_path, "r", encoding="utf-8") as f:
-            template_str = f.read()
-
-        template = cls._compile_template(template_str)
-        cls._templates[template_name] = template
-        return template
-
-    @classmethod
-    def render(cls, template_name: str, **kwargs) -> str:
-        """渲染模板"""
-        template = cls.load_template(template_name)
-        return template.render(**kwargs)
-
-
-def build_prompt_from_jinja(
-    messages: List[Dict],
-    tools: Optional[List] = None,
-    enable_thinking: bool = False,
-    add_generation_prompt: bool = True,
-    template_name: str = "qwen35-chat-template-corrected",
-) -> str:
-    """
-    使用 Jinja 模板构建 Prompt
-
-    适用于 Qwen3.5 等需要外部 chat template 的模型。
-    因为 ExLlamaV2 原生不支持 Qwen3 架构，需要通过 jinja 模板弥补。
-
-    Qwen2.5 原生支持 chat template，使用 build_prompt() 即可。
-
-    Args:
-        messages: 消息列表
-        tools: 工具定义列表
-        enable_thinking: 是否启用思考模式
-        add_generation_prompt: 是否添加生成提示符
-        template_name: 模板文件名（不含 .jinja 扩展名）
-
-    Returns:
-        渲染后的 prompt 字符串
-    """
-    template_vars = {
-        "messages": messages,
-        "add_generation_prompt": add_generation_prompt,
-    }
-
-    if tools:
-        template_vars["tools"] = tools
-
-    if not enable_thinking:
-        template_vars["enable_thinking"] = False
-
-    return JinjaTemplateRenderer.render(template_name, **template_vars)
+from chat import Qwen35Chat, Qwen35Server
 
 
 def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[Dict]]:
@@ -227,28 +136,6 @@ def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[D
                             },
                         }
                     ]
-            func_name = xml_match.group(1)
-            arguments_str = xml_match.group(2)
-            arguments = {}
-            for arg_match in re.finditer(
-                r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
-            ):
-                arg_name = arg_match.group(1)
-                arg_value = arg_match.group(2).strip()
-                try:
-                    arguments[arg_name] = json.loads(arg_value)
-                except:
-                    arguments[arg_name] = arg_value
-            return [
-                {
-                    "id": f"call_{int(time.time() * 1000)}",
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": json.dumps(arguments),
-                    },
-                }
-            ]
 
         # 尝试解析 <function=NAME><parameter=KEY>VALUE</parameter>...</function> 格式
         func_match = re.search(r"<function=(\w+)>(.*?)</function>", text, re.DOTALL)
@@ -257,7 +144,9 @@ def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[D
             if is_valid_call(func_name):
                 arguments_str = func_match.group(2)
                 arguments = {}
-                for arg_match in re.finditer(r"<parameter=(\w+)>(.*?)</parameter>", arguments_str, re.DOTALL):
+                for arg_match in re.finditer(
+                    r"<parameter=(\w+)>(.*?)</parameter>", arguments_str, re.DOTALL
+                ):
                     arg_name = arg_match.group(1)
                     arg_value = arg_match.group(2).strip()
                     try:
@@ -338,21 +227,17 @@ def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[D
 def build_prompt(
     messages: List[Dict],
     tools: Optional[List] = None,
-    default_system: str = "You are a helpful coding assistant.",
+    default_system: str = "You are a helpful assistant.",
 ) -> str:
     """
     构建带工具的 Prompt（手动拼接方式）
 
     适用于 Qwen2.5 等原生支持 chat template 的模型。
-    ExLlamaV2 的 tokenizer 会自动使用模型内置模板，不需要外部指定。
-
-    Qwen3.5 + ExLlamaV2 不兼容（ExLlamaV2 不支持 Qwen3 架构），
-    需要使用 build_prompt_from_jinja() + qwen35-chat-template-corrected.jinja
+    ExLlamaV3 的 tokenizer 会自动使用模型内置模板，不需要外部指定。
     """
     if tools is None:
         tools = []
 
-    # Qwen2.5 工具调用格式
     tools_def = ""
     if tools:
         tools_def = "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n"
@@ -376,7 +261,6 @@ def build_prompt(
         elif role == "user":
             prompt += f"<|im_start|>user\n{content}<|im_end|>\n"
         elif role == "assistant":
-            # 处理 assistant 消息，可能是字符串或列表
             if isinstance(content, str):
                 prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
             elif isinstance(content, list):
@@ -390,121 +274,195 @@ def build_prompt(
                 if text_content:
                     prompt += f"<|im_start|>assistant\n{text_content}<|im_end|>\n"
 
-    # 如果没有 system 消息，添加默认的
     if not system_set:
         prompt = f"<|im_start|>system\n{default_system}{tools_def}<|im_end|>\n" + prompt
 
-    # 添加最后的 assistant 标记
     prompt += "<|im_start|>assistant\n"
     return prompt
 
 
-async def generate_completion(
-    data: Dict, generator, tokenizer, settings, max_seq_len: int, model_name: str
-):
-    """
-    核心生成逻辑 - 支持工具调用
+class Qwen35APIHandler:
+    """Qwen3.5 API 处理句柄"""
 
-    使用 build_prompt() 手动拼接（适用于 Qwen2.5 原生格式）。
-    Qwen3.5 需要使用 generate_completion_jinja() + jinja 模板。
-    """
-    messages = data.get("messages", [])
-    tools = data.get("tools", [])
-    max_tokens = data.get("max_tokens", max_seq_len - 1024)
+    def __init__(
+        self,
+        model_dir: str,
+        max_seq_len: int = 131072,
+        cache_tokens: int = 65536,
+        max_batch_size: int = 1,
+        max_chunk_size: int = 2048,
+        model_name: str = "qwen3.5-exl3",
+        default_system_prompt: str = "You are a helpful assistant. Do not think step by step. Answer directly and concisely.",
+    ):
+        self.model_name = model_name
+        self.max_seq_len = max_seq_len
+        self.default_system_prompt = default_system_prompt
 
-    prompt = build_prompt(messages, tools)
+        self.chat = Qwen35Chat(
+            model_dir=model_dir,
+            max_seq_len=max_seq_len,
+            cache_tokens=cache_tokens,
+            max_batch_size=max_batch_size,
+            max_chunk_size=max_chunk_size,
+        )
 
-    input_ids = tokenizer.encode(prompt)
-    if isinstance(input_ids, tuple):
-        input_ids = input_ids[0]
+    def load(self, progressbar: bool = True):
+        """加载模型"""
+        self.chat.load(progressbar=progressbar)
 
-    full_text = ""
-    eos = False
-    generated = 0
-    generator.begin_stream(input_ids, settings)
+    def unload(self):
+        """卸载模型"""
+        self.chat.unload()
 
-    while generated < max_tokens:
-        result = generator.stream_ex()
-        chunk = result["chunk"]
-        eos = result["eos"]
-        tokens = result.get("chunk_token_ids", None)
+    async def generate_completion(self, data: Dict) -> Dict:
+        """
+        核心生成逻辑 - 支持工具调用
 
-        if chunk:
-            full_text += chunk
-            if tokens is not None:
-                gen_tokens = (
-                    tokens.shape[1] if hasattr(tokens, "shape") else len(tokens)
-                )
-                generated += gen_tokens
-            else:
-                generated += 1
+        Args:
+            data: 包含 messages, tools, max_tokens 等字段的字典
 
-        if eos:
-            break
+        Returns:
+            OpenAI Chat Completion 格式的响应
+        """
+        messages = data.get("messages", [])
+        tools = data.get("tools", [])
+        max_tokens = data.get("max_tokens", self.max_seq_len - 1024)
+        temperature = data.get("temperature", 0.0)
+        system_prompt = data.get("system_prompt", self.default_system_prompt)
 
-    tool_calls = parse_tool_calls(full_text, tools)
+        prompt = self.chat.format_prompt(messages, system_prompt)
+        full_text = self.chat.generate_text(
+            prompt,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+        )
 
-    if tool_calls:
-        return {
-            "id": f"chatcmpl-{int(time.time() * 1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": data.get("model", model_name),
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "tool_calls": tool_calls},
-                    "finish_reason": "tool_calls",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": input_ids.shape[-1]
-                if hasattr(input_ids, "shape")
-                else len(input_ids),
-                "completion_tokens": generated,
-                "total_tokens": (
-                    input_ids.shape[-1]
-                    if hasattr(input_ids, "shape")
-                    else len(input_ids)
-                )
-                + generated,
-            },
-        }
-    else:
-        return {
-            "id": f"chatcmpl-{int(time.time() * 1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": data.get("model", model_name),
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": full_text},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": input_ids.shape[-1]
-                if hasattr(input_ids, "shape")
-                else len(input_ids),
-                "completion_tokens": generated,
-                "total_tokens": (
-                    input_ids.shape[-1]
-                    if hasattr(input_ids, "shape")
-                    else len(input_ids)
-                )
-                + generated,
-            },
-        }
+        input_len = self.chat.get_token_count(prompt)
+        output_len = self.chat.get_token_count(full_text)
+
+        tool_calls = parse_tool_calls(full_text, tools)
+
+        if tool_calls:
+            return {
+                "id": f"chatcmpl-{int(time.time() * 1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": data.get("model", self.model_name),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "tool_calls": tool_calls},
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": input_len,
+                    "completion_tokens": output_len,
+                    "total_tokens": input_len + output_len,
+                },
+            }
+        else:
+            return {
+                "id": f"chatcmpl-{int(time.time() * 1000)}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": data.get("model", self.model_name),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": full_text},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": input_len,
+                    "completion_tokens": output_len,
+                    "total_tokens": input_len + output_len,
+                },
+            }
+
+    async def generate_completion_stream(self, data: Dict):
+        """
+        流式生成逻辑
+
+        Yields:
+            SSE 格式的数据块
+        """
+        messages = data.get("messages", [])
+        max_tokens = data.get("max_tokens", self.max_seq_len - 1024)
+        temperature = data.get("temperature", 0.0)
+        system_prompt = data.get("system_prompt", self.default_system_prompt)
+
+        prompt = self.chat.format_prompt(messages, system_prompt)
+        tool_calls_sent = False
+
+        for chunk in self.chat.chat_stream(
+            message="",  # 空消息，因为 prompt 已经格式化好了
+            system_prompt=system_prompt,
+            history=messages[:-1] if messages else [],
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+        ):
+            # 由于 chat_stream 不返回完整文本，我们需要重新处理
+            pass
+
+        # 使用底层流式接口
+        import torch
+        from exllamav3.generator.sampler import ComboSampler
+        from exllamav3.generator import Job
+
+        sampler = ComboSampler(
+            temperature=temperature,
+            top_p=0.9,
+            min_p=0.0,
+            top_k=0,
+            rep_p=1.0,
+            rep_decay_range=1024,
+        )
+
+        input_ids = self.chat.tokenizer.encode(prompt, add_bos=False)
+
+        job = Job(
+            input_ids=input_ids,
+            max_new_tokens=max_tokens,
+            sampler=sampler,
+            stop_conditions=["<|im_end|>", "<|im_start|>"],
+        )
+
+        self.chat.generator.enqueue(job)
+        full_output = ""
+
+        while self.chat.generator.num_remaining_jobs():
+            for r in self.chat.generator.iterate():
+                if r["stage"] == "streaming":
+                    chunk = r.get("text", "")
+                    full_output += chunk
+
+                    if not tool_calls_sent:
+                        tc = parse_tool_calls(full_output)
+                        if tc:
+                            yield f"data: {json.dumps({'choices': [{'delta': {'role': 'assistant', 'tool_calls': tc}, 'finish_reason': 'tool_calls'}]})}\n\n"
+                            tool_calls_sent = True
+                            continue
+
+                    yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk}, 'finish_reason': None}]})}\n\n"
+
+                if r.get("eos"):
+                    if not tool_calls_sent:
+                        yield f"data: {json.dumps({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+        if not tool_calls_sent:
+            yield "data: [DONE]\n\n"
 
 
-async def responses_endpoint(request, generate_completion_func, default_model: str):
+async def responses_endpoint(request, handler: Qwen35APIHandler, default_model: str):
     """OpenAI Responses API 端点处理"""
     from fastapi import Request
 
     data = await request.json()
 
-    # 转换 input 为 messages
     messages = []
     input_data = data.get("input", "")
     if isinstance(input_data, str):
@@ -512,7 +470,6 @@ async def responses_endpoint(request, generate_completion_func, default_model: s
     elif isinstance(input_data, list):
         messages = input_data
 
-    # 构建 chat.completions 请求
     tools = data.get("tools", [])
     chat_data = {
         "model": data.get("model", default_model),
@@ -523,15 +480,12 @@ async def responses_endpoint(request, generate_completion_func, default_model: s
         "stream": False,
     }
 
-    # 调用生成逻辑
-    result = await generate_completion_func(chat_data)
+    result = await handler.generate_completion(chat_data)
 
-    # 检查是否是 tool_calls
     message = result.get("choices", [{}])[0].get("message", {})
     content = message.get("content", "")
     tool_calls = message.get("tool_calls", [])
 
-    # 构建 output
     output = []
     if tool_calls:
         for tc in tool_calls:
@@ -564,3 +518,30 @@ async def responses_endpoint(request, generate_completion_func, default_model: s
         "incomplete": False,
         "incomplete_details": None,
     }
+
+
+def create_api_server(
+    model_dir: str,
+    port: int = 11434,
+    host: str = "0.0.0.0",
+    **kwargs,
+) -> Qwen35Server:
+    """
+    创建 API 服务器
+
+    Args:
+        model_dir: 模型目录路径
+        port: 端口
+        host: 主机地址
+        **kwargs: 传递给 Qwen35Server 的其他参数
+
+    Returns:
+        Qwen35Server 实例
+    """
+    server = Qwen35Server(
+        model_dir=model_dir,
+        port=port,
+        host=host,
+        **kwargs,
+    )
+    return server
