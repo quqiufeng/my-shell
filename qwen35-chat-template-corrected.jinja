@@ -124,8 +124,8 @@
         
         {{- '<|im_start|>assistant\n' }}
         
-        {# thinking 输出控制 #}
-        {%- if enable_thinking is not defined or enable_thinking is true %}
+        {# thinking 输出控制 - 强制关闭 #}
+        {%- if false and enable_thinking is not defined or enable_thinking is true %}
             {%- if reasoning_content %}
                 {{- '<think>\n' + reasoning_content + '\n</think>\n\n' }}
             {%- elif loop.index0 > ns.last_query_index %}
@@ -183,7 +183,7 @@
 {# ========== 生成提示 ========== #}
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
-    {%- if enable_thinking is not defined or enable_thinking is true %}
+    {%- if false and enable_thinking is not defined or enable_thinking is true %}
         {{- '<think>\n' }}
     {%- endif %}
 {%- endif %}
