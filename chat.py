@@ -43,16 +43,80 @@ class PromptFormat_qwen35(PromptFormat):
     def default_system_prompt(self, think: bool = False) -> str:
         if think:
             return "You are a helpful AI assistant that can think step by step."
-        return "You are a helpful AI assistant. Do not think step by step. Answer directly and concisely."
+        return "You are a helpful AI assistant. Answer directly and concisely. When you need to use a tool, use the <tool_call> format."
 
-    def format(self, system_prompt: str, messages: list, think: bool = False) -> str:
-        context = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+    def format(
+        self,
+        system_prompt: str,
+        messages: list,
+        think: bool = False,
+        tools: Optional[list] = None,
+    ) -> str:
+        tools_section = ""
+        if tools:
+            tools_section = "\n## Available Tools\n\n"
+            tools_section += (
+                "You can call one or more functions to assist with the user query.\n\n"
+            )
+            for tool in tools:
+                func = tool.get("function", {})
+                name = func.get("name", "")
+                desc = func.get("description", "")
+                params = func.get("parameters", {})
+                props = params.get("properties", {})
+                required = params.get("required", [])
+
+                tools_section += f"### {name}\n"
+                tools_section += f"{desc}\n"
+                tools_section += "Arguments:\n"
+                for pname, pinfo in props.items():
+                    ptype = pinfo.get("type", "string")
+                    required_mark = " (required)" if pname in required else ""
+                    tools_section += f"  - {pname}: {ptype}{required_mark}\n"
+                tools_section += "\n"
+            tools_section += "When using tools, you MUST respond in this format:\n"
+            tools_section += "<tool_call>\n"
+            tools_section += "<function=TOOL_NAME>\n"
+            tools_section += "<parameter=ARG_NAME>value</parameter>\n"
+            tools_section += "</function>\n"
+            tools_section += "</tool_call>\n\n"
+            tools_section += "Or for multiple tool calls:\n"
+            tools_section += "<tool_call>\n"
+            tools_section += "<function=TOOL_NAME1>\n"
+            tools_section += "<parameter=ARG_NAME>value</parameter>\n"
+            tools_section += "</function>\n"
+            tools_section += "<function=TOOL_NAME2>\n"
+            tools_section += "<parameter=ARG_NAME>value</parameter>\n"
+            tools_section += "</function>\n"
+            tools_section += "</tool_call>\n\n"
+
+        context = f"<|im_start|>system\n{system_prompt}{tools_section}<|im_end|>\n"
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            context += f"<|im_start|>{role}\n{content}<|im_end|>\n"
-            if role == "assistant" and not think:
-                context += f"<|im_start|>assistant\n"
+            tool_calls = msg.get("tool_calls", None)
+
+            if role == "assistant" and tool_calls:
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    func_name = func.get("name", "")
+                    args = func.get("arguments", "{}")
+                    if isinstance(args, str):
+                        try:
+                            import json
+
+                            args = json.loads(args)
+                        except:
+                            args = {"raw": args}
+                    context += "<tool_call>\n"
+                    context += f"<function={func_name}>\n"
+                    for arg_name, arg_value in args.items():
+                        context += f"<parameter={arg_name}>{arg_value}</parameter>\n"
+                    context += "</function>\n"
+                    context += "</tool_call>\n"
+            else:
+                context += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+
         context += "<|im_start|>assistant\n"
         return context
 
@@ -140,6 +204,7 @@ class Qwen35Chat:
         messages: list,
         system_prompt: Optional[str] = None,
         think: bool = False,
+        tools: Optional[list] = None,
     ) -> str:
         if system_prompt is None:
             system_prompt = (
@@ -147,7 +212,7 @@ class Qwen35Chat:
                 if not think
                 else self.prompt_format.default_system_prompt(think)
             )
-        return self.prompt_format.format(system_prompt, messages, think)
+        return self.prompt_format.format(system_prompt, messages, think, tools)
 
     def generate_text(
         self,

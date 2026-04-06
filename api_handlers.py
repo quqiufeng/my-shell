@@ -118,6 +118,61 @@ def parse_tool_calls(text: str, tools: Optional[List] = None) -> Optional[List[D
                     }
                 ]
 
+        # llama.cpp 的 <tool_call><function=name> 格式
+        tool_call_match = re.search(
+            r"<tool_call>\s*<function=(\w+)>(.*?)</function>\s*</tool_call>",
+            text,
+            re.DOTALL,
+        )
+        if tool_call_match:
+            func_name = tool_call_match.group(1)
+            if is_valid_call(func_name):
+                arguments_str = tool_call_match.group(2)
+                arguments = {}
+                for arg_match in re.finditer(
+                    r"<parameter=(\w+)>(.*?)</parameter>", arguments_str, re.DOTALL
+                ):
+                    arg_name = arg_match.group(1)
+                    arg_value = arg_match.group(2).strip()
+                    try:
+                        arguments[arg_name] = json.loads(arg_value)
+                    except:
+                        arguments[arg_name] = arg_value
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": func_name,
+                            "arguments": json.dumps(arguments),
+                        },
+                    }
+                ]
+        if xml_match:
+            func_name = xml_match.group(1)
+            if is_valid_call(func_name):
+                arguments_str = xml_match.group(2)
+                arguments = {}
+                for arg_match in re.finditer(
+                    r"<(\w+)>(.*?)</\1>", arguments_str, re.DOTALL
+                ):
+                    arg_name = arg_match.group(1)
+                    arg_value = arg_match.group(2).strip()
+                    try:
+                        arguments[arg_name] = json.loads(arg_value)
+                    except:
+                        arguments[arg_name] = arg_value
+                return [
+                    {
+                        "id": f"call_{int(time.time() * 1000)}",
+                        "type": "function",
+                        "function": {
+                            "name": func_name,
+                            "arguments": json.dumps(arguments),
+                        },
+                    }
+                ]
+
         # Qwen2.5 的 <xml>{JSON}</xml> 格式
         xml_json_match = re.search(r"<xml>\s*(\{.*?\})\s*</xml>", text, re.DOTALL)
         if xml_json_match:
@@ -328,11 +383,11 @@ class Qwen35APIHandler:
         """
         messages = data.get("messages", [])
         tools = data.get("tools", [])
-        max_tokens = data.get("max_tokens", self.max_seq_len - 1024)
+        max_tokens = data.get("max_tokens", 4096)
         temperature = data.get("temperature", 0.0)
         system_prompt = data.get("system_prompt", self.default_system_prompt)
 
-        prompt = self.chat.format_prompt(messages, system_prompt)
+        prompt = self.chat.format_prompt(messages, system_prompt, tools=tools)
         full_text = self.chat.generate_text(
             prompt,
             max_new_tokens=max_tokens,
@@ -391,11 +446,12 @@ class Qwen35APIHandler:
             SSE 格式的数据块
         """
         messages = data.get("messages", [])
-        max_tokens = data.get("max_tokens", self.max_seq_len - 1024)
+        tools = data.get("tools", [])
+        max_tokens = data.get("max_tokens", 4096)
         temperature = data.get("temperature", 0.0)
         system_prompt = data.get("system_prompt", self.default_system_prompt)
 
-        prompt = self.chat.format_prompt(messages, system_prompt)
+        prompt = self.chat.format_prompt(messages, system_prompt, tools=tools)
         tool_calls_sent = False
 
         for chunk in self.chat.chat_stream(

@@ -150,7 +150,7 @@ def main():
         max_batch_size=MAX_BATCH_SIZE,
         max_chunk_size=MAX_CHUNK_SIZE,
         model_name="qwen3.5-9b-exl3",
-        default_system_prompt="You are a helpful assistant. Do not think step by step. Answer directly and concisely.",
+        default_system_prompt="You are a helpful AI assistant. When you need to call a tool, you MUST use this exact format:\n<tool_call>\n<function=TOOL_NAME>\n<parameter=PARAM_NAME>PARAM_VALUE</parameter>\n</function>\n</tool_call>\n\nCRITICAL RULES:\n1. ONLY use <tool_call> format for tool calls - no markdown code blocks\n2. Each <tool_call> contains ONE function call\n3. NEVER add text after </tool_call> until you receive the result\n4. Wait for tool results before making the next call\n5. For file operations, use exact paths provided\n6. If no tool is needed, respond naturally",
         cache_type=CACHE_TYPE,
     )
 
