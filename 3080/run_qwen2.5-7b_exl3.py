@@ -68,7 +68,7 @@ from api_handlers import Qwen35APIHandler
 
 MODEL_DIR = "/opt/image/Qwen2.5-7B-Instruct-exl3"
 MAX_SEQ_LEN = 32768
-PORT = 11435
+PORT = 11434
 CACHE_TOKENS = 32768
 MAX_BATCH_SIZE = 16
 MAX_CHUNK_SIZE = 8192
