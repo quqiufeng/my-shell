@@ -1,6 +1,8 @@
 #!/bin/bash
 
 export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
+export GGML_CUDA_FORCE_MMQ=1
+export GGML_CUDA_NO_VMM=1
 
 MODEL_DIR="/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
@@ -8,7 +10,7 @@ LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 echo "=============================="
 echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务"
 echo "地址: http://0.0.0.0:11434"
-echo "上下文: 32768"
+echo "上下文: 64K"
 echo "GPU层数: 全部"
 echo "=============================="
 
@@ -17,15 +19,25 @@ $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port 11434 \
   --n-gpu-layers 99 \
-  --ctx-size 65536 \
-  --batch-size 4096 \
+  --ctx-size 131072 \
+  --rope-scaling yarn \
+  --rope-scale 4 \
+  --yarn-orig-ctx 32768 \
+  --batch-size 256 \
   --flash-attn on \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
-  --threads 14 \
+  --threads 8 \
+  --parallel 1 \
+  --no-mmap \
+  --mlock \
   --log-disable \
   --jinja \
-  --temp 0 &
+  --chat-template-file /opt/my-shell/qwen35-chat-template-corrected.jinja \
+  --temp 0.0 \
+  --top-p 1.0 \
+  --top-k 1 \
+  --repeat-penalty 1.1 &
 
 sleep 40
 
@@ -45,12 +57,17 @@ echo '  -H "Content-Type: application/json" \\'
 echo '  -d '"'"'{"model": "Qwen3.5-9B-Q6_K.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
 echo ""
 echo "性能参数:"
-echo "  模型: Qwen3.5-9B-Q6_K.gguf"
+echo "  模型: Qwen3.5-9B.Q4_K_M.gguf"
 echo "  上下文: 64K"
 echo "  GPU层数: 99"
-echo "  KV缓存: q4_0"
+echo "  KV缓存: q8_0"
+echo "  Batch: 256"
+echo "  并行: 1"
 echo "  Flash Attention: on"
-echo "  速度: ~94 tokens/s"
+echo "  Temperature: 0.0"
+echo "  Top-P: 1.0"
+echo "  Top-K: 1"
+echo "  Repeat Penalty: 1.1"
 
 # ==========================================
 # 测试命令 (curl)
