@@ -50,7 +50,9 @@ pkill -f run_qwen2.5-7b_exl3
 - 服务: exllamav3
 
 [汇总]
-- 平均速度: 待测试
+- 总耗时: 198.21s
+- 总token数: 10964
+- 平均速度: 55.3 tok/s
 - 模型大小: ~5.5GB
 - 上下文: 32K
 
@@ -67,7 +69,7 @@ from api_handlers import Qwen35APIHandler
 MODEL_DIR = "/opt/image/Qwen2.5-7B-Instruct-exl3"
 MAX_SEQ_LEN = 32768
 PORT = 11435
-CACHE_TOKENS = 65536
+CACHE_TOKENS = 32768
 MAX_BATCH_SIZE = 16
 MAX_CHUNK_SIZE = 8192
 CACHE_TYPE = "fp16"
