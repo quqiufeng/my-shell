@@ -83,6 +83,7 @@ class Qwen35Chat:
         device: str = "cuda",
         k_bits: int = 4,
         v_bits: int = 4,
+        cache_type: str = "quant",
     ):
         self.model_dir = model_dir
         self.max_seq_len = max_seq_len
@@ -92,6 +93,7 @@ class Qwen35Chat:
         self.device = device
         self.k_bits = k_bits
         self.v_bits = v_bits
+        self.cache_type = cache_type
 
         self.model = None
         self.cache = None
@@ -104,13 +106,21 @@ class Qwen35Chat:
         config.flash_attn = True
 
         self.model = Model.from_config(config)
-        self.cache = Cache(
-            self.model,
-            max_num_tokens=self.cache_tokens,
-            layer_type=CacheLayer_quant,
-            k_bits=self.k_bits,
-            v_bits=self.v_bits,
-        )
+
+        if self.cache_type == "fp16":
+            self.cache = Cache(
+                self.model,
+                max_num_tokens=self.cache_tokens,
+                layer_type=CacheLayer_fp16,
+            )
+        else:
+            self.cache = Cache(
+                self.model,
+                max_num_tokens=self.cache_tokens,
+                layer_type=CacheLayer_quant,
+                k_bits=self.k_bits,
+                v_bits=self.v_bits,
+            )
         self.tokenizer = Tokenizer.from_config(config)
 
         self.model.load(progressbar=progressbar)
@@ -132,7 +142,11 @@ class Qwen35Chat:
         think: bool = False,
     ) -> str:
         if system_prompt is None:
-            system_prompt = self.DEFAULT_SYSTEM_PROMPT if not think else self.prompt_format.default_system_prompt(think)
+            system_prompt = (
+                self.DEFAULT_SYSTEM_PROMPT
+                if not think
+                else self.prompt_format.default_system_prompt(think)
+            )
         return self.prompt_format.format(system_prompt, messages, think)
 
     def generate_text(
@@ -267,7 +281,9 @@ class Qwen35Server(Qwen35Chat):
             from fastapi import FastAPI, Request
             from fastapi.responses import StreamingResponse
         except ImportError:
-            raise ImportError("fastapi and uvicorn are required for server mode: pip install fastapi uvicorn")
+            raise ImportError(
+                "fastapi and uvicorn are required for server mode: pip install fastapi uvicorn"
+            )
 
         app = FastAPI()
 
@@ -298,6 +314,7 @@ class Qwen35Server(Qwen35Chat):
             system_prompt = data.get("system_prompt", self.DEFAULT_SYSTEM_PROMPT)
 
             if stream:
+
                 async def generate_stream():
                     prompt = self.format_prompt(messages, system_prompt)
 
@@ -325,14 +342,39 @@ class Qwen35Server(Qwen35Chat):
                         for r in self.generator.iterate():
                             if r["stage"] == "streaming":
                                 chunk = r.get("text", "")
-                                yield "data: " + json.dumps({'choices': [{'delta': {'content': chunk}, 'finish_reason': None}]}) + "\n\n"
+                                yield (
+                                    "data: "
+                                    + json.dumps(
+                                        {
+                                            "choices": [
+                                                {
+                                                    "delta": {"content": chunk},
+                                                    "finish_reason": None,
+                                                }
+                                            ]
+                                        }
+                                    )
+                                    + "\n\n"
+                                )
 
                             if r.get("eos"):
-                                yield "data: " + json.dumps({'choices': [{'delta': {}, 'finish_reason': 'stop'}]}) + "\n\n"
+                                yield (
+                                    "data: "
+                                    + json.dumps(
+                                        {
+                                            "choices": [
+                                                {"delta": {}, "finish_reason": "stop"}
+                                            ]
+                                        }
+                                    )
+                                    + "\n\n"
+                                )
                                 yield "data: [DONE]\n\n"
                                 return
 
-                return StreamingResponse(generate_stream(), media_type="text/event-stream")
+                return StreamingResponse(
+                    generate_stream(), media_type="text/event-stream"
+                )
             else:
                 prompt = self.format_prompt(messages, system_prompt)
                 response_text = self.generate_text(prompt, max_new_tokens, temperature)
@@ -367,6 +409,7 @@ class Qwen35Server(Qwen35Chat):
             self.create_app()
 
         import uvicorn
+
         print(f"Starting Qwen3.5 server on {self.host}:{self.port}")
         uvicorn.run(self.app, host=self.host, port=self.port)
 
@@ -375,12 +418,20 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Qwen3.5 Chat Library")
-    parser.add_argument("--model-dir", type=str, required=True, help="Path to Qwen3.5 model directory")
+    parser.add_argument(
+        "--model-dir", type=str, required=True, help="Path to Qwen3.5 model directory"
+    )
     parser.add_argument("--port", type=int, default=11434, help="Server port")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Server host")
-    parser.add_argument("--cache-tokens", type=int, default=65536, help="Cache token count")
-    parser.add_argument("--max-new-tokens", type=int, default=1024, help="Max new tokens per generation")
-    parser.add_argument("--interactive", action="store_true", help="Interactive chat mode")
+    parser.add_argument(
+        "--cache-tokens", type=int, default=65536, help="Cache token count"
+    )
+    parser.add_argument(
+        "--max-new-tokens", type=int, default=1024, help="Max new tokens per generation"
+    )
+    parser.add_argument(
+        "--interactive", action="store_true", help="Interactive chat mode"
+    )
     parser.add_argument("--think", action="store_true", help="Enable thinking mode")
 
     args = parser.parse_args()

@@ -293,6 +293,7 @@ class Qwen35APIHandler:
         max_chunk_size: int = 2048,
         model_name: str = "qwen3.5-exl3",
         default_system_prompt: str = "You are a helpful assistant. Do not think step by step. Answer directly and concisely.",
+        cache_type: str = "quant",
     ):
         self.model_name = model_name
         self.max_seq_len = max_seq_len
@@ -304,6 +305,7 @@ class Qwen35APIHandler:
             cache_tokens=cache_tokens,
             max_batch_size=max_batch_size,
             max_chunk_size=max_chunk_size,
+            cache_type=cache_type,
         )
 
     def load(self, progressbar: bool = True):

@@ -19,7 +19,7 @@ Qwen3.5-9B EXL3 启动脚本 - RTX 3080 10GB
 
 [性能参数 - RTX 3080 10GB 优化]
   Cache: 65536 tokens (Q4 4bit)
-  max_batch_size=1, max_chunk_size=2048
+  max_batch_size=8, max_chunk_size=4096
   max_seq_len: 131072 (128k)
   flash_attn: True
   VRAM: ~9.4GB 模型 + 缓存
@@ -102,17 +102,26 @@ MODEL_DIR = "/opt/image/Qwen3.5-9B-exl3"
 MAX_SEQ_LEN = 131072
 PORT = 11434
 CACHE_TOKENS = 65536
+MAX_BATCH_SIZE = 8
+MAX_CHUNK_SIZE = 4096
+CACHE_TYPE = "fp16"
 
 
 def main():
     print(f"Loading Qwen3.5-9B model from {MODEL_DIR}...")
+    print(
+        f"Max batch size: {MAX_BATCH_SIZE}, Chunk size: {MAX_CHUNK_SIZE}, Cache: {CACHE_TYPE}"
+    )
 
     handler = Qwen35APIHandler(
         model_dir=MODEL_DIR,
         max_seq_len=MAX_SEQ_LEN,
         cache_tokens=CACHE_TOKENS,
+        max_batch_size=MAX_BATCH_SIZE,
+        max_chunk_size=MAX_CHUNK_SIZE,
         model_name="qwen3.5-9b-exl3",
         default_system_prompt="You are a helpful assistant. Do not think step by step. Answer directly and concisely.",
+        cache_type=CACHE_TYPE,
     )
 
     handler.load(progressbar=True)
