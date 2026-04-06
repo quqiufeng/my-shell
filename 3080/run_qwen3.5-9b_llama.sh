@@ -1,16 +1,16 @@
 #!/bin/bash
 #
 # 【模型信息】
-# 模型: Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled (GGUF Q4_K_M)
+# 模型: Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled (GGUF Q5_K_S)
 # 框架: llama.cpp
-# 显存占用: ~6GB (RTX 3080 10GB)
+# 显存占用: ~7GB (RTX 3080 10GB)
 # 上下文: 64K (262144 tokens, 实际可用 ~64K)
 #
 # 【性能测试数据 - 30个高难度提示词】
-# 平均速度: 66.8 tokens/s
-# 最快: 线程安全 78.3 tokens/s
-# 最慢: 跳表 57.1 tokens/s
-# 典型速度: 60-75 tokens/s
+# Q5_K_S: 67.5 tok/s (当前使用，质量更好)
+# Q4_K_M: 69.3 tok/s (略快)
+# 最快: Python性能优化 72.8 tokens/s
+# 最慢: 一致性哈希 63.0 tokens/s
 #
 # 【测试方法】
 # cd /home/dministrator/my-shell
@@ -28,7 +28,7 @@
 # ```json
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "openai/qwen3.5-9b-exl3",
+#   "model": "openai/Qwen3.5-9B.Q5_K_S.gguf",
 #   "provider": {
 #     "openai": {
 #       "npm": "@ai-sdk/openai-compatible",
@@ -38,14 +38,9 @@
 #         "apiKey": "dummy"
 #       },
 #       "models": {
-#         "qwen3.5-9b-exl3": {
-#           "name": "Qwen3.5-9B-EXL3 (本地3080)",
-#           "maxContextWindow": 131072,
-#           "maxOutputTokens": 65536
-#         },
-#         "qwen3.5-9b-llama": {
-#           "name": "Qwen3.5-9B-llama.cpp (本地3080)",
-#           "maxContextWindow": 131072,
+#         "Qwen3.5-9B.Q5_K_S.gguf": {
+#           "name": "Qwen3.5-9B-llama.cpp Q5 (本地3080)",
+#           "maxContextWindow": 65536,
 #           "maxOutputTokens": 4096
 #         }
 #       }
@@ -54,10 +49,8 @@
 # }
 # ```
 #
-# 切换模型: 修改 "model" 字段为 "openai/qwen3.5-9b-exl3" 或 "openai/qwen3.5-9b-llama"
-#
 
-MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
+MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q5_K_S.gguf"
 LLAMA_SERVER="$HOME/llama.cpp/build/bin/llama-server"
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
@@ -65,7 +58,7 @@ export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 echo "=============================="
 echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务 (3080)"
 echo "地址: http://0.0.0.0:11434"
-echo "模型: Qwen3.5-9B-Q4_K_M.gguf"
+echo "模型: Qwen3.5-9B-Q5_K_S.gguf"
 echo "上下文参数: -c 262144"
 echo "实际上下文: ~64K"
 echo "GPU层数: 35"
@@ -115,9 +108,8 @@ $LLAMA_SERVER \
   --stop "<|im_start|>" \
   --stop "</tool_call>" \
   --jinja \
-  --chat-template-file ../qwen35-chat-template-corrected.jinja  \
- 
-    --temp 0.6 \
+  --chat-template-file ../qwen35-chat-template-corrected.jinja \
+  --temp 0.6 \
     --top-p 0.95 \
     --top-k 20 \
     --min-p 0.00 \

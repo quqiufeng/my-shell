@@ -10,6 +10,8 @@ import urllib.request
 import urllib.error
 
 API_URL = "http://localhost:11434/v1/chat/completions"
+MODEL = "Qwen3.5-9B.Q5_K_S.gguf"  # llama.cpp
+# MODEL = "qwen3.5-9b-exl3"  # exl3
 MAX_TOKENS = 1024
 
 TESTS = [
@@ -95,6 +97,7 @@ def count_tokens(text):
 def call_api(prompt, max_tokens=MAX_TOKENS):
     """调用 API"""
     data = {
+        "model": MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "stream": False,
