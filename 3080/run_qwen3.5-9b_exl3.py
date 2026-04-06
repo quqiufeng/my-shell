@@ -41,6 +41,35 @@ ps aux | grep run_qwen3.5-9b_exl3
 pkill -f run_qwen3.5-9b_exl3
 
 ================================================================================
+OpenCode 配置
+================================================================================
+
+配置文件路径: ~/.opencode/opencode.json
+
+配置内容:
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openai/qwen3.5-9b-exl3",
+  "provider": {
+    "openai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Models",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "dummy"
+      },
+      "models": {
+        "qwen3.5-9b-exl3": {
+          "name": "Qwen3.5-9B-EXL3 (本地3080)",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 65536
+        }
+      }
+    }
+  }
+}
+
+================================================================================
 基准测试结果 - 2026-04-06
 ================================================================================
 
@@ -173,6 +202,12 @@ def main():
             )
         else:
             return await handler.generate_completion(data)
+
+    @app.post("/v1/responses")
+    async def responses_endpoint(request: Request):
+        from api_handlers import responses_endpoint as handle_response
+
+        return await handle_response(request, handler, "qwen3.5-9b-exl3")
 
     import uvicorn
 
