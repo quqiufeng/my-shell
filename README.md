@@ -5,6 +5,7 @@
 ## 📚 重要文档
 
 - **[OpenCode 本地大模型配置指南](opencode.md)** - 如何配置 OpenCode 连接本地部署的 Qwen 模型 API
+- **[Llama.cpp API 格式说明](llama_cpp.md)** - llama.cpp 工具调用格式与 OpenCode 集成
 
 ## 环境要求
 
