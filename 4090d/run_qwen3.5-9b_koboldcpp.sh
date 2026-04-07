@@ -4,6 +4,12 @@
 # Qwen3.5-9B (KoboldCpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
+# 【性能数据】(4090D 24GB, 128K上下文, Q5_K_S模型)
+#   速度: ~82-83 tokens/s
+#   测试命令: python3 test_api.py
+#   测试结果: 约82-83 tok/s (高难度算法题)
+# =============================================================
+#
 # 【启动方式】
 #   cd /opt/my-shell/4090d
 #   nohup ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp.log 2>&1 &
@@ -55,7 +61,7 @@
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 MODEL_DIR="/opt/gguf/Qwen3.5-9B.Q5_K_S.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
@@ -73,11 +79,14 @@ echo "=============================="
 cd "$KOBOLDCPP_DIR"
 
 python koboldcpp.py \
-  --model "$MODEL_DIR" \
-  --port 11434 \
+  "$MODEL_DIR" \
+  11434 \
   --host 0.0.0.0 \
   --gpulayers 99 \
   --contextsize 131072 \
+  --batchsize 2048 \
+  --threads 14 \
+  --blasthreads 14 \
   --flashattention \
   --quiet \
   --jinja \
