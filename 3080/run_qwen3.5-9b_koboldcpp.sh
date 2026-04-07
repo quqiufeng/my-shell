@@ -2,9 +2,17 @@
 #
 # 【模型信息】
 # 模型: Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled (GGUF Q4_K_M)
-# 框架: KoboldCpp
-# 显存占用: ~6GB (RTX 3080 10GB)
-# 上下文: 64K (65536 tokens)
+# 框架: KoboldCpp v1.111.1
+# 显存占用: ~8GB (RTX 3080 10GB)
+# 上下文: 128K (131072 tokens)
+# KV量化: q4_0 (--quantkv 1)
+#
+# 【性能测试数据 - 30个高难度提示词】
+# 平均速度: 62.2 tok/s
+# 最快: 快速排序 64.8 tok/s
+# 最慢: 贪心算法 55.8 tok/s
+# 典型速度: 60-65 tok/s
+# 总耗时: 494.07s / 30720 tokens
 #
 # 【OpenCode 配置】
 # 配置文件路径: ~/.opencode/opencode.json
@@ -24,7 +32,7 @@
 #       "models": {
 #         "Qwen3.5-9B.Q4_K_M.gguf": {
 #           "name": "Qwen3.5-9B-KoboldCpp Q4 (本地3080)",
-#           "maxContextWindow": 65536,
+#           "maxContextWindow": 131072,
 #           "maxOutputTokens": 4096
 #         }
 #       }
@@ -44,7 +52,7 @@ echo "=============================="
 echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务 (KoboldCpp)"
 echo "地址: http://0.0.0.0:11434"
 echo "模型: Qwen3.5-9B.Q4_K_M.gguf"
-echo "上下文: 64K (65536 tokens)"
+echo "上下文: 128K (131072 tokens)"
 echo "GPU层数: 35"
 echo "Flash Attention: on"
 echo "Jinja 模板: qwen35-chat-template-corrected.jinja"
@@ -69,10 +77,10 @@ python koboldcpp.py \
   --port 11434 \
   --host 0.0.0.0 \
   --gpulayers 35 \
-  --contextsize 65536 \
+  --contextsize 131072 \
+  --quantkv 1 \
   --flashattention \
   --quiet \
-  --unban_openai \
   --jinja \
   --chat-template "$JINJA_TEMPLATE" \
   --chat-template-kwargs '{"enable_thinking":false}'
