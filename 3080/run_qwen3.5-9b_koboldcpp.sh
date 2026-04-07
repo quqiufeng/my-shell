@@ -4,38 +4,50 @@
 # 模型: Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled (GGUF Q4_K_M)
 # 框架: KoboldCpp
 # 显存占用: ~6GB (RTX 3080 10GB)
-# 上下文: 80K (81920 tokens)
+# 上下文: 64K (65536 tokens)
 #
-# 【性能测试数据 - 30个高难度提示词】
-# 平均速度: 62.0 tokens/s
-# 最快: 最长公共子序列 67.8 tokens/s
-# 最慢: 阻塞队列 46.2 tokens/s
-# 典型速度: 60-65 tokens/s
+# 【OpenCode 配置】
+# 配置文件路径: ~/.opencode/opencode.json
 #
-# 【测试方法】
-# cd /home/dministrator/my-shell
-# python3 branch.py 11434 "koboldcpp/Qwen3.5-9B.Q4_K_M" 200
+# ```json
+# {
+#   "$schema": "https://opencode.ai/config.json",
+#   "model": "openai/Qwen3.5-9B.Q4_K_M.gguf",
+#   "provider": {
+#     "openai": {
+#       "npm": "@ai-sdk/openai-compatible",
+#       "name": "Local Models",
+#       "options": {
+#         "baseURL": "http://localhost:11434/v1",
+#         "apiKey": "dummy"
+#       },
+#       "models": {
+#         "Qwen3.5-9B.Q4_K_M.gguf": {
+#           "name": "Qwen3.5-9B-KoboldCpp Q4 (本地3080)",
+#           "maxContextWindow": 65536,
+#           "maxOutputTokens": 4096
+#         }
+#       }
+#     }
+#   }
+# }
+# ```
 #
-# 【对比其他框架】
-# KoboldCpp: 62.0 tokens/s (当前)
-# llama.cpp: 67.5 tokens/s
-# ExLlamaV2 7B: 78.4 tokens/s
-#
-# 【KoboldCpp 优势】
-# - 比 llama.cpp 更省内存
-# - 支持更多功能（Web UI、多模态）
-# - 速度接近 llama.cpp
 
 MODEL_DIR="/opt/image/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled/Qwen3.5-9B.Q4_K_M.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
+JINJA_TEMPLATE="/home/dministrator/my-shell/qwen35-chat-template-corrected.jinja"
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 echo "=============================="
-echo "启动 Qwen3.5-9B-Claude (KoboldCpp)"
+echo "启动 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled API 服务 (KoboldCpp)"
 echo "地址: http://0.0.0.0:11434"
 echo "模型: Qwen3.5-9B.Q4_K_M.gguf"
-echo "框架: KoboldCpp (比 llama.cpp 更省内存)"
+echo "上下文: 64K (65536 tokens)"
+echo "GPU层数: 35"
+echo "Flash Attention: on"
+echo "Jinja 模板: qwen35-chat-template-corrected.jinja"
 echo "=============================="
 echo ""
 echo "⚠️ Windows 端口转发命令 (在 Windows PowerShell 管理员运行):"
@@ -57,15 +69,10 @@ python koboldcpp.py \
   --port 11434 \
   --host 0.0.0.0 \
   --gpulayers 35 \
-  --contextsize 81920 \
+  --contextsize 65536 \
   --flashattention \
-  --quiet  \
-  --unban_openai  \
-  --chat_template qwen2
-  
-
-# 参数说明:
-# --gpulayers 35: GPU 层数
-# --contextsize 81920: 上下文长度 (80K)
-# --flashattention: 启用 Flash Attention
-# --quiet: 减少日志输出
+  --quiet \
+  --unban_openai \
+  --jinja \
+  --chat-template "$JINJA_TEMPLATE" \
+  --chat-template-kwargs '{"enable_thinking":false}'
