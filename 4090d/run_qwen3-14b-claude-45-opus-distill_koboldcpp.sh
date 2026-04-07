@@ -4,6 +4,11 @@
 # Qwen3-14B-Claude-4.5-Opus-Distill (KoboldCpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
+# 【性能数据】(4090D 24GB, 80K上下文, Q4_K_M模型)
+#   速度: ~74-75 tokens/s
+#   测试命令: python3 test_api.py
+# =============================================================
+#
 # 【启动方式】
 #   cd /opt/my-shell/4090d
 #   nohup ./run_qwen3-14b-claude-45-opus-distill_koboldcpp.sh > /tmp/claude45opus_koboldcpp.log 2>&1 &
