@@ -117,6 +117,14 @@ tar -xzf koboldcpp-linux-x64-cuda1210.tar.gz
 | `run_qwen3.5-9b_api.sh` | **Qwen3.5-9B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF/Qwen3.5-9B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | **~110 tok/s** |
 | `run_qwen3.5-27b-claude-46-opus_reasoning_api.sh` | **Qwen3.5-27B-Claude-4.6-Opus** | `/opt/gguf/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUFF/Qwen3.5-27B.Q4_K_M.gguf` | 推理增强 (蒸馏Claude思维链) | ~41 tokens/s |
 
+#### 14B 模型速度对比 (4090D 24GB, KoboldCpp)
+
+| 模型 | 量化 | 大小 | 上下文 | 速度 | 备注 |
+|------|------|------|--------|------|------|
+| **Qwen3-14B-Q4_K_M** | Q4_K_M | 9GB | 80K | **~75 tok/s** | 基础版 |
+| **Qwen3-14B-Claude-4.5-Opus-Distill** | Q4_K_M | 9GB | 80K | **~74-75 tok/s** | Claude推理蒸馏 |
+| **Qwen3-14B-Q5_K_M** | Q5_K_M | 10.5GB | 80K | **~67 tok/s** | 精度更高但更慢 |
+
 ---
 
 ### 2.1 Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled
