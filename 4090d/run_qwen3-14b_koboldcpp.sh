@@ -1,19 +1,19 @@
 #!/bin/bash
 #
 # =============================================================
-# Qwen3-14B (llama.cpp) API 启动脚本 (4090D 24GB)
+# Qwen3-14B (KoboldCpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
 # 【启动方式】
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwen3-14b_llama.cpp_api.sh > /tmp/14b_llama.log 2>&1 &
+#   nohup ./run_qwen3-14b_koboldcpp.sh > /tmp/14b_koboldcpp.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
-#   tail -f /tmp/14b_llama.log
+#   tail -f /tmp/14b_koboldcpp.log
 #
 # 【停止服务】
-#   killall -9 llama-server
+#   pkill -f koboldcpp.py
 #
 # 【测试API】
 #   curl http://localhost:11434/v1/models
@@ -30,17 +30,20 @@
 # =============================================================
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "llama.cpp/Qwen3-14B",
+#   "model": "openai/Qwen3-14B-Q4_K_M.gguf",
 #   "provider": {
-#     "llama.cpp": {
+#     "openai": {
 #       "npm": "@ai-sdk/openai-compatible",
-#       "options": { "baseURL": "http://localhost:11434/v1" },
+#       "name": "Local Models",
+#       "options": {
+#         "baseURL": "http://localhost:11434/v1",
+#         "apiKey": "dummy"
+#       },
 #       "models": {
-#         "Qwen3-14B": {
-#           "name": "Qwen3-14B-Q4_K_M.gguf",
+#         "Qwen3-14B-Q4_K_M.gguf": {
+#           "name": "Qwen3-14B-KoboldCpp Q4 (4090D)",
 #           "maxContextWindow": 131072,
-#           "maxOutputTokens": 32768,
-#           "options": { "num_ctx": 131072 }
+#           "maxOutputTokens": 32768
 #         }
 #       }
 #     }
@@ -48,62 +51,38 @@
 # }
 #
 # 【使用 opencode】
-#   opencode -m llama.cpp/Qwen3-14B
-#
-# 【性能数据】(4090D 24GB, 128K上下文)
-#   速度: ~88 tokens/s (q8_0 KV缓存)
-#   测试命令: python3 test_api.py
-#   测试结果: 约88 tok/s (30个高难度算法题)
+#   opencode -m openai/Qwen3-14B-Q4_K_M.gguf
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
-export GGML_CUDA_FORCE_MMH=1
-export GGML_CUDA_NO_VMM=1
+export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 MODEL_DIR="/opt/gguf/Qwen3-14B-Q4_K_M.gguf"
-LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
+KOBOLDCPP_DIR="/opt/koboldcpp"
 
 echo "=============================="
-echo "启动 Qwen3-14B Q4_K_M (llama.cpp) API 服务"
+echo "启动 Qwen3-14B Q4_K_M (KoboldCpp) API 服务"
 echo "地址: http://0.0.0.0:11434"
 echo "上下文: 128K (131072)"
 echo "GPU层数: 99"
-echo "KV缓存: q8_0"
 echo "Flash Attention: on"
 echo "Jinja模板: 自动检测 (qwen3)"
 echo "=============================="
 
-$LLAMA_SERVER \
-  -m "$MODEL_DIR" \
-  --host 0.0.0.0 \
-  --port 11434 \
-  --n-gpu-layers 99 \
-  -c 131072 \
-  -n 32768 \
-  --batch-size 256 \
-  --flash-attn on \
-  --cache-type-k q8_0 \
-  --cache-type-v q8_0 \
-  --threads 8 \
-  --parallel 1 \
-  --no-mmap \
-  --mlock \
-  --temp 0.0 \
-  --top-p 1.0 \
-  --top-k 1 \
-  --repeat-penalty 1.1 \
-  --log-disable \
-  --jinja \
-  --reasoning-format none \
-  --rope-scaling yarn \
-  --rope-scale 4 \
-  --yarn-orig-ctx 32768 \
-  --context-shift \
-  --metrics \
-  --chat-template-kwargs "{\"enable_thinking\":false}" &
+cd "$KOBOLDCPP_DIR"
 
-sleep 40
+python koboldcpp.py \
+  --model "$MODEL_DIR" \
+  --port 11434 \
+  --host 0.0.0.0 \
+  --gpulayers 99 \
+  --contextsize 131072 \
+  --flashattention \
+  --quiet \
+  --jinja \
+  --chat-template-kwargs '{"enable_thinking":false}' &
+
+sleep 10
 
 INSTANCE_ID=${XGC_INSTANCE_ID:-$(hostname)}
 
@@ -122,17 +101,10 @@ echo '  -d '"'"'{"model": "Qwen3-14B-Q4_K_M.gguf", "messages": [{"role": "user",
 echo ""
 echo "性能参数:"
 echo "  模型: Qwen3-14B-Q4_K_M.gguf"
+echo "  框架: KoboldCpp"
 echo "  上下文: 128K"
 echo "  最大输出: 32K"
 echo "  GPU层数: 99"
-echo "  KV缓存: q8_0"
-echo "  Batch: 256"
-echo "  并行: 1 (单序列优化)"
 echo "  Flash Attention: on"
-echo "  Temperature: 0.0"
-echo "  Top-P: 1.0"
-echo "  Top-K: 1"
-echo "  Repeat Penalty: 1.1"
-echo "  Reasoning格式: none"
 echo "  Chat模板: jinja自动检测 (qwen3)"
 echo "  思考模式: 关闭 (enable_thinking=false)"

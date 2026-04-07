@@ -1,19 +1,19 @@
 #!/bin/bash
 #
 # =============================================================
-# Qwen3.5-9B (llama.cpp) API 启动脚本 (4090D 24GB)
+# Qwen3.5-9B (KoboldCpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
 # 【启动方式】
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwen3.5-9b_llama.cpp_api.sh > /tmp/9b_llama.log 2>&1 &
+#   nohup ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
-#   tail -f /tmp/9b_llama.log
+#   tail -f /tmp/9b_koboldcpp.log
 #
 # 【停止服务】
-#   killall -9 llama-server
+#   pkill -f koboldcpp.py
 #
 # 【测试API】
 #   curl http://localhost:11434/v1/models
@@ -30,17 +30,20 @@
 # =============================================================
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "llama.cpp/Qwen3.5-9B",
+#   "model": "openai/Qwen3.5-9B.Q5_K_S.gguf",
 #   "provider": {
-#     "llama.cpp": {
+#     "openai": {
 #       "npm": "@ai-sdk/openai-compatible",
-#       "options": { "baseURL": "http://localhost:11434/v1" },
+#       "name": "Local Models",
+#       "options": {
+#         "baseURL": "http://localhost:11434/v1",
+#         "apiKey": "dummy"
+#       },
 #       "models": {
-#         "Qwen3.5-9B": {
-#           "name": "Qwen3.5-9B.Q5_K_S.gguf",
+#         "Qwen3.5-9B.Q5_K_S.gguf": {
+#           "name": "Qwen3.5-9B-KoboldCpp Q5 (4090D)",
 #           "maxContextWindow": 131072,
-#           "maxOutputTokens": 32768,
-#           "options": { "num_ctx": 131072 }
+#           "maxOutputTokens": 32768
 #         }
 #       }
 #     }
@@ -48,64 +51,40 @@
 # }
 #
 # 【使用 opencode】
-#   opencode -m llama.cpp/Qwen3.5-9B
-#
-# 【性能数据】(4090D 24GB, 128K上下文, Q5_K_S模型)
-#   速度: ~85 tokens/s
-#   测试命令: python3 test_api.py
-#   测试结果: 约85 tok/s (30个高难度算法题)
+#   opencode -m openai/Qwen3.5-9B.Q5_K_S.gguf
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
-export GGML_CUDA_FORCE_MMQ=1
-export GGML_CUDA_NO_VMM=1
+export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 MODEL_DIR="/opt/gguf/Qwen3.5-9B.Q5_K_S.gguf"
-LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
+KOBOLDCPP_DIR="/opt/koboldcpp"
+JINJA_TEMPLATE="/opt/my-shell/qwen35-chat-template-corrected.jinja"
 
 echo "=============================="
-echo "启动 Qwen3.5-9B Q5_K_S (llama.cpp) API 服务"
+echo "启动 Qwen3.5-9B Q5_K_S (KoboldCpp) API 服务"
 echo "地址: http://0.0.0.0:11434"
 echo "上下文: 128K (131072)"
 echo "GPU层数: 99"
-echo "KV缓存: q4_0"
 echo "Flash Attention: on"
 echo "Jinja模板: qwen35-chat-template-corrected.jinja"
 echo "=============================="
 
-$LLAMA_SERVER \
-  -m "$MODEL_DIR" \
-  --host 0.0.0.0 \
-  --port 11434 \
-  --n-gpu-layers 99 \
-  -c 131072 \
-  -n 32768 \
-  --batch-size 1024 \
-  --ubatch-size 512 \
-  --flash-attn on \
-  --cache-type-k q4_0 \
-  --cache-type-v q4_0 \
-  --threads 14 \
-  --parallel 1 \
-  --no-mmap \
-  --mlock \
-  --temp 0.0 \
-  --top-p 1.0 \
-  --top-k 1 \
-  --repeat-penalty 1.1 \
-  --log-disable \
-  --jinja \
-  --chat-template-file /opt/my-shell/qwen35-chat-template-corrected.jinja \
-  --reasoning-format none \
-  --rope-scaling yarn \
-  --rope-scale 4 \
-  --yarn-orig-ctx 32768 \
-  --context-shift \
-  --metrics \
-  --chat-template-kwargs "{\"enable_thinking\":false}" &
+cd "$KOBOLDCPP_DIR"
 
-sleep 40
+python koboldcpp.py \
+  --model "$MODEL_DIR" \
+  --port 11434 \
+  --host 0.0.0.0 \
+  --gpulayers 99 \
+  --contextsize 131072 \
+  --flashattention \
+  --quiet \
+  --jinja \
+  --chat-template "$JINJA_TEMPLATE" \
+  --chat-template-kwargs '{"enable_thinking":false}' &
+
+sleep 10
 
 INSTANCE_ID=${XGC_INSTANCE_ID:-$(hostname)}
 
@@ -124,18 +103,10 @@ echo '  -d '"'"'{"model": "Qwen3.5-9B.Q5_K_S.gguf", "messages": [{"role": "user"
 echo ""
 echo "性能参数:"
 echo "  模型: Qwen3.5-9B.Q5_K_S.gguf"
+echo "  框架: KoboldCpp"
 echo "  上下文: 128K"
 echo "  最大输出: 32K"
 echo "  GPU层数: 99"
-echo "  KV缓存: q4_0"
-echo "  Batch: 1024"
-echo "  UBatch: 512"
-echo "  并行: 1 (单序列优化)"
 echo "  Flash Attention: on"
-echo "  Temperature: 0.0"
-echo "  Top-P: 1.0"
-echo "  Top-K: 1"
-echo "  Repeat Penalty: 1.1"
-echo "  Reasoning格式: none"
 echo "  Chat模板: qwen35-chat-template-corrected.jinja"
 echo "  思考模式: 关闭 (enable_thinking=false)"
