@@ -1,16 +1,16 @@
 #!/bin/bash
 #
 # =============================================================
-# Qwen3.5-9B API 启动脚本 (4090D 24GB)
+# Qwen3-14B (llama.cpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
 # 【启动方式】
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwen3.5-9b_api.sh > /tmp/9b.log 2>&1 &
+#   nohup ./run_qwen3-14b_llama.cpp_api.sh > /tmp/14b_llama.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
-#   tail -f /tmp/14b.log
+#   tail -f /tmp/14b_llama.log
 #
 # 【停止服务】
 #   killall -9 llama-server
@@ -19,7 +19,7 @@
 #   curl http://localhost:11434/v1/models
 #   curl -s http://localhost:11434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
-#     -d '{"model": "Qwen3.5-9B.Q5_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
+#     -d '{"model": "Qwen3-14B-Q4_K_M.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
 #
 # 【性能测试】
 #   cd /opt/my-shell
@@ -30,14 +30,14 @@
 # =============================================================
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "llama.cpp/Qwen3.5-9B",
+#   "model": "llama.cpp/Qwen3-14B",
 #   "provider": {
 #     "llama.cpp": {
 #       "npm": "@ai-sdk/openai-compatible",
 #       "options": { "baseURL": "http://localhost:11434/v1" },
 #       "models": {
-#         "Qwen3.5-9B": {
-#           "name": "Qwen3.5-9B.Q5_K_S.gguf",
+#         "Qwen3-14B": {
+#           "name": "Qwen3-14B-Q4_K_M.gguf",
 #           "maxContextWindow": 131072,
 #           "maxOutputTokens": 32768,
 #           "options": { "num_ctx": 131072 }
@@ -48,30 +48,30 @@
 # }
 #
 # 【使用 opencode】
-#   opencode -m llama.cpp/Qwen3.5-9B
+#   opencode -m llama.cpp/Qwen3-14B
 #
-# 【性能数据】(4090D 24GB, 128K上下文, Q5_K_S模型)
-#   速度: ~85 tokens/s
+# 【性能数据】(4090D 24GB, 128K上下文)
+#   速度: ~88 tokens/s (q8_0 KV缓存)
 #   测试命令: python3 test_api.py
-#   测试结果: 约85 tok/s (30个高难度算法题)
-#   速度测试: curl -s http://localhost:11434/v1/chat/completions \
-#     -H "Content-Type: application/json" \
-#     -d '{"model": "Qwen3.5-9B.Q5_K_S.gguf", "messages": [{"role": "user", "content": "用Python实现快速排序"}], "max_tokens": 1024}' | jq -r '.timings.predicted_per_second'
+#   测试结果: 约88 tok/s (30个高难度算法题)
 #
 # =============================================================
 
 export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/opt/llama.cpp/build/lib:$LD_LIBRARY_PATH
-export GGML_CUDA_FORCE_MMQ=1
+export GGML_CUDA_FORCE_MMH=1
 export GGML_CUDA_NO_VMM=1
 
-MODEL_DIR="/opt/gguf/Qwen3.5-9B.Q5_K_S.gguf"
+MODEL_DIR="/opt/gguf/Qwen3-14B-Q4_K_M.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
 echo "=============================="
-echo "启动 Qwen3.5-9B Q5_K_S API 服务"
+echo "启动 Qwen3-14B Q4_K_M (llama.cpp) API 服务"
 echo "地址: http://0.0.0.0:11434"
-echo "上下文: 128K"
-echo "GPU层数: 全部"
+echo "上下文: 128K (131072)"
+echo "GPU层数: 99"
+echo "KV缓存: q8_0"
+echo "Flash Attention: on"
+echo "Jinja模板: 自动检测 (qwen3)"
 echo "=============================="
 
 $LLAMA_SERVER \
@@ -81,12 +81,11 @@ $LLAMA_SERVER \
   --n-gpu-layers 99 \
   -c 131072 \
   -n 32768 \
-  --batch-size 1024 \
-  --ubatch-size 512 \
+  --batch-size 256 \
   --flash-attn on \
-  --cache-type-k q4_0 \
-  --cache-type-v q4_0 \
-  --threads 14 \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --threads 8 \
   --parallel 1 \
   --no-mmap \
   --mlock \
@@ -96,7 +95,6 @@ $LLAMA_SERVER \
   --repeat-penalty 1.1 \
   --log-disable \
   --jinja \
-  --chat-template-file /opt/my-shell/qwen35-chat-template-corrected.jinja \
   --reasoning-format none \
   --rope-scaling yarn \
   --rope-scale 4 \
@@ -120,22 +118,21 @@ echo ""
 echo "调试命令:"
 echo "curl -s http://localhost:11434/v1/chat/completions \\"
 echo '  -H "Content-Type: application/json" \'
-echo '  -d '"'"'{"model": "Qwen3.5-9B.Q5_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
+echo '  -d '"'"'{"model": "Qwen3-14B-Q4_K_M.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'"'"''
 echo ""
 echo "性能参数:"
-echo "  模型: Qwen3.5-9B.Q5_K_S.gguf"
+echo "  模型: Qwen3-14B-Q4_K_M.gguf"
 echo "  上下文: 128K"
 echo "  最大输出: 32K"
 echo "  GPU层数: 99"
-echo "  KV缓存: q4_0"
-echo "  Batch: 1024"
-echo "  UBatch: 512"
+echo "  KV缓存: q8_0"
+echo "  Batch: 256"
 echo "  并行: 1 (单序列优化)"
 echo "  Flash Attention: on"
 echo "  Temperature: 0.0"
 echo "  Top-P: 1.0"
 echo "  Top-K: 1"
 echo "  Repeat Penalty: 1.1"
-echo "  Reasoning格式: deepseek"
-echo "  Chat模板: qwen35-chat-template-corrected.jinja"
-echo "  思考模式: 关闭"
+echo "  Reasoning格式: none"
+echo "  Chat模板: jinja自动检测 (qwen3)"
+echo "  思考模式: 关闭 (enable_thinking=false)"
