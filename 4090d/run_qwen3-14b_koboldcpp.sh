@@ -72,11 +72,14 @@ echo "=============================="
 cd "$KOBOLDCPP_DIR"
 
 python koboldcpp.py \
-  --model "$MODEL_DIR" \
-  --port 11434 \
+  "$MODEL_DIR" \
+  11434 \
   --host 0.0.0.0 \
   --gpulayers 99 \
-  --contextsize 131072 \
+  --contextsize 81920 \
+  --batchsize 512 \
+  --threads 14 \
+  --blasthreads 14 \
   --flashattention \
   --quiet \
   --jinja \
