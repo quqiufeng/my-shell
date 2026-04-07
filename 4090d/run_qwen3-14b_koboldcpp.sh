@@ -28,6 +28,7 @@
 # =============================================================
 # OpenCode 配置文件 (~/.config/opencode/opencode.json)
 # =============================================================
+# 路径: ~/.config/opencode/opencode.json
 # {
 #   "$schema": "https://opencode.ai/config.json",
 #   "model": "openai/Qwen3-14B-Q4_K_M.gguf",
@@ -41,8 +42,8 @@
 #       },
 #       "models": {
 #         "Qwen3-14B-Q4_K_M.gguf": {
-#           "name": "Qwen3-14B-KoboldCpp Q4 (4090D)",
-#           "maxContextWindow": 131072,
+#           "name": "Qwen3-14B-Q4_K_M.gguf",
+#           "maxContextWindow": 81920,
 #           "maxOutputTokens": 32768
 #         }
 #       }
