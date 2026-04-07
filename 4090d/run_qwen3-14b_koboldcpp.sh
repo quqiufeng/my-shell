@@ -57,7 +57,7 @@
 
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
-MODEL_DIR="/opt/gguf/Qwen3-14B-Q4_K_M.gguf"
+MODEL_DIR="/opt/image/Qwen3-14B-Q4_K_M.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 
 echo "=============================="
