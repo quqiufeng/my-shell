@@ -4,10 +4,21 @@
 # Qwen3.5-9B (KoboldCpp) API 启动脚本 (4090D 24GB) - 优化版
 # =============================================================
 #
-# 【性能数据】(4090D 24GB, 256K上下文, Q4_K_M模型)
-#   速度: ~90-95 tokens/s
-#   测试命令: python3 test_api.py
-#   测试结果: 约90-95 tok/s (高难度算法题)
+# 【基准测试数据】(2025-04-13, test_api.py 30题算法题, max_tokens=1024)
+# ┌─────────────┬──────────┬────────────┬────────────────────────┐
+# │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                   │
+# ├─────────────┼──────────┼────────────┼────────────────────────┤
+# │ 256K        │ 112.2    │ 30720      │ batch=4096, threads=16 │
+# └─────────────┴──────────┴────────────┴────────────────────────┘
+# 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
+# 模型: Qwopus3.5-9B-v3.Q4_K_M.gguf
+#
+# 【优化要点】
+#   - gpulayers: 99 (全载GPU)
+#   - batchsize: 4096 (KoboldCpp最大支持4096, 8192不支持)
+#   - threads: 16 / blasthreads: 16 (32线程无提升)
+#   - flashattention + usemlock + nommap
+#   - contextsize: 262144 (256K)
 # =============================================================
 #
 # 【启动方式】
@@ -64,13 +75,13 @@
 export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 # 4090D 优化参数
-MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3.Q4_K_M.gguf"
+MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q4_K_M.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 
 # 4090D 24GB 显存可以支持更大上下文
 GPULAYERS=99          # 全部加载到GPU
 CONTEXTSIZE=262144    # 256K 上下文 (4090D 24GB 支持)
-BATCHSIZE=4096        # 更大的batch size
+BATCHSIZE=4096        # batch size (最大支持4096)
 THREADS=16            # 更多线程
 BLASTHREADS=16        # BLAS线程
 

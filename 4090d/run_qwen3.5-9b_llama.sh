@@ -4,15 +4,30 @@
 # Qwen3.5-9B (llama.cpp) API 启动脚本 (4090D 24GB) - 优化版
 # =============================================================
 #
-# 【性能数据】(4090D 24GB, 64K上下文, Q4_K_M模型)
-#   速度: ~95-100 tokens/s
-#   测试命令: python3 test_api.py
-#   测试结果: 约95-100 tok/s (高难度算法题)
+# 【基准测试数据】(2025-04-13, test_api.py 30题算法题, max_tokens=1024)
+# ┌─────────────┬──────────┬────────────┬────────────────────────┐
+# │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                   │
+# ├─────────────┼──────────┼────────────┼────────────────────────┤
+# │ 64K         │ 113.2    │ 30720      │ batch=4096, threads=16 │
+# │ 256K        │ 111.8    │ 30720      │ batch=4096, threads=16 │
+# └─────────────┴──────────┴────────────┴────────────────────────┘
+# 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
+# 模型: Qwopus3.5-9B-v3.Q4_K_M.gguf
+#
+# 【优化要点】
+#   - ctx-size: 262144 (256K)
+#   - batch-size: 4096 (原2048)
+#   - ubatch-size: 4096 (原2048)
+#   - threads: 16 (最佳, 32无提升)
+#   - --parallel 1: 减少slot开销
+#   - --prio 2: 高优先级
+#   - --flash-attn on + cache-type-k/v f16
+#   - --mlock + --no-mmap
 # =============================================================
 #
 # 【启动方式】
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama.log 2>&1 &
+#   nohup ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_256k.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
@@ -64,15 +79,15 @@
 export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 # 4090D 24GB 显存优化参数
-MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3.Q4_K_M.gguf"
-LLAMA_SERVER="/root/llama.cpp/build/bin/llama-server"
+MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q4_K_M.gguf"
+LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
 # 4090D 可以支持更大的上下文和 batch size
 NGL=99              # GPU层数 (全部加载到GPU)
-CTX=65536           # 上下文 64K (4090D 24GB 支持)
-BATCH=2048          # batch size (更大)
-UBATCH=2048         # micro batch size
-THREADS=16          # CPU线程数 (4090D有更多核心)
+CTX=262144          # 上下文 256K (4090D 24GB 极限测试)
+BATCH=4096          # batch size (优化: 4096)
+UBATCH=4096         # micro batch size (优化: 4096)
+THREADS=16          # CPU线程数 (优化后: 16线程最佳)
 
 PORT=11434
 
@@ -85,7 +100,7 @@ echo "GPU层数: $NGL"
 echo "Batch Size: $BATCH"
 echo "uBatch Size: $UBATCH"
 echo "Threads: $THREADS"
-echo "目标: 95-100 tok/s"
+echo "目标: 110+ tok/s"
 echo "=============================="
 echo ""
 
@@ -100,6 +115,7 @@ $LLAMA_SERVER \
   --flash-attn on \
   --threads $THREADS \
   --threads-batch $THREADS \
+  --prio 2 \
   --no-mmap \
   --mlock \
   --temp 0.6 \
@@ -108,6 +124,7 @@ $LLAMA_SERVER \
   --min-p 0.00 \
   --cache-type-k f16 \
   --cache-type-v f16 \
-  --metrics
+  --metrics \
+  --parallel 1
 
 # 注意: 使用模型内置的chat template，不指定自定义模板
