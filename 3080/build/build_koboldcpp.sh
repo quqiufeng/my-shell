@@ -1,5 +1,12 @@
 #!/bin/bash
 set -e
+#
+# 【编译优化选项】
+#   NVCCFLAGS=-arch=sm_86    仅编译 RTX 3080 架构，避免生成多余 PTX
+#   NVCCFLAGS+=-O3           显式开启 CUDA O3 优化
+#   NVCCFLAGS+=-use_fast_math 快速数学函数（Makefile 已有，显式保险）
+#   LDFLAGS=-flto            链接时优化
+#
 
 echo "=== 编译 koboldcpp (CUDA 版本 for RTX 3080) ==="
 echo ""
@@ -28,11 +35,16 @@ ln -sf /opt/koboldcpp/nvcc_wrapper.sh /opt/koboldcpp_nvcc_path/nvcc
 echo ""
 echo "=== 开始编译 (CUDA/cuBLAS for RTX 3080) ==="
 echo "架构: CUDA 8.6 (RTX 3080)"
+echo "NVCCFLAGS: -arch=sm_86 -O3 -use_fast_math"
+echo "LDFLAGS: -flto (链接时优化)"
 echo "使用 CUDA 12 nvcc + wrapper (绕过 GCC 13 兼容性检查)"
 echo "这可能需要 10-20 分钟..."
 echo ""
 
-PATH="/opt/koboldcpp_nvcc_path:$PATH" make -j$(nproc) LLAMA_CUBLAS=1 CUDA_ARCHITECTURES=86 koboldcpp_cublas
+export NVCCFLAGS="-arch=sm_86 -O3 -use_fast_math -extended-lambda --forward-unknown-to-host-compiler"
+export LDFLAGS="-flto"
+
+PATH="/opt/koboldcpp_nvcc_path:$PATH" make -j$(nproc) LLAMA_CUBLAS=1 koboldcpp_cublas
 
 echo ""
 echo "=== 编译完成 ==="

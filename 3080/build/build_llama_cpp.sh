@@ -1,7 +1,15 @@
 #!/bin/bash
 
-# llama.cpp CUDA 编译脚本
+# llama.cpp CUDA 编译脚本 (RTX 3080 优化版)
 # 支持自动检测 GPU 架构
+#
+# 【编译优化选项】
+#   -DGGML_CUDA_FA=ON           编译时启用 Flash Attention 内核优化
+#   -DGGML_CUDA_GRAPHS=ON       启用 CUDA Graphs 加速小 batch 推理 (新版默认 OFF，需显式开启)
+#   -DGGML_CUDA_FORCE_MMQ=ON    强制使用 mmq kernels 替代 cuBLAS，消费级显卡小 batch 更快
+#   -DGGML_LTO=ON               启用链接时优化，编译更慢但运行可能稍快
+#   -DGGML_NATIVE=OFF           禁用 CPU native 优化，避免纯 GPU 推理时干扰
+#
 
 echo "=========================================="
 echo "llama.cpp CUDA 编译脚本"
@@ -56,7 +64,14 @@ esac
 
 echo "使用 CUDA_ARCH: $CUDA_ARCH"
 
-cmake .. -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCH
+cmake .. \
+  -DGGML_CUDA=ON \
+  -DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCH \
+  -DGGML_CUDA_FA=ON \
+  -DGGML_CUDA_GRAPHS=ON \
+  -DGGML_CUDA_FORCE_MMQ=ON \
+  -DGGML_LTO=ON \
+  -DGGML_NATIVE=OFF
 
 # 编译
 echo ""

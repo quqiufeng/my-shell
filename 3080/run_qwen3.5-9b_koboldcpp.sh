@@ -4,13 +4,23 @@
 # 模型: Jackrong/Qwopus3.5-9B-v3-GGUF (GGUF Q5_K_S)
 # 框架: KoboldCpp (优化版，目标 100+ tok/s)
 # 显存占用: ~7GB (RTX 3080 10GB)
-# 上下文: 8K (减少KV缓存提高速度)
+# 上下文: 128K (131072 tokens)
+# KV量化: q4_0 (--quantkv 1)
+#
+# 【实测性能】2026-04-13 RTX 3080 10GB
+#   快速排序: 53.6 tok/s
+#   线程安全: 58.1 tok/s
+#   二分查找: 59.1 tok/s
+#   数据库索引: 57.8 tok/s
+#   Python性能优化: 55.4 tok/s
+#   归并排序: 58.7 tok/s
+#   平均约: 57 tok/s
 #
 # 【优化策略】
-# 1. 减小上下文到 8K
-# 2. 使用 smartcontext 优化
-# 3. 禁用不必要的功能
-# 4. 使用合适的量化级别
+# 1. 增大上下文到 128K
+# 2. 使用 KV 量化 q4_0 控制显存
+# 3. 启用 Flash Attention
+# 4. 禁用不必要的功能
 #
 
 MODEL_DIR="/opt/image/Qwopus3.5-9B-v3-GGUF/Qwen3.5-9B.Q5_K_S.gguf"
@@ -20,7 +30,7 @@ export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 # 优化参数
 GPULAYERS=33        # GPU层数
-CONTEXTSIZE=8192    # 上下文 8K (从128K减少)
+CONTEXTSIZE=131072  # 上下文 128K
 PORT=11434
 
 echo "=============================="
@@ -42,6 +52,7 @@ python koboldcpp.py \
   --gpulayers $GPULAYERS \
   --contextsize $CONTEXTSIZE \
   --flashattention \
+  --quantkv 1 \
   --quiet \
   --usemlock \
   --nommap
