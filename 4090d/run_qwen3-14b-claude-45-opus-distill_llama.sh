@@ -19,8 +19,15 @@
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
 # 模型: Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf
 #
+# 【上下文限制】(4090D 24GB)
+#   - 80K:  安全运行, 速度 89.4 tok/s
+#   - 128K: OOM (需要 ~20GB KV cache, 24GB 不足)
+#   - 256K: 不可行
+# 【升级建议】
+#   - RTX 4090 48GB: 可支持 128K 甚至 256K 上下文
+#
 # 【优化要点】
-#   - ctx-size: 81920 (80K)
+#   - ctx-size: 81920 (80K, 4090D 安全上限)
 #   - batch-size: 2048 (4096会OOM)
 #   - ubatch-size: 2048
 #   - threads: 16
@@ -89,8 +96,8 @@ LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
 # 4090D 可以支持更大的上下文和 batch size
 NGL=99              # GPU层数 (全部加载到GPU)
-CTX=81920           # 上下文 80K (4090D 24GB 支持)
-BATCH=2048          # batch size (14B模型最佳值, 4096会OOM)
+CTX=81920           # 上下文 80K (4090D 24GB 安全值, 128K会OOM)
+BATCH=2048          # batch size (14B最佳值)
 UBATCH=2048         # micro batch size
 THREADS=16          # CPU线程数
 
