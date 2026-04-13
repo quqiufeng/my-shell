@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 API 性能测试脚本
+用法: python3 test_api.py [模型名称] [API地址]
+示例:
+  python3 test_api.py                                    # 使用默认模型
+  python3 test_api.py "Qwen3.5-9B.Q5_K_S.gguf"           # 指定模型名称
+  python3 test_api.py "koboldcpp/Qwen3.5-9B.Q5_K_S" "http://localhost:11435/v1/chat/completions"
 """
 
 import sys
@@ -9,10 +14,14 @@ import json
 import urllib.request
 import urllib.error
 
-API_URL = "http://localhost:11434/v1/chat/completions"
-MODEL = "Qwen3.5-9B.Q5_K_S.gguf"  # llama.cpp
-# MODEL = "qwen3.5-9b-exl3"  # exl3
+# 默认配置
+DEFAULT_MODEL = "koboldcpp/Qwopus3.5-9B-v3.Q4_K_M"
+DEFAULT_API_URL = "http://localhost:11434/v1/chat/completions"
 MAX_TOKENS = 1024
+
+# 从命令行参数获取配置
+MODEL = "Qwen3.5-9B.Q5_K_S.gguf"
+API_URL = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_API_URL
 
 TESTS = [
     (
