@@ -16,6 +16,7 @@
 # │ 80K         │ 89.4     │ 30720      │ batch=2048, threads=16, prio2│
 # └─────────────┴──────────┴────────────┴──────────────────────────────┘
 # 对比: KoboldCpp 同模型约 74-75 tok/s, llama.cpp 快 ~20%
+# 对比 9B: llama.cpp 113.3 tok/s, 14B 下降约 21%
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
 # 模型: Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf
 #
