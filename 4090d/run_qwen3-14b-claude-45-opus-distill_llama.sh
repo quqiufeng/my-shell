@@ -8,34 +8,43 @@
 # llama.cpp > KoboldCpp (快 ~20%)
 # =============================================================
 #
-# 【基准测试数据】(2025-04-13, test_api.py 30题算法题, max_tokens=1024)
+# 【基准测试数据】(2025-04-14, test_api.py 30题算法题, max_tokens=1024)
 # ┌─────────────┬──────────┬────────────┬──────────────────────────────┐
 # │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                         │
 # ├─────────────┼──────────┼────────────┼──────────────────────────────┤
-# │ 80K         │ 89.4     │ 30720      │ batch=2048, threads=16       │
-# │ 80K         │ 89.4     │ 30720      │ batch=2048, threads=16, prio2│
+# │ 128K        │ 79.4     │ 30720      │ batch=1024, threads=16,      │
+# │             │          │            │ cache-type-k/v=q4_0, fa=on   │
 # └─────────────┴──────────┴────────────┴──────────────────────────────┘
-# 对比: KoboldCpp 同模型约 74-75 tok/s, llama.cpp 快 ~20%
-# 对比 9B: llama.cpp 113.3 tok/s, 14B 下降约 21%
+# 历史数据:
+#   - 80K f16: 89.4 tok/s (batch=2048)
+#   - KoboldCpp 80K: 74-75 tok/s
+# 对比: 128K q4_0 比 80K f16 慢约 11%，但上下文扩大 60%
+# 对比 9B: llama.cpp 113.3 tok/s, 14B 下降约 30%
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
 # 模型: Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf
 #
-# 【上下文限制】(4090D 24GB)
-#   - 80K:  安全运行, 速度 89.4 tok/s
-#   - 128K: OOM (需要 ~20GB KV cache, 24GB 不足)
-#   - 256K: 不可行
-# 【升级建议】
-#   - RTX 4090 48GB: 可支持 128K 甚至 256K 上下文
+# 【上下文配置】(4090D 24GB)
+#   - 128K: 可行, 依赖 KV cache 量化 (-ctk/-ctv q4_0)
+#   - 模型权重 ~8.5GB, 128K KV cache 量化后约需 1.75GB
+#   - 如果不开启 KV cache 量化, 128K 会需要 ~14GB KV cache 导致 OOM
+#   - 256K: 可尝试 (需进一步降低 batch size 至 512)
+# 【降级建议】(若启动时 OOM)
+#   - 将 -c 131072 降为 98304 (96k)
+#   - 关闭浏览器/视频播放器等显存占用程序
 #
 # 【优化要点】
-#   - ctx-size: 81920 (80K, 4090D 安全上限)
-#   - batch-size: 2048 (4096会OOM)
-#   - ubatch-size: 2048
+#   - ctx-size: 131072 (128K, 4090D 24GB 极限值, 依赖KV cache量化)
+#   - batch-size: 1024 (14B 在 128K 上下文下的平衡值)
+#   - ubatch-size: 1024
+#   - cache-type-k/v: q4_0 (核心省显存参数, 24GB 跑 128K 的关键)
+#   - flash-attn on: 必须开启, 大幅降低长文本显存压力并提升速度
 #   - threads: 16
 #   - --parallel 1: 减少slot开销
 #   - --prio 2: 高优先级
-#   - --flash-attn on + cache-type-k/v f16
 #   - --mlock + --no-mmap
+#   - --temp 0.2: 低温度, 写代码需要极高确定性
+#   - --min-p 0.05: 过滤低概率废话, 适合复杂代码生成
+#   - --repeat-penalty 1.1: 防止长循环代码陷入死循环
 # =============================================================
 #
 # 【启动方式】
@@ -76,7 +85,7 @@
 #       "models": {
 #         "Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf": {
 #           "name": "Qwen3-14B-Claude-4.5-Opus-Distill Q4 (4090D)",
-#           "maxContextWindow": 81920,
+#           "maxContextWindow": 131072,
 #           "maxOutputTokens": 32768
 #         }
 #       }
@@ -95,11 +104,11 @@ export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx
 MODEL_DIR="/opt/gguf/Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 
-# 4090D 可以支持更大的上下文和 batch size
+# 4090D 14B 模型参数 (24GB 显存极限, 128K 上下文)
 NGL=99              # GPU层数 (全部加载到GPU)
-CTX=81920           # 上下文 80K (4090D 24GB 安全值, 128K会OOM)
-BATCH=2048          # batch size (14B最佳值)
-UBATCH=2048         # micro batch size
+CTX=131072          # 上下文 128K (4090D 24GB 极限值, 依赖KV cache量化)
+BATCH=1024          # batch size (14B在128K上下文下的平衡值)
+UBATCH=1024         # micro batch size
 THREADS=16          # CPU线程数
 
 PORT=11434
@@ -113,6 +122,7 @@ echo "GPU层数: $NGL"
 echo "Batch Size: $BATCH"
 echo "uBatch Size: $UBATCH"
 echo "Threads: $THREADS"
+echo "KV Cache: q4_0"
 echo "=============================="
 echo ""
 
@@ -130,12 +140,13 @@ $LLAMA_SERVER \
   --prio 2 \
   --no-mmap \
   --mlock \
-  --temp 0.6 \
+  --temp 0.2 \
   --top-p 0.95 \
   --top-k 20 \
-  --min-p 0.00 \
-  --cache-type-k f16 \
-  --cache-type-v f16 \
+  --min-p 0.05 \
+  --repeat-penalty 1.1 \
+  --cache-type-k q4_0 \
+  --cache-type-v q4_0 \
   --metrics \
   --parallel 1
 
