@@ -1,22 +1,31 @@
 #!/bin/bash
+set -euo pipefail
 #
 # =============================================================
 # Qwen3-14B-Claude-4.5-Opus-Distill (KoboldCpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
-# 【基准测试数据】(2025-04-13, test_api.py 30题算法题, max_tokens=1024)
-# ┌─────────────┬──────────┬────────────┬────────────────────────┐
-# │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                   │
-# ├─────────────┼──────────┼────────────┼────────────────────────┤
-# │ 80K         │ 74-75    │ -          │ batch=512, threads=14  │
-# └─────────────┴──────────┴────────────┴────────────────────────┘
-# 对比: llama.cpp 同模型达 89.4 tok/s, 快 ~20%
+# 【基准测试数据】(2025-04-15, test_api.py 30题算法题, max_tokens=1024)
+# ┌─────────────┬──────────┬────────────┬─────────────────────────────┐
+# │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                        │
+# ├─────────────┼──────────┼────────────┼─────────────────────────────┤
+# │ 128K        │ ~69.5    │ -          │ batch=512, threads=14,      │
+# │             │          │            │ quantkv=2, fa=on            │
+# │ 80K         │ 74-75    │ -          │ batch=512, threads=14       │
+# └─────────────┴──────────┴────────────┴─────────────────────────────┘
+# 对比: llama.cpp 128K 约 79.4 tok/s
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
+#
+# 【优化要点】
+#   - contextsize: 131072 (128K, 依赖 quantkv=2 省显存)
+#   - quantkv 2: KV cache q4 量化, 24GB 跑 128K 的关键
+#   - flashattention: 必须开启
+#   - batchsize: 512 (128K 下的平衡值)
 # =============================================================
 #
 # 【启动方式】
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwen3-14b-claude-45-opus-distill_koboldcpp.sh > /tmp/claude45opus_koboldcpp.log 2>&1 &
+#   setsid nohup ./run_qwen3-14b-claude-45-opus-distill_koboldcpp.sh > /tmp/claude45opus_koboldcpp.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
@@ -66,17 +75,35 @@
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+# 快速环境检查
+if ! command -v nvidia-smi &> /dev/null; then
+    echo "警告: nvidia-smi 未找到, 请确认 CUDA 驱动已安装"
+fi
+if [[ ! -f "/opt/koboldcpp/koboldcpp.py" ]]; then
+    echo "错误: /opt/koboldcpp/koboldcpp.py 不存在"
+    exit 1
+fi
+
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 MODEL_DIR="/opt/gguf/Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 
+GPULAYERS=99
+CONTEXTSIZE=131072
+BATCHSIZE=512
+THREADS=14
+BLASTHREADS=14
+
 echo "=============================="
 echo "启动 Qwen3-14B-Claude-4.5-Opus-Distill Q4_K_M (KoboldCpp) API 服务"
 echo "地址: http://0.0.0.0:11434"
-echo "上下文: 80K (81920)"
-echo "GPU层数: 99"
+echo "上下文: 128K ($CONTEXTSIZE)"
+echo "GPU层数: $GPULAYERS"
+echo "Batch Size: $BATCHSIZE"
+echo "Threads: $THREADS"
 echo "Flash Attention: on"
+echo "KV Cache: quantkv=2 (q4)"
 echo "Jinja模板: 自动检测 (qwen3)"
 echo "=============================="
 
@@ -86,13 +113,16 @@ python koboldcpp.py \
   "$MODEL_DIR" \
   11434 \
   --host 0.0.0.0 \
-  --gpulayers 99 \
-  --contextsize 81920 \
-  --batchsize 512 \
-  --threads 14 \
-  --blasthreads 14 \
+  --gpulayers $GPULAYERS \
+  --contextsize $CONTEXTSIZE \
+  --batchsize $BATCHSIZE \
+  --threads $THREADS \
+  --blasthreads $BLASTHREADS \
   --flashattention \
   --quiet \
+  --usemlock \
+  --nommap \
+  --quantkv 2 \
   --jinja \
   --chat-template-kwargs '{"enable_thinking":false}' &
 
@@ -116,9 +146,12 @@ echo ""
 echo "性能参数:"
 echo "  模型: Qwen3-14B-Claude-4.5-Opus-Distill.q4_k_m.gguf"
 echo "  框架: KoboldCpp"
-echo "  上下文: 80K"
+echo "  上下文: 128K"
 echo "  最大输出: 32K"
-echo "  GPU层数: 99"
+echo "  GPU层数: $GPULAYERS"
+echo "  Batch Size: $BATCHSIZE"
+echo "  Threads: $THREADS"
 echo "  Flash Attention: on"
+echo "  KV Cache: quantkv=2 (q4)"
 echo "  Chat模板: jinja自动检测 (qwen3)"
 echo "  思考模式: 关闭 (enable_thinking=false)"

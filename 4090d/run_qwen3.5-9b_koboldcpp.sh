@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 #
 # =============================================================
 # Qwen3.5-9B (KoboldCpp) API 启动脚本 (4090D 24GB) - 优化版
@@ -73,7 +74,16 @@
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+# 快速环境检查
+if ! command -v nvidia-smi &> /dev/null; then
+    echo "警告: nvidia-smi 未找到, 请确认 CUDA 驱动已安装"
+fi
+if [[ ! -f "/opt/koboldcpp/koboldcpp.py" ]]; then
+    echo "错误: /opt/koboldcpp/koboldcpp.py 不存在"
+    exit 1
+fi
+
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 # 4090D 优化参数
 MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q4_K_M.gguf"

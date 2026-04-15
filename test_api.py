@@ -20,7 +20,7 @@ DEFAULT_API_URL = "http://localhost:11434/v1/chat/completions"
 MAX_TOKENS = 1024
 
 # 从命令行参数获取配置
-MODEL = "Qwen3.5-9B.Q5_K_S.gguf"
+MODEL = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MODEL
 API_URL = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_API_URL
 
 TESTS = [

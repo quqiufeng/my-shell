@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 #
 # =============================================================
 # Qwen3.5-9B (llama.cpp) API 启动脚本 (4090D 24GB) - 优化版
@@ -19,10 +20,12 @@
 #   - batch-size: 4096 (原2048)
 #   - ubatch-size: 4096 (原2048)
 #   - threads: 16 (最佳, 32无提升)
-#   - --parallel 1: 减少slot开销
+#   - --parallel 1 --slots 1: 减少slot开销
 #   - --prio 2: 高优先级
 #   - --flash-attn on + cache-type-k/v f16
 #   - --mlock + --no-mmap
+#   - --no-warmup: 跳过启动warmup, 大幅缩短启动时间
+#   - --defrag-thold 0.1: KV cache 碎片整理阈值
 # =============================================================
 #
 # 【启动方式】
@@ -76,7 +79,16 @@
 #
 # =============================================================
 
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+# 快速环境检查
+if ! command -v nvidia-smi &> /dev/null; then
+    echo "警告: nvidia-smi 未找到, 请确认 CUDA 驱动已安装"
+fi
+if [[ ! -x "/opt/llama.cpp/bin/llama-server" ]]; then
+    echo "错误: /opt/llama.cpp/bin/llama-server 不存在或不可执行"
+    exit 1
+fi
+
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 # 4090D 24GB 显存优化参数
 MODEL_DIR="/opt/gguf/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q4_K_M.gguf"
@@ -104,7 +116,7 @@ echo "目标: 110+ tok/s"
 echo "=============================="
 echo ""
 
-$LLAMA_SERVER \
+exec $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port $PORT \
@@ -118,13 +130,14 @@ $LLAMA_SERVER \
   --prio 2 \
   --no-mmap \
   --mlock \
-  --temp 0.6 \
+  --no-warmup \
+  --parallel 1 \
+  --temp 0.4 \
   --top-p 0.95 \
   --top-k 20 \
   --min-p 0.00 \
   --cache-type-k f16 \
   --cache-type-v f16 \
-  --metrics \
-  --parallel 1
+  --metrics
 
 # 注意: 使用模型内置的chat template，不指定自定义模板
