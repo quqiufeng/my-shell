@@ -4,51 +4,81 @@
 # 图像生成脚本 - 基于 stable-diffusion.cpp
 # =============================================================================
 #
+# 模型下载地址:
+#   - Z-Image-Turbo GGUF: https://modelscope.cn/models/jayn7/Z-Image-Turbo-GGUF/files
+#     推荐: z_image_turbo-Q4_K_M.gguf / z_image_turbo-Q5_K_M.gguf (RTX 3080 10GB 验证可用)
+#
 # 用法:
 #   ./img.sh [提示词] [输出文件] [宽度] [高度]
 #
 # 示例:
 #   ./img.sh "A beautiful landscape"
-#   ./img.sh "A sunset" /opt/sunset.png 2560 1440
+#   ./img.sh "A sunset" /mnt/e/app/sunset.png 1280 720
+#
+# 3. 花卉肖像 (2560x1440)
+#    PROMPT="A captivating portrait of a young woman with a powerful gaze, her dark hair styled in an elegant updo. She is flanked by large white flowers in full bloom on either side, their presence simple yet grand, adding a touch of purity and grace to the composition. The flowers are depicted with rich detail, their stamens plump and petals layered in multiple, intricate arrays. The foreground highlights these blossoms, allowing the viewer to appreciate their full beauty and the artist's skill in rendering them. Her makeup is striking, and her mysterious aura draws the viewer in. The background features a deep green wall that conveys a sense of depth and richness. The color, reminiscent of a lush forest or a verdant meadow, adds a layer of sophistication and historical resonance to the piece. The traces of years are still evident, showcasing a classical and atmospheric elegance. This extraordinary masterpiece perfectly captures the essence of both tradition and modernity, leaving a lasting impression on all who behold it."
+#    NEGATIVE="oily skin, acne, blemishes, wrinkles, dark circles, redness, rosacea, sunburn, uneven skin tone, excessive pores, dry flaky skin, scars, freckles, moles, skin disease, artificial smooth skin, plastic skin, doll-like skin, overexposed, oversaturated, pale skin, gray skin, yellow skin, ashy skin, dull skin, lifeless skin, flat lighting, harsh shadows, window shadow pattern, striped shadows, patchy lighting, uneven illumination"
+#    ./img.sh "$PROMPT" /mnt/e/app/flower_portrait.png 2560 1440
+#
+# 4. 油画百合肖像 (2560x1440)
+#    PROMPT="A captivating portrait of a young woman with a powerful gaze, her dark hair styled in an elegant updo. She is flanked by large white lilies of the valley in full bloom on either side, their presence simple yet grand, adding a touch of purity and grace to the composition. The flowers are depicted with rich detail, their stamens plump and petals layered in multiple, intricate arrays. The foreground highlights these blossoms, allowing the viewer to appreciate their full beauty and the artist's skill in rendering them. Her makeup is striking, and her mysterious aura draws the viewer in. The background features a soft pastel gradient that conveys a sense of depth and richness. The color, reminiscent of a gentle spring morning, adds a layer of sophistication and historical resonance to the piece. The traces of years are still evident, showcasing a classical and atmospheric elegance. Oil painting style with rough brushstrokes, thick impasto texture covering the entire canvas, visible paint strokes, bold blending of colors, expressive line graphics, geometric abstraction elements, dramatic play of shadows and light across the surface, traditional fine art masterpiece."
+#    NEGATIVE="oily skin, acne, blemishes, wrinkles, dark circles, redness, rosacea, sunburn, uneven skin tone, excessive pores, dry flaky skin, scars, freckles, moles, skin disease, artificial smooth skin, plastic skin, doll-like skin, overexposed, oversaturated, pale skin, gray skin, yellow skin, ashy skin, dull skin, lifeless skin, flat lighting, harsh shadows, window shadow pattern, striped shadows, patchy lighting, uneven illumination, digital art, smooth texture, photographic, hyperrealistic, 3d render"
+#    ./img.sh "$PROMPT" /mnt/e/app/lily_oil_painting.png 2560 1440
 #
 # =============================================================================
-# 模型配置
+# 全球十大美景壁纸 (2560x1440)
 # =============================================================================
-# 当前使用 Z-Image Q4_K_M, 适配 RTX 3080 10GB 显存。
-# 所需模型文件:
-#   - diffusion-model: z-image-Q4_K_M.gguf
-#   - vae:             ae.safetensors
-#   - llm:             Qwen3-4B-Instruct-2507-Q4_K_M.gguf
 #
-# =============================================================================
-# 显存适配建议 (本机 RTX 3080 10GB)
-# =============================================================================
-# 模型权重占用估算:
-#   - z-image-Q5_K_M.gguf : ~5.2GB (10GB可用, 但2560x1440可能爆显存)
-#   - z-image-Q4_K_M.gguf : ~4.8GB (10GB甜点选择, 推荐)
-#   - z-image-Q4_K_S.gguf : ~4.5GB (10GB速度快)
+# 1. 瑞士阿尔卑斯山
+#    PROMPT="Swiss Alps, majestic mountain peaks, snow-capped mountains, crystal clear lake, green valleys, scenic landscape, dramatic clouds, golden sunlight at sunrise, photorealistic, high detail, 8K ultra quality, breathtaking panoramic view"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_01_alps.png 2560 1440
 #
-# 加上 LLM (~2.4GB) + VAE (~0.3GB) + CUDA 开销 (~1GB) + compute buffer:
-#   - Q5_K_M: 权重 ~8.2GB -> 10GB 显卡跑 1024x1024 可以, 2560x1440 较悬
-#   - Q4_K_M: 权重 ~7.7GB -> 10GB 显卡配合 --vae-tiling 跑 1280x720 较稳
+# 2. 日本樱花
+#    PROMPT="Japanese cherry blossoms, sakura trees in full bloom, pink flower petals falling, serene temple, traditional architecture, soft spring light, peaceful garden, Mt Fuji in background, photorealistic, high detail, 8K ultra quality, breathtaking view"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_02_sakura.png 2560 1440
 #
-# 10GB 显存推荐配置:
-#   1. 优先使用 z-image-Q4_K_M.gguf (精度/速度/显存平衡最佳)
-#   2. 若追求更高精度可尝试 z-image-Q5_K_M.gguf, 但建议分辨率不超过 1024x1024
-#   3. 大图需求可降到 1024x1024 或加 --offload-to-cpu
+# 3. 冰岛极光
+#    PROMPT="Iceland northern lights, aurora borealis dancing across the night sky, green and purple lights, snow-covered landscape, frozen lake reflection, Scandinavian pine trees, starry sky, dramatic nature, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_03_aurora.png 2560 1440
 #
-# 分辨率上限说明:
-#   - 1024x1024  = 1,048,576 像素 (最安全, 质量与速度平衡)
-#   - 1280x720   = 921,600   像素 (安全, 风景壁纸推荐)
-#   - 1280x1280  = 1,638,400 像素 (极限, 可能触发OOM)
-#   - 1440x1440  = 2,073,600 像素 (不建议, 大概率OOM)
-#   - 1920x1080  = 2,073,600 像素 (不建议, 大概率OOM)
-#   - 2560x1440  = 3,686,400 像素 (必须加 --offload-to-cpu, 速度极慢)
+# 4. 马尔代夫海滩
+#    PROMPT="Maldives tropical beach, crystal clear turquoise water, white sandy beach, palm trees, overwater bungalows, sunset sky, paradise island, coconuts, coral reef visible underwater, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_04_maldives.png 2560 1440
 #
-# 显存占用公式 (估算):
-#   显存 ≈ 模型权重 + (像素数 × 精度系数) + CUDA开销
-#   其中精度系数: FP16约0.008, Q4约0.002
-#   10GB显卡在Q4_K_M下, 像素数超过150万即进入危险区
+# 5. 非洲草原日落
+#    PROMPT="African savanna sunset, golden grass plains, acacia trees silhouette, wildlife including elephants and giraffes, dramatic orange sky, dust particles in air, epic nature landscape, golden hour lighting, National Geographic quality, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_05_savanna.png 2560 1440
+#
+# 6. 科罗拉多大峡谷
+#    PROMPT="Grand Canyon Colorado, majestic red rock formations, layered canyon walls, Colorado River winding through, dramatic lighting, golden hour, vast panoramic view, American Southwest landscape, photorealistic, high detail, 8K ultra quality, breathtaking scenery"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_06_canyon.png 2560 1440
+#
+# 7. 挪威峡湾
+#    PROMPT="Norwegian fjord, dramatic steep mountains, crystal clear blue water, small wooden houses, green valleys, waterfalls cascading down cliffs, scenic village, Nordic landscape, dramatic clouds, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_07_fjord.png 2560 1440
+#
+# 8. 新西兰南岛
+#    PROMPT="New Zealand South Island, dramatic mountain peaks, turquoise lakes, lush green forests, rolling hills, sheep grazing, dramatic sky with clouds, Lord of the Rings landscape, scenic beauty, golden hour lighting, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_08_nz.png 2560 1440
+#
+# 9. 土耳其卡帕多奇亚
+#    PROMPT="Cappadocia Turkey, fairy chimneys rock formations, hot air balloons floating, golden sunrise, unique geological landscape, ancient cave dwellings, dramatic sky, dreamy atmosphere, aerial view, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_09_cappadocia.png 2560 1440
+#
+# 10. 中国黄山
+#    PROMPT="Yellow Mountain China, dramatic granite peaks, famous pine trees, sea of clouds, misty mountains, Chinese ink painting style, traditional shan shui scenery, ethereal atmosphere, Zhang Daqian art style, UNESCO World Heritage, photorealistic, high detail, 8K ultra quality"
+#    NEGATIVE="low quality, blurry, noisy, oversaturated, overexposed, dark, flat, flat lighting, dull, lifeless, ugly, deformed"
+#    ./img.sh "$PROMPT" /mnt/e/app/landscape_10_huangshan.png 2560 1440
+#
 # =============================================================================
 
 MODEL_DIR="/opt/image/model"
@@ -58,7 +88,6 @@ OUTPUT_FILE="$2"
 WIDTH="${3:-1280}"
 HEIGHT="${4:-720}"
 
-# 负面提示词（可通过环境变量传入，默认为空）
 NEGATIVE_PROMPT="${NEGATIVE_PROMPT:-}"
 
 OUTPUT_DIR="$HOME"
@@ -74,7 +103,6 @@ else
   OUTPUT="${TIMESTAMP}_${MD5}.png"
 fi
 
-# 确保输出目录存在
 mkdir -p "$OUTPUT_DIR"
 
 echo "Generating image..."
@@ -83,37 +111,19 @@ echo "Negative: ${NEGATIVE_PROMPT:-(none)}"
 echo "Size: ${WIDTH}x${HEIGHT}"
 echo "Output: $OUTPUT_DIR/$OUTPUT"
 
-# 使用 Z-Image Q4_K_M (10GB显存适配版)
-/opt/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model "$MODEL_DIR/z-image-Q4_K_M.gguf" \
+/home/dministrator/stable-diffusion.cpp/bin/sd-cli \
+  --diffusion-model "$MODEL_DIR/z_image_turbo-Q5_K_M.gguf" \
   --vae "$MODEL_DIR/ae.safetensors" \
   --llm "$MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf" \
   -p "$PROMPT" \
   -n "$NEGATIVE_PROMPT" \
-  --cfg-scale 1.0 \
+  --cfg-scale 1.01 \
   --sampling-method euler \
   --diffusion-fa \
   --vae-tiling \
   -H "$HEIGHT" -W "$WIDTH" \
-  --steps 20 \
+  --steps 15 \
   -s "$RANDOM" \
   -o "$OUTPUT_DIR/$OUTPUT"
 
 echo "Image saved to: $OUTPUT_DIR/$OUTPUT"
-
-# =============================================================================
-# 提示词范例
-# =============================================================================
-#
-# 1. 风景壁纸 (1280x720, 10GB显存安全分辨率)
-#    ./img.sh "Swiss Alps, majestic mountain peaks, snow-capped mountains, crystal clear lake, green valleys, scenic landscape, dramatic clouds, golden sunlight, photorealistic, high detail, 8K quality" ~/alps.png 1280 720
-#
-# 2. 写实肖像 (1024x1024, 10GB显存推荐)
-#    PROMPT="a beautiful young lady in her early 20s, healthy natural skin with subtle texture, soft even skin tone, slight natural flush on cheeks, moist natural lips, clear bright eyes with natural catchlights, soft diffused window light from 45 degrees, shallow depth of field, shot on Canon EOS R5 with 85mm f/1.2 lens, RAW photo, professional beauty photography, 8K UHD, photorealistic"
-#    NEGATIVE="oily skin, acne, blemishes, wrinkles, dark circles, redness, rosacea, sunburn, uneven skin tone, excessive pores, dry flaky skin, scars, freckles, moles, skin disease, artificial smooth skin, plastic skin, doll-like skin, overexposed, oversaturated"
-#    ./img.sh "$PROMPT" ~/portrait.png 1024 1024
-#
-# 注意: 10GB显存安全分辨率 1280x720, 绝对上限 1280x1280
-#       若需 1920x1080 或更大请加 --offload-to-cpu 参数 (速度会显著下降)
-#
-# =============================================================================

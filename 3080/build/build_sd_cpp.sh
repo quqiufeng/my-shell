@@ -29,6 +29,12 @@ fi
 
 cd $HOME/stable-diffusion.cpp
 
+# 确保子模块完整
+if [ ! -f "ggml/CMakeLists.txt" ]; then
+    echo "=== 更新 git 子模块 ==="
+    git submodule update --init --recursive
+fi
+
 # 清理并配置
 echo ""
 echo "=== 配置 CMake ==="
