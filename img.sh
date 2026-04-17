@@ -12,17 +12,19 @@
 #   ./img.sh "A sunset" /opt/sunset.png 2560 1440
 #
 # =============================================================================
-# 重要备注: FLUX.1-dev 兼容性问题
+# 模型配置说明
 # =============================================================================
-# 经测试 (2025-04-17, stable-diffusion.cpp master-572-1b4e9be-2-ga564fdf):
-# - FLUX.1-dev (12B) 的 GGUF 版本在 stable-diffusion.cpp 上加载成功,
-#   但生成输出为空白图 (32KB~63KB), 无论使用 leejet 还是 unsloth 的 GGUF
-#   转换版本, 也无论是否开启 Flash Attention。
-# - 测试环境: RTX 3080 10GB 和 RTX 4090D 24GB 均出现同样问题,
-#   排除显存不足原因。
-# - 目前稳定可用的替代方案: FLUX.2-klein-4b (4B 参数),
-#   在 stable-diffusion.cpp 上兼容性良好, 可正常出图。
-# - 若需使用 FLUX.1-dev, 建议改用 ComfyUI 或 diffusers 原生框架。
+# 当前默认使用 FLUX.1-dev (12B), 经测试在 RTX 4090D 24GB 上可正常出图。
+# 所需模型文件:
+#   - diffusion-model: flux1-dev-q4_k.gguf
+#   - vae:             ae.safetensors
+#   - clip_l:          clip_l.safetensors
+#   - t5xxl:           t5-v1_1-xxl-encoder-Q5_K_M.gguf
+#
+# 若 VRAM 不足或追求速度, 可切换到 FLUX.2-klein-4b (4B) 配置:
+#   - diffusion-model: flux-2-klein-4b-Q8_0.gguf
+#   - vae:             ae_flux32.safetensors
+#   - llm:             Qwen3-4B-Instruct-2507-Q4_K_M.gguf
 # =============================================================================
 
 MODEL_DIR="/opt/image/model"
@@ -50,18 +52,17 @@ echo "Prompt: $PROMPT"
 echo "Size: ${WIDTH}x${HEIGHT}"
 echo "Output: $OUTPUT_DIR/$OUTPUT"
 
-# 4090D 24GB 显存优化参数
-# 使用 FLUX.2-klein-4b (4B), 在 stable-diffusion.cpp 上兼容性最佳
+# 使用 FLUX.1-dev (质量最高)
 /opt/stable-diffusion.cpp/bin/sd-cli \
-  --diffusion-model $MODEL_DIR/flux-2-klein-4b-Q8_0.gguf \
-  --vae $MODEL_DIR/ae_flux32.safetensors \
-  --llm $MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
+  --diffusion-model $MODEL_DIR/flux1-dev-q4_k.gguf \
+  --vae $MODEL_DIR/ae.safetensors \
+  --clip_l $MODEL_DIR/clip_l.safetensors \
+  --t5xxl $MODEL_DIR/t5-v1_1-xxl-encoder-Q5_K_M.gguf \
   -p "$PROMPT" \
-  --prediction flux2_flow \
-  --guidance 4.0 \
-  --diffusion-fa \
+  --cfg-scale 1.0 \
   --sampling-method euler \
   --scheduler simple \
+  --diffusion-fa \
   -H $HEIGHT -W $WIDTH \
   --steps 30 \
   -s $RANDOM \
