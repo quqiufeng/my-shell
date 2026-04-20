@@ -43,7 +43,7 @@ set -euo pipefail
 #
 # 【启动方式】
 #   cd /opt/my-shell/3080
-#   nohup ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp_3080.log 2>&1 &
+#   setsid ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp_3080.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】

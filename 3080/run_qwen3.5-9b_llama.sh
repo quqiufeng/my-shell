@@ -45,7 +45,7 @@ set -euo pipefail
 #
 # 【启动方式】
 #   cd /opt/my-shell/3080
-#   nohup ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_3080.log 2>&1 &
+#   setsid ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_3080.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
@@ -98,7 +98,7 @@ echo "目标: 75+ tok/s"
 echo "=============================="
 echo ""
 
-exec $LLAMA_SERVER \
+$LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port $PORT \
