@@ -121,6 +121,7 @@ echo "Output: $OUTPUT_DIR/$OUTPUT"
   --sampling-method euler \
   --diffusion-fa \
   --vae-tiling \
+  --vae-tile-size 64x64 \
   -H "$HEIGHT" -W "$WIDTH" \
   --steps 15 \
   -s "$RANDOM" \
