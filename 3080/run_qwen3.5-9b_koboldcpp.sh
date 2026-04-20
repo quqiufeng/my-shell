@@ -72,7 +72,7 @@ fi
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 # 3080 10GB 显存优化参数
-MODEL_DIR="/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q4_K_M.gguf"
+MODEL_DIR="/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q5_K_S.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 
 GPULAYERS=33          # GPU层数 (全部加载)
@@ -83,9 +83,9 @@ BLASTHREADS=8         # BLAS线程数
 PORT=11434
 
 echo "=============================="
-echo "启动 Qwen3.5-9B Q4_K_M (KoboldCpp) API 服务"
+echo "启动 Qwen3.5-9B Q5_K_S (KoboldCpp) API 服务"
 echo "地址: http://0.0.0.0:$PORT"
-echo "模型: Qwopus3.5-9B-v3.Q4_K_M.gguf"
+echo "模型: Qwopus3.5-9B-v3.Q5_K_S.gguf"
 echo "上下文: $CONTEXTSIZE"
 echo "GPU层数: $GPULAYERS"
 echo "Batch Size: $BATCHSIZE"
