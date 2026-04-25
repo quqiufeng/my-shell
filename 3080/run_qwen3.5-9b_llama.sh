@@ -38,6 +38,8 @@ set -euo pipefail
 # 8. 增加 --no-warmup (跳过启动 warmup，大幅缩短启动时间)
 # 9. 增加 --parallel 1 --slots 1 (减少 slot 开销)
 # 10. 温度从 0.6 降到 0.4 (与 4090D 保持一致)
+# 11. 增加 --cpu-strict 1 --prio-batch 2 --poll 0 (CPU 亲和性优化)
+# 12. 增加 --no-host --direct-io (GPU 直接访问优化)
 #
 # 【启动方式】
 #   cd /opt/my-shell/3080
@@ -106,16 +108,22 @@ $LLAMA_SERVER \
   --threads $THREADS \
   --threads-batch $THREADS \
   --prio 2 \
+  --prio-batch 2 \
+  --cpu-strict 1 \
+  --poll 0 \
+  --no-host \
+  --direct-io \
   --no-mmap \
   --mlock \
   --no-warmup \
-  --parallel 1 \
+  -np 1 \
   --temp 0.4 \
   --top-p 0.95 \
   --top-k 20 \
   --min-p 0.00 \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
+  --kv-offload \
   --metrics
 
 # 注意: 使用模型内置的chat template，不指定自定义模板

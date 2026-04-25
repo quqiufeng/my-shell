@@ -92,7 +92,7 @@ echo ""
 
 cd "$KOBOLDCPP_DIR"
 
-python koboldcpp.py \
+setsid python koboldcpp.py \
   "$MODEL_DIR" \
   $PORT \
   --host 0.0.0.0 \
