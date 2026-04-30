@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # stable-diffusion.cpp CUDA 编译脚本
 
@@ -12,34 +13,34 @@ if ! command -v nvcc &> /dev/null; then
     exit 1
 fi
 
-echo "检测到 CUDA:"
-nvcc --version | grep "release"
+NVCC_PATH=$(which nvcc)
+CUDA_VERSION=$(nvcc --version | grep "release" | awk '{print $5}' | cut -d',' -f1)
+echo "检测到 CUDA: $CUDA_VERSION"
+echo "NVCC 路径: $NVCC_PATH"
 
-# 设置 CUDA 环境变量（兼容 WSL2）
-export CUDA_HOME=/usr/local/cuda-12.0
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-
-# 克隆或更新 stable-diffusion.cpp
-if [ ! -d "$HOME/stable-diffusion.cpp" ]; then
-    echo ""
-    echo "=== 克隆 stable-diffusion.cpp ==="
-    git clone --recursive https://github.com/leejet/stable-diffusion.cpp.git $HOME/stable-diffusion.cpp
+# 自动检测 CUDA_HOME
+if [ -z "${CUDA_HOME:-}" ]; then
+    CUDA_HOME=$(dirname "$NVCC_PATH")/..
+    export CUDA_HOME
 fi
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
-cd $HOME/stable-diffusion.cpp
+PROJECT_DIR=/opt/stable-diffusion.cpp
+cd "$PROJECT_DIR"
 
 # 确保子模块完整
 if [ ! -f "ggml/CMakeLists.txt" ]; then
+    echo ""
     echo "=== 更新 git 子模块 ==="
     git submodule update --init --recursive
 fi
 
-# 清理并配置
+# 清理 build 目录
 echo ""
-echo "=== 配置 CMake ==="
+echo "=== 清理并配置 CMake ==="
+rm -rf build
 mkdir -p build && cd build
-rm -rf *
 
 # GPU 检测
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
@@ -55,6 +56,7 @@ case $GPU_CC in
     75) CUDA_ARCH=75 ;;
     80) CUDA_ARCH=80 ;;
     90) CUDA_ARCH=90 ;;
+    120) CUDA_ARCH=120 ;;
     12) CUDA_ARCH=120 ;;
     *) CUDA_ARCH=86 ;;
 esac
@@ -70,19 +72,21 @@ cmake .. \
     -DGGML_LTO=ON \
     -DGGML_CUDA_FA_ALL_QUANTS=ON \
     -DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCH \
-    -DCMAKE_CUDA_COMPILER=/usr/bin/nvcc \
+    -DCMAKE_CUDA_COMPILER="$NVCC_PATH" \
     -DCMAKE_BUILD_TYPE=Release
 
 # 编译
+JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 echo ""
-echo "=== 编译中 (使用 4 线程) ==="
-make -j4
+echo "=== 编译中 (使用 $JOBS 线程) ==="
+make -j"$JOBS"
 
 # 移动 bin 目录
-cd $HOME/stable-diffusion.cpp
+cd "$PROJECT_DIR"
 if [ -f "build/bin/sd-cli" ]; then
     echo ""
     echo "=== 整理文件 ==="
+    rm -rf bin
     mv build/bin bin
     # rm -rf build   # 保留 build 目录供 my-img 链接
     
@@ -90,8 +94,8 @@ if [ -f "build/bin/sd-cli" ]; then
     echo "=========================================="
     echo "✅ 编译成功！"
     echo "=========================================="
-    echo "可执行文件: $HOME/stable-diffusion.cpp/bin/sd-cli"
-    echo "API 服务:   $HOME/stable-diffusion.cpp/bin/sd-server"
+    echo "可执行文件: $PROJECT_DIR/bin/sd-cli"
+    echo "API 服务:   $PROJECT_DIR/bin/sd-server"
 else
     echo ""
     echo "❌ 编译失败"
