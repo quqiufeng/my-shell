@@ -4,42 +4,46 @@
 # =============================================================================
 #
 # 【功能说明】
-#   根据一个现有短视频 + 文案素材库，自动生成带配音和字幕的新视频。
+#   根据一个现有短视频 + 文案，自动生成带配音和字幕的新视频。
 #   原视频保留，生成的新视频带配音和字幕。
 #
 # 【工作流程】
 #   1. 获取短视频播放时长
-#   2. 处理文案素材库(info.txt)，生成匹配视频时长的字幕文案
+#   2. 处理文案（支持文件或直接传入）
 #      - 文案总长度可以比视频时长稍短（留出片头/片尾空白）
 #      - 每段文案长度接近，均匀分布
-#      - 文案有意义，不是纯字符堆砌，基于素材库内容提炼
+#      - 文案有意义，不是纯字符堆砌
 #   3. 克隆 voice.wav 的音色生成配音（支持声音克隆）
 #   4. 字幕与配音精确同步（借鉴 v3 算法，从 timings.txt 读取精确时间）
 #   5. 合成新视频：原视频画面 + 配音 + 字幕
 #
 # 【参数说明】
 #   $1 视频文件    : 输入视频文件路径（必填）
-#   $2 文案素材库  : 包含产品介绍等信息的文本文件（必填，如 info.txt）
+#   $2 文案        : 字幕文案（必填）
+#                      - 方式1：直接传入用 | 分隔的文案字符串
+#                      - 方式2：传入文案文件路径（.txt），脚本自动读取
 #   $3 参考音频    : 用于声音克隆的音频文件（可选，默认使用视频同目录下的 voice.wav）
 #                      传 "none" 则使用默认 SFT 预设音色（中文女声）
 #   $4 输出视频    : 输出文件路径（可选，默认在原视频同目录添加 _subtitled 后缀）
 #
 # 【示例】
-#   # 使用默认 voice.wav 克隆音色（推荐）
-#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt
+#   # 方式1：直接传入文案字符串（推荐）
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 '第一句|第二句|第三句'
+#
+#   # 方式2：传入文案文件
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/script.txt
 #
 #   # 指定参考音频
-#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 '第一句|第二句' ~/video/voice.wav
 #
 #   # 使用默认 SFT 音色（不克隆）
-#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt none
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 '第一句|第二句' none
 #
 #   # 指定输出路径
-#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav ~/output.mp4
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 '第一句|第二句' ~/video/voice.wav ~/output.mp4
 #
 # 【前提条件】
-#   - 视频同目录下需有 voice.wav（克隆音色用）
-#   - 文案素材库文件（如 info.txt）需存在
+#   - 视频同目录下需有 voice.wav（克隆音色用，默认自动查找）
 #   - 需先运行 build_cosy_voice_3080.sh 配置 CosyVoice 环境
 #   - 依赖: ffmpeg, ffprobe, CosyVoice, Python3
 #
@@ -67,27 +71,30 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 INPUT_VIDEO="$1"
-INFO_FILE="$2"
+SCRIPT_TEXT="$2"
 PROMPT_WAV="${3:-}"
 OUTPUT="${4:-}"
 
 # =============================================================================
 # 参数检查与初始化
 # =============================================================================
-if [ -z "$INPUT_VIDEO" ] || [ -z "$INFO_FILE" ]; then
-    echo "用法: $0 <视频文件> <文案素材库> [参考音频] [输出视频]"
+if [ -z "$INPUT_VIDEO" ] || [ -z "$SCRIPT_TEXT" ]; then
+    echo "用法: $0 <视频文件> <文案> [参考音频] [输出视频]"
     echo ""
     echo "参数说明:"
     echo "  视频文件    : 输入视频文件路径 (必填)"
-    echo "  文案素材库  : 包含产品介绍等信息的文本文件 (必填)"
+    echo "  文案        : 字幕文案 (必填)"
+    echo "                - 方式1：直接传入用 | 分隔的文案字符串"
+    echo "                - 方式2：传入文案文件路径 (.txt)，脚本自动读取"
     echo "  参考音频    : 用于声音克隆的音频文件 (可选，默认使用视频同目录下的 voice.wav)"
     echo "                传 'none' 则使用默认 SFT 预设音色"
     echo "  输出视频    : 输出文件路径 (可选，默认在原视频同目录添加 _subtitled 后缀)"
     echo ""
     echo "示例:"
-    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt"
-    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav"
-    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt none"
+    echo "  $0 ~/video/orgin.mp4 '第一句|第二句|第三句'"
+    echo "  $0 ~/video/orgin.mp4 ~/video/script.txt"
+    echo "  $0 ~/video/orgin.mp4 '第一句|第二句' ~/video/voice.wav"
+    echo "  $0 ~/video/orgin.mp4 '第一句|第二句' none"
     exit 1
 fi
 
@@ -97,10 +104,14 @@ if [ ! -f "$INPUT_VIDEO" ]; then
     exit 1
 fi
 
-# 检查文案素材库
-if [ ! -f "$INFO_FILE" ]; then
-    echo "错误: 文案素材库不存在: $INFO_FILE"
-    exit 1
+# 判断文案是文件还是字符串
+if [ -f "$SCRIPT_TEXT" ]; then
+    # 从文件读取文案
+    echo "[INFO] 从文件读取文案: $SCRIPT_TEXT"
+    TEXT=$(cat "$SCRIPT_TEXT" | tr '\n' '|' | sed 's/|$//')
+else
+    # 直接使用传入的文案字符串
+    TEXT="$SCRIPT_TEXT"
 fi
 
 # 设置默认参考音频
@@ -117,7 +128,7 @@ if [ "$PROMPT_WAV" != "none" ] && [ ! -f "$PROMPT_WAV" ]; then
 fi
 
 # =============================================================================
-# 步骤 0: 获取视频时长并生成文案
+# 步骤 0: 获取视频时长并解析文案
 # =============================================================================
 echo "========================================"
 echo "视频配音字幕生成工具"
@@ -129,7 +140,6 @@ VIDEO_RES=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,heig
 echo "视频文件: $INPUT_VIDEO"
 echo "视频时长: ${VIDEO_DURATION}秒"
 echo "视频分辨率: $VIDEO_RES"
-echo "文案素材: $INFO_FILE"
 
 # 设置输出路径
 if [ -z "$OUTPUT" ]; then
@@ -144,21 +154,8 @@ echo "输出文件: $OUTPUT"
 echo "========================================"
 echo ""
 
-# 从素材库生成匹配视频时长的文案
-echo "[步骤 1/5] 分析视频时长并生成匹配文案..."
-TEXT=$(python3 -c "
-import sys
-sys.path.insert(0, '$SCRIPT_DIR')
-from prompt import get_video_duration, calculate_char_count, generate_subtitle
-duration = get_video_duration('$INPUT_VIDEO')
-est_chars = calculate_char_count(duration, speed=3.1, adjust=0)
-result = generate_subtitle('$INPUT_VIDEO', '$INFO_FILE', total_chars=est_chars)
-print(result)
-")
-
-echo "  生成文案: ${TEXT:0:80}..."
-
 # 解析文案段数
+echo "[步骤 1/5] 解析文案..."
 IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
 TOTAL_TEXTS=${#TEXT_ARRAY[@]}
 
@@ -179,6 +176,10 @@ if [ "$TOTAL_TEXTS" -eq 0 ]; then
 fi
 
 echo "  文案段数: $TOTAL_TEXTS 段"
+for i in "${!TEXT_ARRAY[@]}"; do
+    idx=$((i+1))
+    echo "  第 $idx 段: ${TEXT_ARRAY[$i]}"
+done
 echo ""
 
 # 调试模式：只显示文案信息
