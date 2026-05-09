@@ -209,15 +209,22 @@ def clean_script(text: str) -> str:
     # 过滤太短的段（少于10个字）
     segments = [s for s in segments if len(s) >= 10]
     
-    # 去重：去掉相似的段落
+    # 去重：去掉相似的段落（相似度超过50%就认为是重复）
     unique = []
     for seg in segments:
         is_dup = False
         for existing in unique:
-            # 如果相似度超过70%，认为是重复
             if len(seg) > 5 and len(existing) > 5:
-                common = sum(1 for a, b in zip(seg, existing) if a == b)
-                if common / max(len(seg), len(existing)) > 0.7:
+                # 计算最长公共子串长度
+                shorter = seg if len(seg) < len(existing) else existing
+                longer = existing if len(seg) < len(existing) else seg
+                # 检查shorter是否是longer的子串，或者有很长的公共部分
+                if shorter in longer:
+                    is_dup = True
+                    break
+                # 计算公共字符数
+                common = len(set(seg) & set(existing))
+                if common / max(len(set(seg)), len(set(existing))) > 0.5:
                     is_dup = True
                     break
         if not is_dup:
