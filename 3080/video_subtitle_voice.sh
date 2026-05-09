@@ -1,24 +1,66 @@
 #!/bin/bash
-# 给已有视频配字幕+配音
-# 
-# 参数说明:
-#   $1 视频: 输入视频文件
-#   $2 文案信息文件: 包含产品介绍信息的文件路径
-#   $3 克隆音频: (可选)用于克隆声音的音频文件，不传则使用默认SFT音色
-#   $4 输出视频: (可选)输出文件路径，默认在输入视频同目录下添加 _subtitled 后缀
+# =============================================================================
+# video_subtitle_voice.sh - 短视频配音字幕生成工具
+# =============================================================================
 #
-# 示例:
-#   ./video_subtitle_voice.sh ./video.mp4 ./info.txt
-#   ./video_subtitle_voice.sh ./video.mp4 ./info.txt ./voice.wav
+# 【功能说明】
+#   根据一个现有短视频 + 文案素材库，自动生成带配音和字幕的新视频。
+#   原视频保留，生成的新视频带配音和字幕。
 #
-# 案例：JBL产品介绍
-#   ./video_subtitle_voice.sh ~/video/1.mp4 ~/video/info.txt
+# 【工作流程】
+#   1. 获取短视频播放时长
+#   2. 处理文案素材库(info.txt)，生成匹配视频时长的字幕文案
+#      - 文案总长度可以比视频时长稍短（留出片头/片尾空白）
+#      - 每段文案长度接近，均匀分布
+#      - 文案有意义，不是纯字符堆砌，基于素材库内容提炼
+#   3. 克隆 voice.wav 的音色生成配音（支持声音克隆）
+#   4. 字幕与配音精确同步（借鉴 v3 算法，从 timings.txt 读取精确时间）
+#   5. 合成新视频：原视频画面 + 配音 + 字幕
+#
+# 【参数说明】
+#   $1 视频文件    : 输入视频文件路径（必填）
+#   $2 文案素材库  : 包含产品介绍等信息的文本文件（必填，如 info.txt）
+#   $3 参考音频    : 用于声音克隆的音频文件（可选，默认使用视频同目录下的 voice.wav）
+#                      传 "none" 则使用默认 SFT 预设音色（中文女声）
+#   $4 输出视频    : 输出文件路径（可选，默认在原视频同目录添加 _subtitled 后缀）
+#
+# 【示例】
+#   # 使用默认 voice.wav 克隆音色（推荐）
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt
+#
+#   # 指定参考音频
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav
+#
+#   # 使用默认 SFT 音色（不克隆）
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt none
+#
+#   # 指定输出路径
+#   ./video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav ~/output.mp4
+#
+# 【前提条件】
+#   - 视频同目录下需有 voice.wav（克隆音色用）
+#   - 文案素材库文件（如 info.txt）需存在
+#   - 需先运行 build_cosy_voice_3080.sh 配置 CosyVoice 环境
+#   - 依赖: ffmpeg, ffprobe, CosyVoice, Python3
+#
+# 【输出】
+#   - 新视频: 原视频画面 + 配音 + 字幕
+#   - 原视频: 保留不变
+#   - 临时文件: 自动清理
+#
+# =============================================================================
+
+set -euo pipefail
 
 # ==================== 配置变量 ====================
-INTRO_PAUSE=0.2
-SPEED=1.2
+# 段间停顿时间（秒），控制每段配音之间的静音时长
 PAUSE=0.3
-SUBTITLE_CHAR_LIMIT=12
+
+# 开头延迟时间（秒），视频开始时的静音时长
+INTRO_PAUSE=0.3
+
+# 字幕样式配置
+SUBTITLE_STYLE="Default,Noto Sans CJK SC Bold,14,&H00FFFFFF,&H00FFFFFF,&H00FFA500,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1"
 # ==================== 配置变量 ====================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -26,37 +68,84 @@ cd "$SCRIPT_DIR"
 
 INPUT_VIDEO="$1"
 INFO_FILE="$2"
-PROMPT_WAV="$3"
-OUTPUT="$4"
+PROMPT_WAV="${3:-}"
+OUTPUT="${4:-}"
 
-# 参数检查
+# =============================================================================
+# 参数检查与初始化
+# =============================================================================
 if [ -z "$INPUT_VIDEO" ] || [ -z "$INFO_FILE" ]; then
-    echo "用法: $0 <视频> <文案信息文件> [克隆音频] [输出视频]"
+    echo "用法: $0 <视频文件> <文案素材库> [参考音频] [输出视频]"
     echo ""
     echo "参数说明:"
-    echo "  视频: 输入视频文件 (必填)"
-    echo "  文案信息文件: (必填)包含产品介绍信息的文件路径"
-    echo "  克隆音频: (可选)用于克隆声音的音频文件，默认 ./voice.wav"
-    echo "  输出视频: (可选)输出文件路径，默认在输入视频同目录下添加 _subtitled 后缀"
+    echo "  视频文件    : 输入视频文件路径 (必填)"
+    echo "  文案素材库  : 包含产品介绍等信息的文本文件 (必填)"
+    echo "  参考音频    : 用于声音克隆的音频文件 (可选，默认使用视频同目录下的 voice.wav)"
+    echo "                传 'none' 则使用默认 SFT 预设音色"
+    echo "  输出视频    : 输出文件路径 (可选，默认在原视频同目录添加 _subtitled 后缀)"
     echo ""
     echo "示例:"
-    echo "  $0 ./video.mp4 ./info.txt"
-    echo "  $0 ./video.mp4 ./info.txt ./voice.wav"
+    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt"
+    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt ~/video/voice.wav"
+    echo "  $0 ~/video/orgin.mp4 ~/video/info.txt none"
     exit 1
 fi
 
-# 默认克隆音频
-if [ -z "$PROMPT_WAV" ]; then
-    PROMPT_WAV="./voice.wav"
+# 检查视频文件
+if [ ! -f "$INPUT_VIDEO" ]; then
+    echo "错误: 视频文件不存在: $INPUT_VIDEO"
+    exit 1
 fi
 
+# 检查文案素材库
 if [ ! -f "$INFO_FILE" ]; then
-    echo "错误: 文案信息文件不存在: $INFO_FILE"
+    echo "错误: 文案素材库不存在: $INFO_FILE"
     exit 1
 fi
 
-# 从信息文件生成文案
-echo "[0/3] 自动生成文案..."
+# 设置默认参考音频
+if [ -z "$PROMPT_WAV" ]; then
+    PROMPT_WAV="$(dirname "$INPUT_VIDEO")/voice.wav"
+    echo "[INFO] 使用默认参考音频: $PROMPT_WAV"
+fi
+
+# 检查参考音频（如果不是 "none"）
+if [ "$PROMPT_WAV" != "none" ] && [ ! -f "$PROMPT_WAV" ]; then
+    echo "错误: 参考音频不存在: $PROMPT_WAV"
+    echo "提示: 请提供参考音频文件，或传 'none' 使用默认 SFT 音色"
+    exit 1
+fi
+
+# =============================================================================
+# 步骤 0: 获取视频时长并生成文案
+# =============================================================================
+echo "========================================"
+echo "视频配音字幕生成工具"
+echo "========================================"
+
+VIDEO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT_VIDEO")
+VIDEO_RES=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$INPUT_VIDEO")
+
+echo "视频文件: $INPUT_VIDEO"
+echo "视频时长: ${VIDEO_DURATION}秒"
+echo "视频分辨率: $VIDEO_RES"
+echo "文案素材: $INFO_FILE"
+
+# 设置输出路径
+if [ -z "$OUTPUT" ]; then
+    input_dir=$(dirname "$INPUT_VIDEO")
+    input_name=$(basename "$INPUT_VIDEO")
+    input_ext="${input_name##*.}"
+    input_name_noext="${input_name%.*}"
+    OUTPUT="${input_dir}/${input_name_noext}_subtitled.${input_ext}"
+fi
+
+echo "输出文件: $OUTPUT"
+echo "========================================"
+echo ""
+
+# 从素材库生成匹配视频时长的文案
+echo "[步骤 1/5] 分析视频时长并生成匹配文案..."
 TEXT=$(python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
@@ -66,137 +155,113 @@ est_chars = calculate_char_count(duration, speed=3.1, adjust=0)
 result = generate_subtitle('$INPUT_VIDEO', '$INFO_FILE', total_chars=est_chars)
 print(result)
 ")
-echo "  自动生成文案: ${TEXT:0:50}..."
 
-# 检测并合并不达标的段落（每段至少12个汉字）
-MIN_CHARS=12
-TEXT=$(python3 -c "
-import sys
-text = '''$TEXT'''
-segments = text.split('|')
-result = []
-current = ''
-for seg in segments:
-    chinese = sum(1 for c in seg if '\u4e00' <= c <= '\u9fff')
-    if chinese >= $MIN_CHARS:
-        if current:
-            result.append(current)
-            current = ''
-        result.append(seg)
-    else:
-        current += seg
-if current:
-    result.append(current)
-print('|'.join(result))
-")
+echo "  生成文案: ${TEXT:0:80}..."
 
-if [ -z "$TEXT" ]; then
+# 解析文案段数
+IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
+TOTAL_TEXTS=${#TEXT_ARRAY[@]}
+
+# 过滤空文案段
+VALID_TEXTS=()
+for text in "${TEXT_ARRAY[@]}"; do
+    text=$(echo "$text" | xargs)
+    if [ -n "$text" ]; then
+        VALID_TEXTS+=("$text")
+    fi
+done
+TEXT_ARRAY=("${VALID_TEXTS[@]}")
+TOTAL_TEXTS=${#TEXT_ARRAY[@]}
+
+if [ "$TOTAL_TEXTS" -eq 0 ]; then
     echo "错误: 文案为空"
     exit 1
 fi
 
-if [ ! -f "$INPUT_VIDEO" ]; then
-    echo "错误: 视频文件不存在: $INPUT_VIDEO"
-    exit 1
-fi
-
-VIDEO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT_VIDEO")
-VIDEO_RES=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$INPUT_VIDEO")
-
-if [ -z "$OUTPUT" ]; then
-    input_dir=$(dirname "$INPUT_VIDEO")
-    input_name=$(basename "$INPUT_VIDEO")
-    input_ext="${input_name##*.}"
-    input_name_noext="${input_name%.*}"
-    OUTPUT="${input_dir}/${input_name_noext}_subtitled.${input_ext}"
-fi
-
-IFS='|' read -ra TEXT_ARRAY <<< "$TEXT"
-TOTAL_TEXTS=${#TEXT_ARRAY[@]}
+echo "  文案段数: $TOTAL_TEXTS 段"
+echo ""
 
 # 调试模式：只显示文案信息
-if [ "$DEBUG" = "1" ]; then
+if [ "${DEBUG:-}" = "1" ]; then
     echo "========================================"
-    echo "调试模式：只显示文案信息"
+    echo "调试模式：文案信息"
     echo "========================================"
-    echo "视频: $INPUT_VIDEO"
-    echo "时长: ${VIDEO_DURATION}秒"
-    echo "段数: $TOTAL_TEXTS"
-    echo ""
-    echo "字幕文案:"
     for i in "${!TEXT_ARRAY[@]}"; do
         idx=$((i+1))
-        echo "  $idx: ${TEXT_ARRAY[$i]}"
+        echo "  第 $idx 段: ${TEXT_ARRAY[$i]}"
     done
     exit 0
 fi
 
-echo "========================================"
-echo "视频配字幕 + 配音"
-echo "========================================"
-echo "视频: $INPUT_VIDEO"
-echo "时长: ${VIDEO_DURATION}秒"
-echo "文案: $TOTAL_TEXTS 段"
-if [ -n "$PROMPT_WAV" ] && [ -f "$PROMPT_WAV" ]; then
-    echo "配音: 克隆 (参考音频: $PROMPT_WAV)"
-else
-    echo "配音: 默认SFT音色"
-fi
-echo "输出: $OUTPUT"
-echo "========================================"
+# =============================================================================
+# 步骤 2: 准备参考音频
+# =============================================================================
+echo "[步骤 2/5] 准备参考音频..."
 
-AUDIO_DIR="$(dirname "$INPUT_VIDEO")/audio_$(basename "$INPUT_VIDEO" .mp4)"
+# 创建临时工作目录
+WORK_DIR=$(mktemp -d)
+AUDIO_DIR="$WORK_DIR/audios"
 mkdir -p "$AUDIO_DIR"
-SUB_ASS="$(dirname "$INPUT_VIDEO")/$(basename "$INPUT_VIDEO" .mp4).ass"
 
-if [ -n "$PROMPT_WAV" ] && [ -f "$PROMPT_WAV" ]; then
+# 转换参考音频为 wav 格式（如果需要）
+if [ "$PROMPT_WAV" != "none" ]; then
     PROMPT_WAV_EXT="${PROMPT_WAV##*.}"
     if [ "$PROMPT_WAV_EXT" != "wav" ]; then
-        PROMPT_WAV_WAV="$(dirname "$INPUT_VIDEO")/$(basename "$PROMPT_WAV" .$PROMPT_WAV_EXT).wav"
-        if [ ! -f "$PROMPT_WAV_WAV" ]; then
-            ffmpeg -y -i "$PROMPT_WAV" -ar 16000 -ac 1 "$PROMPT_WAV_WAV" 2>/dev/null
-        fi
+        PROMPT_WAV_WAV="$WORK_DIR/voice.wav"
+        ffmpeg -y -i "$PROMPT_WAV" -ar 16000 -ac 1 "$PROMPT_WAV_WAV" 2>/dev/null
         PROMPT_WAV="$PROMPT_WAV_WAV"
     fi
+    echo "  使用克隆音色: $(basename "$PROMPT_WAV")"
+else
+    echo "  使用默认 SFT 音色（中文女声）"
 fi
+echo ""
+
+# =============================================================================
+# 步骤 3: 生成配音（借鉴 v3 算法，使用 tts_batch_v3.py）
+# =============================================================================
+echo "[步骤 3/5] 生成配音（使用 v3 同步算法）..."
 
 cd ~/CosyVoice
-
-# 激活 conda
 source $HOME/anaconda3/bin/activate cosyvoice
 
-echo ""
-echo "[1/3] 生成配音..."
+# 使用 tts_batch_v3.py 一次性生成所有配音
+# 特点：
+#   - 模型只加载一次
+#   - 自动在段间插入 0.3 秒停顿
+#   - 生成 merged.wav（已含停顿的合并音频）
+#   - 生成 timings.txt（精确时间信息）
+python3 "$SCRIPT_DIR/tts_batch_v3.py" \
+    "$PROMPT_WAV" \
+    "$AUDIO_DIR" \
+    "${TEXT_ARRAY[@]}"
 
-if [ -n "$PROMPT_WAV" ] && [ -f "$PROMPT_WAV" ]; then
-    python3 ~/my-shell/3080/tts_batch.py \
-        "/opt/image/Fun-CosyVoice3-0.5B" \
-        "$PROMPT_WAV" \
-        "$AUDIO_DIR" \
-        "$SPEED" \
-        "${TEXT_ARRAY[@]}"
-else
-    python3 ~/my-shell/3080/tts_batch.py \
-        "/opt/image/CosyVoice-300M-SFT" \
-        "none" \
-        "$AUDIO_DIR" \
-        "$SPEED" \
-        "${TEXT_ARRAY[@]}"
+# 检查输出文件
+if [ ! -f "$AUDIO_DIR/merged.wav" ]; then
+    echo "错误: 配音生成失败，未找到 merged.wav"
+    exit 1
 fi
 
-echo "  配音生成完成"
+if [ ! -f "$AUDIO_DIR/timings.txt" ]; then
+    echo "错误: 时间信息文件不存在: $AUDIO_DIR/timings.txt"
+    exit 1
+fi
 
-# 获取每段时长
-declare -a ADJUSTED_DURATIONS
-for i in $(seq 1 $TOTAL_TEXTS); do
-    dur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/$i.wav")
-    ADJUSTED_DURATIONS+=($dur)
-done
-
+# 获取配音总时长
+TTS_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_DIR/merged.wav")
+echo "  配音总时长: ${TTS_DURATION}秒"
+echo "  时间信息: $AUDIO_DIR/timings.txt"
 echo ""
-echo "[2/3] 生成字幕..."
 
-cat > "$SUB_ASS" << 'ASS_EOF'
+# =============================================================================
+# 步骤 4: 生成字幕（从 timings.txt 读取精确时间）
+# =============================================================================
+echo "[步骤 4/5] 生成字幕（精确同步配音）..."
+
+SUB_ASS="$WORK_DIR/subtitle.ass"
+
+# 生成 ASS 字幕头
+cat > "$SUB_ASS" << ASS_EOF
 [Script Info]
 Title: Generated Subtitle
 ScriptType: v4.00+
@@ -206,86 +271,90 @@ YCbCr Matrix: None
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Noto Sans CJK SC Bold,14,&H00FFFFFF,&H00FFFFFF,&H00FFA500,&H00666666,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
+Style: $SUBTITLE_STYLE
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ASS_EOF
 
-CURRENT_TIME=$INTRO_PAUSE
-
-for i in "${!TEXT_ARRAY[@]}"; do
-    idx=$((i+1))
-    text="${TEXT_ARRAY[$i]}"
-    text=$(echo "$text" | xargs)
-    text_no_punct=$(echo "$text" | sed 's/[,，。、！!？?。；;：:""''（）()【】《》]//g')
+# 自动换行函数
+auto_wrap() {
+    local text="$1"
+    local max_len=13
+    local len=${#text}
     
-    # 超过13个汉字则换行
-    chinese_count=$(echo "$text_no_punct" | grep -oP '\p{Han}' | wc -l)
-    if [ "$chinese_count" -gt 13 ]; then
-        text_no_punct=$(python3 -c "
-text = '''$text_no_punct'''
-count = 0
-pos = 0
-for i, c in enumerate(text):
-    if '\u4e00' <= c <= '\u9fff':
-        count += 1
-        if count == 13:
-            pos = i + 1
-            break
-if pos > 0:
-    print(text[:pos] + r'\N' + text[pos:])
-else:
-    print(text)
-")
+    if [ "$len" -le "$max_len" ]; then
+        echo "$text"
+        return
     fi
     
-    duration="${ADJUSTED_DURATIONS[$i]}"
-    # 每段字幕前后各加0.2秒停顿
-    duration_with_pause=$(awk "BEGIN {print $duration + $PAUSE + $INTRO_PAUSE}")
+    local lines=$(( (len + max_len - 1) / max_len ))
+    local result=""
     
-    # 不拆分字幕，整段显示
-    START_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($CURRENT_TIME/60), $CURRENT_TIME%60}")
-    END_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int(($CURRENT_TIME+$duration_with_pause)/60), ($CURRENT_TIME+$duration_with_pause)%60}")
-    echo "Dialogue: 0,$START_TIME,$END_TIME,Default,,0,0,0,,$text_no_punct" >> "$SUB_ASS"
-    CURRENT_TIME=$(awk "BEGIN {print $CURRENT_TIME + $duration_with_pause}")
+    for i in $(seq 0 $((lines-1))); do
+        local start=$((i * max_len))
+        local end=$(((i + 1) * max_len))
+        if [ "$end" -gt "$len" ]; then
+            end=$len
+        fi
+        local chunk="${text:$start:$((end-start))}"
+        if [ -n "$result" ]; then
+            result="$result\\N$chunk"
+        else
+            result="$chunk"
+        fi
+    done
+    echo "$result"
+}
+
+# 从 timings.txt 读取精确时间并生成字幕
+# 格式: idx: start end duration subtitle_start subtitle_end
+mapfile -t timing_lines < <(grep -v "^#" "$AUDIO_DIR/timings.txt")
+
+for line in "${timing_lines[@]}"; do
+    [ -z "$line" ] && continue
+    
+    idx=$(echo "$line" | awk '{print $1}' | tr -d ':')
+    subtitle_start=$(echo "$line" | awk '{print $5}')
+    subtitle_end=$(echo "$line" | awk '{print $6}')
+    
+    text="${TEXT_ARRAY[$((idx-1))]}"
+    text=$(echo "$text" | xargs)
+    text=$(auto_wrap "$text")
+    
+    START_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($subtitle_start/60), $subtitle_start%60}")
+    END_TIME=$(awk "BEGIN {printf \"0:%02d:%05.2f\", int($subtitle_end/60), $subtitle_end%60}")
+    
+    echo "Dialogue: 0,$START_TIME,$END_TIME,Default,,0,0,0,,$text" >> "$SUB_ASS"
+    echo "  字幕 $idx: $START_TIME -> $END_TIME"
 done
 
 echo "  字幕生成完成"
-
 echo ""
-echo "[3/3] 合成最终视频..."
 
-# 给每段音频加0.2秒前后停顿
-PADDED_DIR="/tmp/padded_$$"
-mkdir -p "$PADDED_DIR"
-for i in $(seq 1 $TOTAL_TEXTS); do
-    # 先加前端0.2秒静音
-    ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$AUDIO_DIR/$i.wav" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$PADDED_DIR/${i}_prefix.wav" 2>/dev/null
-    # 再加后端0.3秒静音
-    ffmpeg -y -i "$PADDED_DIR/${i}_prefix.wav" -af "apad=pad_dur=$PAUSE" "$PADDED_DIR/$i.wav" 2>/dev/null
-done
+# =============================================================================
+# 步骤 5: 合成最终视频
+# =============================================================================
+echo "[步骤 5/5] 合成最终视频..."
 
-# 给整体音频加0.2秒前置偏移，对齐字幕
-AUDIO_LIST="/tmp/audio_list_$$.txt"
-for i in $(seq 1 $TOTAL_TEXTS); do
-    echo "file '$PADDED_DIR/$i.wav'" >> "$AUDIO_LIST"
-done
-
-COMBINED_AAC="/tmp/combined_$$.aac"
-ffmpeg -y -f concat -safe 0 -i "$AUDIO_LIST" -c:a aac "$COMBINED_AAC" 2>/dev/null
-
-# 整体前置0.2秒静音对齐字幕
-ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=$INTRO_PAUSE" -i "$COMBINED_AAC" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" "$COMBINED_AAC" 2>/dev/null
-
-ffmpeg -y -i "$INPUT_VIDEO" -i "$COMBINED_AAC" -vf "ass=$SUB_ASS" -af "volume=1.5" \
+# 将配音合并到视频中
+# 策略：如果配音时长 < 视频时长，则保留完整视频（配音结束后视频继续播放）
+#       如果配音时长 > 视频时长，则截断配音（使用 -shortest）
+ffmpeg -y -i "$INPUT_VIDEO" -i "$AUDIO_DIR/merged.wav" -vf "ass=$SUB_ASS" -af "volume=1.5" \
     -map 0:v -map 1:a \
-    -c:v libx264 -c:a aac -shortest \
+    -c:v libx264 -c:a aac \
+    -shortest \
     "$OUTPUT" 2>/dev/null
 
-rm -rf "$AUDIO_LIST" "$COMBINED_AAC" "$PROMPT_WAV_WAV" "$PADDED_DIR"
+# 清理临时文件
+rm -rf "$WORK_DIR"
 
 echo ""
 echo "========================================"
-echo "完成！输出: $OUTPUT"
+echo "完成！"
+echo "========================================"
+echo "输入视频: $INPUT_VIDEO (保留)"
+echo "输出视频: $OUTPUT"
+echo "配音时长: ${TTS_DURATION}秒"
+echo "视频时长: ${VIDEO_DURATION}秒"
 echo "========================================"
