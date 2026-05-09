@@ -398,3 +398,374 @@ cp ~/.config/opencode/opencode.json ~/my-shell/opencode.json
 
 ---
 
+## img.sh - AI 图像生成脚本
+
+基于 stable-diffusion.cpp 的图像生成工具，针对 RTX 3080 10GB 显存优化。
+
+### 功能
+
+- 使用 SD Turbo 模型快速生成高质量图片
+- 支持自定义分辨率、采样方法、CFG Scale
+- 自动添加质量前缀词提升生成质量
+- 支持负面提示词过滤不良内容
+- 集成 FreeU、SAG、自动增强等高级特性
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| $1 | 提示词 (Prompt) | "A beautiful landscape" |
+| $2 | 输出文件路径 | ~/TIMESTAMP_MD5.png |
+| $3 | 宽度 | 1280 |
+| $4 | 高度 | 720 |
+
+### 环境变量
+
+```bash
+SAMPLING_METHOD=euler CFG_SCALE=3.2 STEPS=25 ./img.sh "一只猫"
+```
+
+### 用法
+
+```bash
+# 基础用法
+./3080/img.sh "A beautiful landscape"
+
+# 指定输出路径和分辨率
+./3080/img.sh "A sunset" /mnt/e/app/sunset.png 1280 720
+
+# 使用环境变量覆盖参数
+SAMPLING_METHOD=dpm++ CFG_SCALE=4.0 STEPS=30 ./3080/img.sh "A cat"
+```
+
+### 原理
+
+1. 使用 `myimg-cli` (stable-diffusion.cpp 封装) 加载模型
+2. 通过 Qwen3-4B 模型理解提示词
+3. 使用 z_image_turbo-Q5_K_M.gguf 扩散模型生成图片
+4. 应用 FreeU、SAG 等技术提升质量
+5. 输出 PNG 格式图片
+
+### 依赖
+
+- `~/my-img/build/myimg-cli`
+- `/opt/image/model/z_image_turbo-Q5_K_M.gguf`
+- `/opt/image/model/ae.safetensors` (VAE)
+- `/opt/image/model/Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (提示词理解)
+- ONNX Runtime
+
+---
+
+## run_qwen3.5-9b_llama.sh - llama.cpp API 服务启动脚本
+
+启动 Qwen3.5-9B 模型的 llama.cpp API 服务，提供 OpenAI 兼容的 API 接口。
+
+### 功能
+
+- 在 RTX 3080 10GB 上运行 Qwen3.5-9B (Q5_K_S) 模型
+- 提供 OpenAI 兼容的 `/v1/chat/completions` API
+- 支持 128K 上下文长度
+- 使用 Flash Attention 和 KV Cache 量化优化显存
+
+### 参数
+
+无命令行参数，所有配置在脚本内定义：
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| GPU 层数 | 33 | 全部加载到 GPU |
+| 上下文 | 131072 | 128K |
+| Batch Size | 1024 | 批量大小 |
+| KV Cache | q4_0 | KV 缓存量化 |
+| 端口 | 11434 | API 服务端口 |
+
+### 用法
+
+```bash
+# 启动服务
+cd ~/my-shell/3080
+setsid ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_3080.log 2>&1 &
+echo $!  # 记录 PID
+
+# 查看日志
+tail -f /tmp/9b_llama_3080.log
+
+# 测试 API
+curl http://localhost:11434/v1/models
+
+# 停止服务
+pkill -f llama-server
+```
+
+### 原理
+
+1. 使用 llama.cpp 的 `llama-server` 二进制文件
+2. 加载 Qwopus3.5-9B-v3.Q5_K_S.gguf 模型
+3. 启用 CUDA 加速 (`-ngl 33`)
+4. 使用 Flash Attention 提升推理速度
+5. KV Cache 量化 (q4_0) 控制显存占用约 8GB
+
+### 性能
+
+- RTX 3080 10GB 上约 **75 tok/s** (Q5_K_S, BATCH=1024)
+- 显存占用约 8136 MiB
+
+### 依赖
+
+- `~/llama.cpp/build/bin/llama-server`
+- `/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q5_K_S.gguf`
+- CUDA 12.0+
+
+---
+
+## run_qwen3.5-9b_koboldcpp.sh - KoboldCpp API 服务启动脚本
+
+使用 KoboldCpp 框架启动 Qwen3.5-9B API 服务，作为 llama.cpp 的替代方案。
+
+### 功能
+
+- 提供与 llama.cpp 相同的 OpenAI 兼容 API
+- 支持 KoboldCpp 特有的功能（如智能缓存）
+- 显存占用略低 (~7.5GB vs ~8.0GB)
+
+### 参数
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| GPU 层数 | 33 | 全部加载到 GPU |
+| 上下文 | 131072 | 128K |
+| Batch Size | 1024 | 批量大小 |
+| KV Cache | q4_0 | KV 缓存量化 |
+| 端口 | 11434 | API 服务端口 |
+
+### 用法
+
+```bash
+# 启动服务
+cd ~/my-shell/3080
+setsid ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp_3080.log 2>&1 &
+echo $!  # 记录 PID
+
+# 停止服务
+pkill -f koboldcpp.py
+```
+
+### 性能对比
+
+| 框架 | 速度 | 显存占用 | 推荐度 |
+|------|------|----------|--------|
+| llama.cpp | ~75 tok/s | ~8.0GB | ⭐⭐⭐⭐⭐ |
+| KoboldCpp | ~57 tok/s | ~7.5GB | ⭐⭐⭐ |
+
+### 依赖
+
+- `/opt/koboldcpp/koboldcpp.py`
+- Python 3
+- 模型文件同 llama.cpp
+
+---
+
+## test_api_performance.sh - API 性能测试脚本
+
+自动测试 llama.cpp 和 KoboldCpp 的性能表现。
+
+### 功能
+
+- 自动启动 llama.cpp 和 KoboldCpp 服务
+- 使用 `test_api.py` 进行标准化性能测试
+- 对比两种框架的推理速度
+- 自动清理服务进程
+
+### 用法
+
+```bash
+cd ~/my-shell/3080
+./test_api_performance.sh
+```
+
+### 测试流程
+
+1. 停止现有服务
+2. 启动 llama.cpp → 测试性能 → 停止服务
+3. 启动 KoboldCpp → 测试性能 → 停止服务
+4. 输出对比结果
+
+### 依赖
+
+- `~/my-shell/test_api.py` (性能测试脚本)
+- 两个启动脚本 (`run_qwen3.5-9b_llama.sh`, `run_qwen3.5-9b_koboldcpp.sh`)
+
+---
+
+## video_subtitle_voice.sh - 视频配音字幕生成工具
+
+为现有短视频添加 AI 配音和同步字幕。
+
+### 功能
+
+- 根据文案自动生成配音（支持声音克隆或默认音色）
+- 字幕与配音精确同步（使用 tts_batch_v3.py 的 timings.txt）
+- 保留原视频画面，叠加配音和字幕
+- 支持文案直接传入或从文件读取
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| $1 | 输入视频文件 | 必填 |
+| $2 | 文案（\|分隔）或 .txt 文件路径 | 必填 |
+| $3 | 参考音频（用于克隆） | 视频同目录下 voice.wav |
+| $4 | 输出视频路径 | 原视频名_subtitled.mp4 |
+
+### 用法
+
+```bash
+# 方式1：直接传入文案
+./3080/video_subtitle_voice.sh ~/video/orgin.mp4 '第一句|第二句|第三句'
+
+# 方式2：从文件读取文案
+./3080/video_subtitle_voice.sh ~/video/orgin.mp4 ~/video/script.txt
+
+# 指定参考音频（声音克隆）
+./3080/video_subtitle_voice.sh ~/video/orgin.mp4 '文案' ~/video/voice.wav
+
+# 使用默认 SFT 音色（不克隆）
+./3080/video_subtitle_voice.sh ~/video/orgin.mp4 '文案' none
+```
+
+### 原理
+
+1. 解析文案（支持 \| 分隔的字符串或 .txt 文件）
+2. 使用 `tts_batch_v3.py` 生成配音（模型只加载一次）
+3. 从 `timings.txt` 读取精确时间信息
+4. 生成 ASS 字幕文件（自动换行、精确时间对齐）
+5. 使用 ffmpeg 合成：原视频 + 配音 + 字幕
+
+### 特点
+
+- 段间停顿 0.3 秒
+- 字幕自动换行（每行约 13 字）
+- 配音音量增益 1.5 倍
+- 临时文件自动清理
+
+### 依赖
+
+- CosyVoice 环境（`conda activate cosyvoice`）
+- `tts_batch_v3.py`
+- ffmpeg
+
+---
+
+## audio_to_subtitle.sh - 音频转字幕工具
+
+根据配音文件生成时间对齐的 ASS 字幕文件。
+
+### 功能
+
+- 读取分段配音文件（1.wav, 2.wav...）
+- 计算每段配音时长
+- 生成带精确时间戳的 ASS 字幕
+- 支持自定义段间停顿
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| $1 | 配音文件夹（含 1.wav, 2.wav...） | 必填 |
+| $2 | 段间停顿（秒） | 0.3 |
+| $3 | 文案（\|分隔） | 必填 |
+| $4 | 输出字幕文件路径 | 必填 |
+
+### 用法
+
+```bash
+./3080/audio_to_subtitle.sh "/opt/image/audios/" 0.3 "第一句|第二句|第三句" /opt/image/subtitle.ass
+```
+
+### 原理
+
+1. 使用 ffprobe 获取每段配音时长
+2. 累加时间计算字幕起止时间
+3. 自动换行（每行约 12 字）
+4. 输出标准 ASS 格式字幕文件
+
+---
+
+## generate_script.py - 视频字幕文案生成工具
+
+调用本地 Qwen 模型，根据产品介绍素材自动生成短视频字幕文案。
+
+### 功能
+
+- 根据视频时长自动计算文案段数和字数
+- 读取产品介绍素材（info.txt）
+- 调用本地 Qwen API 生成文案
+- 自动过滤英文、数字、标点符号
+- 去重和长度校验
+
+### 参数
+
+| 参数 | 说明 |
+|------|------|
+| 参数1 | 视频文件路径（用于计算时长） |
+| 参数2 | 素材文件路径（产品介绍文本） |
+| `--output` | 输出文案文件路径（可选） |
+
+### 用法
+
+```bash
+# 基础用法
+python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt
+
+# 保存到文件
+python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt --output ~/video/script.txt
+
+# 生成后直接用于视频合成
+SCRIPT=$(python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt | tail -1)
+./3080/video_subtitle_voice.sh ~/video/orgin.mp4 "$SCRIPT"
+```
+
+### 原理
+
+1. 使用 ffprobe 获取视频时长
+2. 按语速 3.1 字/秒计算总字数和段数
+3. 构建 prompt 调用本地 Qwen API (`localhost:11434`)
+4. 处理 reasoning 模型的输出（提取最终文案）
+5. 清理：去掉英文、数字、标点，去重
+6. 验证每段长度（10-40 字）
+
+### 文案要求
+
+- 无标点符号
+- 无英文字母和数字
+- 用 `|` 分隔段落
+- 顺序：品牌介绍 → 核心卖点 → 功能特点 → 行动号召
+
+### 依赖
+
+- 本地 llama.cpp 服务（`./run_qwen3.5-9b_llama.sh`）
+- Python 3 + requests
+- ffmpeg (ffprobe)
+
+---
+
+## 脚本关系图
+
+```
+图像生成: img.sh → stable-diffusion.cpp → PNG 图片
+           ↓
+文案生成: generate_script.py → Qwen API (localhost:11434) → 字幕文案
+           ↓
+视频合成: img_to_video_v1/v2/v3.sh → CosyVoice TTS + ffmpeg → 带配音字幕视频
+           ↓
+后期处理: video_subtitle_voice.sh → 为现有视频添加配音字幕
+           ↓
+字幕工具: audio_to_subtitle.sh → 根据配音生成 ASS 字幕
+
+模型服务: run_qwen3.5-9b_llama.sh → llama.cpp API (推荐)
+          run_qwen3.5-9b_koboldcpp.sh → KoboldCpp API (备选)
+          test_api_performance.sh → 性能测试对比
+```
+
+---
+
