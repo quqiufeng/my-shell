@@ -9,6 +9,8 @@
 #   -DGGML_CUDA_FORCE_MMQ=ON    强制使用 mmq kernels 替代 cuBLAS，消费级显卡小 batch 更快
 #   -DGGML_LTO=ON               启用链接时优化，编译更慢但运行可能稍快
 #   -DGGML_NATIVE=OFF           禁用 CPU native 优化，避免纯 GPU 推理时干扰
+#   -DLLAMA_BUILD_SERVER=ON     编译 API 服务 (llama-server)
+#   -DLLAMA_BUILD_EXAMPLES=ON   编译示例程序 (含 llama-llava-cli 多模态工具)
 #
 
 echo "=========================================="
@@ -71,7 +73,9 @@ cmake .. \
   -DGGML_CUDA_GRAPHS=ON \
   -DGGML_CUDA_FORCE_MMQ=ON \
   -DGGML_LTO=ON \
-  -DGGML_NATIVE=OFF
+  -DGGML_NATIVE=OFF \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DLLAMA_BUILD_EXAMPLES=ON
 
 # 编译
 echo ""
@@ -86,6 +90,14 @@ if [ -f "$HOME/llama.cpp/build/bin/llama-cli" ]; then
     echo "=========================================="
     echo "可执行文件: $HOME/llama.cpp/build/bin/llama-cli"
     echo "API 服务:   $HOME/llama.cpp/build/bin/llama-server"
+    echo "多模态CLI:  $HOME/llama.cpp/build/bin/llama-llava-cli"
+    
+    # 检查多模态库
+    if [ -f "$HOME/llama.cpp/build/libmtmd.so" ]; then
+        echo "多模态库:   $HOME/llama.cpp/build/libmtmd.so ✅"
+    else
+        echo "⚠️ 多模态库 libmtmd.so 未生成"
+    fi
     
     # 测试 GPU
     echo ""
