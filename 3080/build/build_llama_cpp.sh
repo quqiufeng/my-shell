@@ -93,8 +93,8 @@ if [ -f "$HOME/llama.cpp/build/bin/llama-cli" ]; then
     echo "多模态CLI:  $HOME/llama.cpp/build/bin/llama-llava-cli"
     
     # 检查多模态库
-    if [ -f "$HOME/llama.cpp/build/libmtmd.so" ]; then
-        echo "多模态库:   $HOME/llama.cpp/build/libmtmd.so ✅"
+    if [ -f "$HOME/llama.cpp/build/bin/libmtmd.so" ]; then
+        echo "多模态库:   $HOME/llama.cpp/build/bin/libmtmd.so ✅"
     else
         echo "⚠️ 多模态库 libmtmd.so 未生成"
     fi
