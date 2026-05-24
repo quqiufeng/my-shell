@@ -145,7 +145,7 @@ wget https://ice521.com/linux.html -O /tmp/digilink.deb
 sudo dpkg -i /tmp/digilink.deb
 ```
 
-### 6.1 安装依赖库
+### 7.1 安装依赖库
 
 首次启动可能报错缺少 `libwebkit2gtk-4.1.so.0`，需安装：
 
@@ -153,7 +153,7 @@ sudo dpkg -i /tmp/digilink.deb
 sudo apt install -y libwebkit2gtk-4.1-0 libayatana-appindicator3-1 libssl3
 ```
 
-### 6.2 修复桌面启动器
+### 7.2 修复桌面启动器
 
 安装后桌面文件名称异常，需修复：
 
@@ -163,7 +163,14 @@ sudo rm /usr/share/applications/.desktop
 sudo update-desktop-database /usr/share/applications
 ```
 
-### 6.3 启动方式
+### 7.3 设置开机自启动
+
+```bash
+mkdir -p ~/.config/autostart
+cp /usr/share/applications/digilink.desktop ~/.config/autostart/
+```
+
+### 7.4 启动方式
 
 - 图形界面：在应用菜单搜索 "Digilink"
 - 命令行：`digilink`
