@@ -87,7 +87,24 @@ rm -rf ~/.cache/fontconfig/* && fc-cache -rv
 
 ---
 
-## 4. 安装 Google Chrome
+## 4. 安装 Lubuntu Desktop（可选）
+
+Lubuntu 是基于 LXQt 的轻量级桌面环境，适合低配置机器。
+
+```bash
+sudo apt install -y lubuntu-desktop
+```
+
+安装过程中会提示选择**显示管理器**，保持默认的 **SDDM** 即可。
+
+安装完成后重启生效：
+```bash
+sudo reboot
+```
+
+---
+
+## 5. 安装 Google Chrome
 
 ```bash
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -97,7 +114,7 @@ sudo apt --fix-broken install -y
 
 ---
 
-## 5. 安装微信（WeChat）
+## 6. 安装微信（WeChat）
 
 ```bash
 wget https://dldir1.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.deb
@@ -118,7 +135,7 @@ cp /usr/share/applications/wechat.desktop ~/.config/autostart/
 
 ---
 
-## 6. 安装梯子软件（DigiLink）
+## 7. 安装梯子软件（DigiLink）
 
 DigiLink 代理客户端，支持多种协议。
 
@@ -153,7 +170,7 @@ sudo update-desktop-database /usr/share/applications
 
 ---
 
-## 7. 卸载无用软件
+## 8. 卸载无用软件
 
 ### 6.1 卸载 Firefox
 ```bash
@@ -169,7 +186,7 @@ sudo apt autoremove -y libreoffice* --purge
 
 ---
 
-## 8. 修复显示分辨率
+## 9. 修复显示分辨率
 
 当前分辨率被限制为 640x480，修改为 1920x1080：
 ```bash
@@ -178,7 +195,7 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 9. OpenCode 权限配置
+## 10. OpenCode 权限配置
 
 修改 `~/.config/opencode/opencode.jsonc`，放开所有权限（无需二次确认）：
 
@@ -196,7 +213,7 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 10. 开发编译套件
+## 11. 开发编译套件
 
 ### 9.1 基础编译工具
 ```bash
@@ -227,7 +244,7 @@ sudo apt install -y libssl-dev libffi-dev zlib1g-dev libbz2-dev \
 
 ---
 
-## 11. 视频解码器安装
+## 12. 视频解码器安装
 
 ### 10.1 核心解码库
 ```bash
@@ -244,7 +261,7 @@ sudo apt install -y yt-dlp
 
 ---
 
-## 12. 时间同步配置
+## 13. 时间同步配置
 
 ### 11.1 设置时区为北京时间
 ```bash
@@ -275,7 +292,7 @@ timedatectl status
 
 ---
 
-## 13. LVM 磁盘扩容
+## 14. LVM 磁盘扩容
 
 系统安装后，LVM 逻辑卷默认只使用了约一半磁盘空间。以下是将根分区扩展到使用全部可用空间的操作。
 
@@ -336,7 +353,7 @@ sudo df -h /
 
 ---
 
-## 14. sudo 免密码配置
+## 15. sudo 免密码配置
 
 ### 13.1 配置当前用户免密码 sudo
 
@@ -363,7 +380,7 @@ sudo -n whoami
 
 ---
 
-## 15. 系统清理
+## 16. 系统清理
 
 ### 14.1 清理 apt 缓存
 ```bash
@@ -379,12 +396,13 @@ rm -f /tmp/wechat.deb
 
 ---
 
-## 16. 已安装软件清单
+## 17. 已安装软件清单
 
 | 类别 | 软件 |
 |------|------|
 | 浏览器 | Google Chrome |
 | 输入法 | IBus + 智能拼音 |
+| 桌面环境 | Lubuntu Desktop (LXQt) |
 | 通讯 | 微信 (WeChat) |
 | 网络工具 | DigiLink（梯子） |
 | 视频播放 | VLC, MPV, FFmpeg |
