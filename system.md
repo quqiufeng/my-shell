@@ -241,6 +241,8 @@ curl -fsSL https://opencode.ai/install | bash
 
 运行 `/themes` 命令选择喜欢的主题。
 
+推荐主题：**cobalt2** — 深蓝色调，对比度适中，适合长时间使用。
+
 ### 12.3 权限配置
 
 参考官方文档：[https://opencode.ai/docs/permissions/](https://opencode.ai/docs/permissions/)
