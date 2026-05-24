@@ -125,13 +125,13 @@ wget https://dldir1.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.deb
 sudo dpkg -i WeChatLinux_x86_64.deb
 ```
 
-### 5.1 修复依赖问题
+### 6.1 修复依赖问题
 微信启动报错缺少 `libatomic.so.1`，需安装：
 ```bash
 sudo apt install -y libatomic1
 ```
 
-### 5.2 设置微信开机自启动
+### 6.2 设置微信开机自启动
 ```bash
 mkdir -p ~/.config/autostart
 cp /usr/share/applications/wechat.desktop ~/.config/autostart/
@@ -148,7 +148,17 @@ sudo dpkg -i com.alibabainc.dingtalk_8.1.0.6021101_amd64.deb
 
 ---
 
-## 8. 安装梯子软件（DigiLink）
+## 8. 安装 WPS Office
+
+```bash
+wget "https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2023/25882/wps-office_12.1.2.25882.AK.preread.sw.Personal_662820_amd64.deb?t=1779620023&k=f021fec797320ef1da65dd6111cc421a" -O /tmp/wps-office.deb
+sudo dpkg -i /tmp/wps-office.deb
+sudo apt --fix-broken install -y
+```
+
+---
+
+## 9. 安装梯子软件（DigiLink）
 
 DigiLink 代理客户端，支持多种协议。
 
@@ -158,7 +168,7 @@ wget https://ice521.com/linux.html -O /tmp/digilink.deb
 sudo dpkg -i /tmp/digilink.deb
 ```
 
-### 7.1 安装依赖库
+### 9.1 安装依赖库
 
 首次启动可能报错缺少 `libwebkit2gtk-4.1.so.0`，需安装：
 
@@ -166,7 +176,7 @@ sudo dpkg -i /tmp/digilink.deb
 sudo apt install -y libwebkit2gtk-4.1-0 libayatana-appindicator3-1 libssl3
 ```
 
-### 7.2 修复桌面启动器
+### 9.2 修复桌面启动器
 
 安装后桌面文件名称异常，需修复：
 
@@ -176,37 +186,37 @@ sudo rm /usr/share/applications/.desktop
 sudo update-desktop-database /usr/share/applications
 ```
 
-### 7.3 设置开机自启动
+### 9.3 设置开机自启动
 
 ```bash
 mkdir -p ~/.config/autostart
 cp /usr/share/applications/digilink.desktop ~/.config/autostart/
 ```
 
-### 7.4 启动方式
+### 9.4 启动方式
 
 - 图形界面：在应用菜单搜索 "Digilink"
 - 命令行：`digilink`
 
 ---
 
-## 9. 卸载无用软件
+## 10. 卸载无用软件
 
-### 6.1 卸载 Firefox
+### 10.1 卸载 Firefox
 ```bash
 sudo apt autoremove -y firefox --purge
 # 如为 snap 安装：
 sudo snap remove firefox
 ```
 
-### 6.2 卸载 LibreOffice
+### 10.2 卸载 LibreOffice
 ```bash
 sudo apt autoremove -y libreoffice* --purge
 ```
 
 ---
 
-## 10. 修复显示分辨率
+## 11. 修复显示分辨率
 
 当前分辨率被限制为 640x480，修改为 1920x1080：
 ```bash
@@ -215,7 +225,7 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 11. OpenCode 权限配置
+## 12. OpenCode 权限配置
 
 参考官方文档：[https://opencode.ai/docs/permissions/](https://opencode.ai/docs/permissions/)
 
@@ -239,20 +249,20 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 12. 开发编译套件
+## 13. 开发编译套件
 
-### 9.1 基础编译工具
+### 13.1 基础编译工具
 ```bash
 sudo apt install -y build-essential cmake make gcc g++ clang \
   gdb lldb git curl wget vim pkg-config autoconf automake libtool
 ```
 
-### 9.2 Python 开发环境
+### 13.2 Python 开发环境
 ```bash
 sudo apt install -y python3-dev python3-pip python3-venv
 ```
 
-### 9.3 常用开发库
+### 13.3 常用开发库
 ```bash
 sudo apt install -y libssl-dev libffi-dev zlib1g-dev libbz2-dev \
   liblzma-dev libzip-dev libpcre3-dev libpcre2-dev libonig-dev \
@@ -270,9 +280,9 @@ sudo apt install -y libssl-dev libffi-dev zlib1g-dev libbz2-dev \
 
 ---
 
-## 13. 视频解码器安装
+## 14. 视频解码器安装
 
-### 10.1 核心解码库
+### 14.1 核心解码库
 ```bash
 sudo apt install -y ffmpeg libavcodec-extra vlc libmpv2 mpv \
   gstreamer1.0-libav gstreamer1.0-plugins-good \
@@ -280,26 +290,26 @@ sudo apt install -y ffmpeg libavcodec-extra vlc libmpv2 mpv \
   gstreamer1.0-vaapi libdvdnav4 libdvdread8 libbluray2 libaacs0
 ```
 
-### 10.2 视频下载工具
+### 14.2 视频下载工具
 ```bash
 sudo apt install -y yt-dlp
 ```
 
 ---
 
-## 14. 时间同步配置
+## 15. 时间同步配置
 
-### 11.1 设置时区为北京时间
+### 15.1 设置时区为北京时间
 ```bash
 sudo timedatectl set-timezone Asia/Shanghai
 ```
 
-### 11.2 启用 NTP 自动同步
+### 15.2 启用 NTP 自动同步
 ```bash
 sudo timedatectl set-ntp true
 ```
 
-### 11.3 配置国内 NTP 服务器
+### 15.3 配置国内 NTP 服务器
 系统默认已启用 systemd-timesyncd，如需切换为国内 NTP 服务器：
 
 ```bash
@@ -318,11 +328,11 @@ timedatectl status
 
 ---
 
-## 15. LVM 磁盘扩容
+## 16. LVM 磁盘扩容
 
 系统安装后，LVM 逻辑卷默认只使用了约一半磁盘空间。以下是将根分区扩展到使用全部可用空间的操作。
 
-### 12.1 查看当前磁盘和 LVM 状态
+### 16.1 查看当前磁盘和 LVM 状态
 
 ```bash
 # 查看物理卷
@@ -345,7 +355,7 @@ PV 总容量:     116.19 GB
 空闲未分配:     58.09 GB  ← 还有一半没用到
 ```
 
-### 12.2 扩展逻辑卷到全部空间
+### 16.2 扩展逻辑卷到全部空间
 
 ```bash
 sudo lvextend -l +100%FREE -r /dev/mapper/ubuntu--vg-ubuntu--lv
@@ -356,7 +366,7 @@ sudo lvextend -l +100%FREE -r /dev/mapper/ubuntu--vg-ubuntu--lv
 - `-r`：同时扩展文件系统（resize2fs/xfs_growfs）
 - `/dev/mapper/ubuntu--vg-ubuntu--lv`：逻辑卷设备路径
 
-### 12.3 验证扩容结果
+### 16.3 验证扩容结果
 
 ```bash
 sudo lvs
@@ -370,7 +380,7 @@ sudo df -h /
 根分区 /: 57 GB → 115 GB，可用 95 GB
 ```
 
-### 12.4 操作前注意事项
+### 16.4 操作前注意事项
 
 - **先备份重要数据**：虽然 LVM 在线扩容风险很低，但建议先备份
 - **确认卷组有空闲空间**：`sudo vgs` 查看 VFree 列
@@ -379,9 +389,9 @@ sudo df -h /
 
 ---
 
-## 16. sudo 免密码配置
+## 17. sudo 免密码配置
 
-### 13.1 配置当前用户免密码 sudo
+### 17.1 配置当前用户免密码 sudo
 
 创建 sudoers 配置文件：
 
@@ -389,14 +399,14 @@ sudo df -h /
 printf 'qqf332\n' | sudo -S bash -c 'echo "quqiufeng ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/quqiufeng && chmod 440 /etc/sudoers.d/quqiufeng'
 ```
 
-### 13.2 验证配置
+### 17.2 验证配置
 
 ```bash
 sudo -n whoami
 # 输出: root  （不提示密码即表示成功）
 ```
 
-### 13.3 配置文件说明
+### 17.3 配置文件说明
 
 - 文件位置：`/etc/sudoers.d/quqiufeng`
 - 权限：`-r--r-----` (440)
@@ -406,15 +416,15 @@ sudo -n whoami
 
 ---
 
-## 17. 系统清理
+## 18. 系统清理
 
-### 14.1 清理 apt 缓存
+### 18.1 清理 apt 缓存
 ```bash
 sudo apt-get clean
 sudo apt-get autoclean
 ```
 
-### 14.2 清理已下载的安装包
+### 18.2 清理已下载的安装包
 ```bash
 rm -f /tmp/google-chrome-stable_current_amd64.deb
 rm -f /tmp/wechat.deb
@@ -422,11 +432,11 @@ rm -f /tmp/wechat.deb
 
 ---
 
-## 18. 定制内核编译（可选）
+## 19. 定制内核编译（可选）
 
 根据本机硬件专门编译内核，去掉不需要的驱动，系统更轻量、响应更快。
 
-### 17.1 本机硬件
+### 19.1 本机硬件
 
 - CPU: Intel Core i5-2400 (Sandy Bridge)
 - 显卡: Intel HD Graphics 2000（集成显卡）
@@ -434,7 +444,7 @@ rm -f /tmp/wechat.deb
 - 内存: 12GB DDR3
 - 网络: Realtek RTL8111/8168 PCI-E 千兆网卡（有线）
 
-### 17.2 精简内容
+### 19.2 精简内容
 
 - 移除所有无线驱动（Wi-Fi、蓝牙、NFC）
 - 移除不需要的总线驱动（Infiniband、FireWire、Thunderbolt、PCMCIA）
@@ -442,7 +452,7 @@ rm -f /tmp/wechat.deb
 - 开启 `PREEMPT_DYNAMIC` 动态抢占，提升桌面响应
 - 使用 zstd 压缩内核
 
-### 17.3 编译脚本
+### 19.3 编译脚本
 
 完整编译记录和脚本：`~/my-shell/build_kernel.sh`
 
@@ -454,7 +464,7 @@ uname -r
 
 ---
 
-## 19. 已安装软件清单
+## 20. 已安装软件清单
 
 | 类别 | 软件 |
 |------|------|
@@ -462,6 +472,7 @@ uname -r
 | 输入法 | IBus + 智能拼音 |
 | 桌面环境 | Lubuntu Desktop (LXQt) |
 | 通讯 | 微信 (WeChat), 钉钉 (DingTalk) |
+| 办公软件 | WPS Office |
 | 网络工具 | DigiLink（梯子） |
 | 视频播放 | VLC, MPV, FFmpeg |
 | 编译器 | GCC 13, G++ 13, Clang 18 |
@@ -472,9 +483,9 @@ uname -r
 
 ---
 
-## 20. Snap 完全移除与桌面修复
+## 21. Snap 完全移除与桌面修复
 
-### 20.1 系统调研
+### 21.1 系统调研
 
 本机系统概况：
 - **OS**: Ubuntu 24.04.4 LTS (Noble)
@@ -495,7 +506,7 @@ uname -r
 
 **关键发现**：之前安装过 firefox snap，但已被移除（`snap changes` 确认）。当前无任何 snap 应用连接这些运行时，共占用约 150MB+ 空间但完全闲置。
 
-### 20.2 卸载所有 snap 包
+### 21.2 卸载所有 snap 包
 
 ```bash
 # 按依赖顺序逐个卸载（gtk-common-themes 依赖 bare）
@@ -507,7 +518,7 @@ sudo snap remove --purge core24
 sudo snap remove --purge snapd
 ```
 
-### 20.3 移除 snapd deb 包
+### 21.3 移除 snapd deb 包
 
 ```bash
 # 停止 snapd 相关服务
@@ -520,7 +531,7 @@ sudo apt remove --purge snapd -y
 
 移除过程中连带卸载了 `ubuntu-server-minimal` 元包。
 
-### 20.4 问题：分辨率回退到 640x480
+### 21.4 问题：分辨率回退到 640x480
 
 移除 snapd 后重新登录，桌面分辨率从 1920x1080 回退到 **640x480**。
 
@@ -531,7 +542,7 @@ sudo apt remove --purge snapd -y
 4. LXQt 显示器配置 (`~/.config/lxqt/lxqt-config-monitor.conf`) 原本就是空的，没有保存过分辨率设置
 5. X11 回退到安全默认分辨率 640x480
 
-### 20.5 修复：创建登录自动设置分辨率
+### 21.5 修复：创建登录自动设置分辨率
 
 **临时恢复**（立即生效）：
 ```bash
@@ -552,7 +563,7 @@ NoDisplay=true
 EOF
 ```
 
-### 20.6 清理残留
+### 21.6 清理残留
 
 ```bash
 # 清理不再需要的依赖
