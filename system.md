@@ -211,6 +211,17 @@ sudo apt install -y yt-dlp
 
 ## 11. 时间同步配置
 
+### 11.1 设置时区为北京时间
+```bash
+sudo timedatectl set-timezone Asia/Shanghai
+```
+
+### 11.2 启用 NTP 自动同步
+```bash
+sudo timedatectl set-ntp true
+```
+
+### 11.3 配置国内 NTP 服务器
 系统默认已启用 systemd-timesyncd，如需切换为国内 NTP 服务器：
 
 ```bash
@@ -220,6 +231,11 @@ NTP=ntp.aliyun.com ntp1.aliyun.com ntp.tencent.com time1.cloud.tencent.com
 FallbackNTP=time.asia.apple.com time.windows.com
 EOF
 sudo systemctl restart systemd-timesyncd
+```
+
+验证时间同步状态：
+```bash
+timedatectl status
 ```
 
 ---
@@ -344,4 +360,4 @@ rm -f /tmp/wechat.deb
 
 ---
 
-*文档生成时间：2026-05-23*
+*文档生成时间：2026-05-24*
