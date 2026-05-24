@@ -139,7 +139,16 @@ cp /usr/share/applications/wechat.desktop ~/.config/autostart/
 
 ---
 
-## 7. 安装梯子软件（DigiLink）
+## 7. 安装钉钉（DingTalk）
+
+```bash
+wget https://dtapp-pub.dingtalk.com/dingtalk-desktop/xc_dingtalk_update/linux_deb/Release/com.alibabainc.dingtalk_8.1.0.6021101_amd64.deb
+sudo dpkg -i com.alibabainc.dingtalk_8.1.0.6021101_amd64.deb
+```
+
+---
+
+## 8. 安装梯子软件（DigiLink）
 
 DigiLink 代理客户端，支持多种协议。
 
@@ -181,7 +190,7 @@ cp /usr/share/applications/digilink.desktop ~/.config/autostart/
 
 ---
 
-## 8. 卸载无用软件
+## 9. 卸载无用软件
 
 ### 6.1 卸载 Firefox
 ```bash
@@ -197,7 +206,7 @@ sudo apt autoremove -y libreoffice* --purge
 
 ---
 
-## 9. 修复显示分辨率
+## 10. 修复显示分辨率
 
 当前分辨率被限制为 640x480，修改为 1920x1080：
 ```bash
@@ -206,7 +215,7 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 10. OpenCode 权限配置
+## 11. OpenCode 权限配置
 
 参考官方文档：[https://opencode.ai/docs/permissions/](https://opencode.ai/docs/permissions/)
 
@@ -230,7 +239,7 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 11. 开发编译套件
+## 12. 开发编译套件
 
 ### 9.1 基础编译工具
 ```bash
@@ -261,7 +270,7 @@ sudo apt install -y libssl-dev libffi-dev zlib1g-dev libbz2-dev \
 
 ---
 
-## 12. 视频解码器安装
+## 13. 视频解码器安装
 
 ### 10.1 核心解码库
 ```bash
@@ -278,7 +287,7 @@ sudo apt install -y yt-dlp
 
 ---
 
-## 13. 时间同步配置
+## 14. 时间同步配置
 
 ### 11.1 设置时区为北京时间
 ```bash
@@ -309,7 +318,7 @@ timedatectl status
 
 ---
 
-## 14. LVM 磁盘扩容
+## 15. LVM 磁盘扩容
 
 系统安装后，LVM 逻辑卷默认只使用了约一半磁盘空间。以下是将根分区扩展到使用全部可用空间的操作。
 
@@ -370,7 +379,7 @@ sudo df -h /
 
 ---
 
-## 15. sudo 免密码配置
+## 16. sudo 免密码配置
 
 ### 13.1 配置当前用户免密码 sudo
 
@@ -397,7 +406,7 @@ sudo -n whoami
 
 ---
 
-## 16. 系统清理
+## 17. 系统清理
 
 ### 14.1 清理 apt 缓存
 ```bash
@@ -413,7 +422,7 @@ rm -f /tmp/wechat.deb
 
 ---
 
-## 17. 定制内核编译（可选）
+## 18. 定制内核编译（可选）
 
 根据本机硬件专门编译内核，去掉不需要的驱动，系统更轻量、响应更快。
 
@@ -445,14 +454,14 @@ uname -r
 
 ---
 
-## 18. 已安装软件清单
+## 19. 已安装软件清单
 
 | 类别 | 软件 |
 |------|------|
 | 浏览器 | Google Chrome |
 | 输入法 | IBus + 智能拼音 |
 | 桌面环境 | Lubuntu Desktop (LXQt) |
-| 通讯 | 微信 (WeChat) |
+| 通讯 | 微信 (WeChat), 钉钉 (DingTalk) |
 | 网络工具 | DigiLink（梯子） |
 | 视频播放 | VLC, MPV, FFmpeg |
 | 编译器 | GCC 13, G++ 13, Clang 18 |
