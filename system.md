@@ -150,6 +150,8 @@ sudo dpkg -i com.alibabainc.dingtalk_8.1.0.6021101_amd64.deb
 
 ## 8. 安装 WPS Office
 
+官网地址：[https://linux.wps.cn/](https://linux.wps.cn/)
+
 ```bash
 wget "https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2023/25882/wps-office_12.1.2.25882.AK.preread.sw.Personal_662820_amd64.deb?t=1779620023&k=f021fec797320ef1da65dd6111cc421a" -O /tmp/wps-office.deb
 sudo dpkg -i /tmp/wps-office.deb
