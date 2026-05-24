@@ -472,4 +472,96 @@ uname -r
 
 ---
 
-*文档生成时间：2026-05-24*
+## 20. Snap 完全移除与桌面修复
+
+### 20.1 系统调研
+
+本机系统概况：
+- **OS**: Ubuntu 24.04.4 LTS (Noble)
+- **内核**: Linux 6.8.12-custom-20260523 (自定义编译)
+- **桌面**: LXQt 1.4.0 (Lubuntu 24.04.10)
+- **显示**: X11
+- **硬件**: Intel Core i5-2400 / 12GB DDR3 / 115GB 根分区
+
+当时已安装的 snap 包：
+| 包名 | 类型 | 状态 |
+|------|------|------|
+| bare | 基础包 | 无应用使用 |
+| core24 | Ubuntu 24.04 运行时 | 无应用使用 |
+| gnome-46-2404 | GNOME 运行时 | 无应用使用 |
+| gtk-common-themes | GTK 主题 | 无应用使用 |
+| mesa-2404 | Mesa 图形驱动 | 无应用使用 |
+| snapd | snap 守护进程 | 系统核心 |
+
+**关键发现**：之前安装过 firefox snap，但已被移除（`snap changes` 确认）。当前无任何 snap 应用连接这些运行时，共占用约 150MB+ 空间但完全闲置。
+
+### 20.2 卸载所有 snap 包
+
+```bash
+# 按依赖顺序逐个卸载（gtk-common-themes 依赖 bare）
+sudo snap remove --purge gtk-common-themes
+sudo snap remove --purge gnome-46-2404
+sudo snap remove --purge mesa-2404
+sudo snap remove --purge bare
+sudo snap remove --purge core24
+sudo snap remove --purge snapd
+```
+
+### 20.3 移除 snapd deb 包
+
+```bash
+# 停止 snapd 相关服务
+sudo systemctl stop snapd.socket snapd.service snapd.seeded.service snapd.apparmor.service
+sudo systemctl disable snapd.socket snapd.service snapd.seeded.service snapd.apparmor.service
+
+# 通过 apt 移除
+sudo apt remove --purge snapd -y
+```
+
+移除过程中连带卸载了 `ubuntu-server-minimal` 元包。
+
+### 20.4 问题：分辨率回退到 640x480
+
+移除 snapd 后重新登录，桌面分辨率从 1920x1080 回退到 **640x480**。
+
+**根因分析**：
+1. `snapd` 被 `ubuntu-server-minimal` 依赖，移除 snapd 连带移除了该元包
+2. `ubuntu-server-minimal` 依赖 `ubuntu-drivers-common`（显卡驱动管理工具）
+3. 移除后触发了显示配置的重新初始化
+4. LXQt 显示器配置 (`~/.config/lxqt/lxqt-config-monitor.conf`) 原本就是空的，没有保存过分辨率设置
+5. X11 回退到安全默认分辨率 640x480
+
+### 20.5 修复：创建登录自动设置分辨率
+
+**临时恢复**（立即生效）：
+```bash
+xrandr --output HDMI-1 --mode 1920x1080
+```
+
+**永久修复**（登录自动设置）：
+```bash
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/screen-resolution.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Set Screen Resolution
+Exec=xrandr --output HDMI-1 --mode 1920x1080
+Hidden=false
+X-LXQt-Need-Tray=false
+NoDisplay=true
+EOF
+```
+
+### 20.6 清理残留
+
+```bash
+# 清理不再需要的依赖
+sudo apt autoremove -y
+
+# 清理 apt 缓存
+sudo apt-get clean
+```
+
+---
+
+*文档更新：2026-05-24*
