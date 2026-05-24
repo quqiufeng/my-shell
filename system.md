@@ -204,6 +204,8 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ## 10. OpenCode 权限配置
 
+参考官方文档：[https://opencode.ai/docs/permissions/](https://opencode.ai/docs/permissions/)
+
 修改 `~/.config/opencode/opencode.jsonc`，放开所有权限（无需二次确认）：
 
 ```json
@@ -215,6 +217,10 @@ xrandr --output HDMI-1 --mode 1920x1080
   }
 }
 ```
+
+配置说明：
+- `"*": "allow"` — 所有工具（read/edit/bash/grep/webfetch 等）自动执行，无需确认
+- `"external_directory": "allow"` — 允许访问工作目录外的所有文件和文件夹，无需确认
 
 **注意**：修改后需重启 opencode 生效。
 
