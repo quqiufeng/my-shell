@@ -409,7 +409,39 @@ rm -f /tmp/wechat.deb
 
 ---
 
-## 17. 已安装软件清单
+## 17. 定制内核编译（可选）
+
+根据本机硬件专门编译内核，去掉不需要的驱动，系统更轻量、响应更快。
+
+### 17.1 本机硬件
+
+- CPU: Intel Core i5-2400 (Sandy Bridge)
+- 显卡: Intel HD Graphics 2000（集成显卡）
+- 存储: Samsung 128GB NVMe SSD
+- 内存: 12GB DDR3
+- 网络: Realtek RTL8111/8168 PCI-E 千兆网卡（有线）
+
+### 17.2 精简内容
+
+- 移除所有无线驱动（Wi-Fi、蓝牙、NFC）
+- 移除不需要的总线驱动（Infiniband、FireWire、Thunderbolt、PCMCIA）
+- 移除嵌入式 SoC 驱动
+- 开启 `PREEMPT_DYNAMIC` 动态抢占，提升桌面响应
+- 使用 zstd 压缩内核
+
+### 17.3 编译脚本
+
+完整编译记录和脚本：`~/my-shell/build_kernel.sh`
+
+```bash
+# 查看当前内核版本
+uname -r
+# 输出: 6.8.12-custom-20260523
+```
+
+---
+
+## 18. 已安装软件清单
 
 | 类别 | 软件 |
 |------|------|
