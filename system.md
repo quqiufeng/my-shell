@@ -227,7 +227,21 @@ xrandr --output HDMI-1 --mode 1920x1080
 
 ---
 
-## 12. OpenCode 权限配置
+## 12. OpenCode 配置
+
+官网：[https://opencode.ai/](https://opencode.ai/)
+
+### 12.1 安装
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+### 12.2 主题切换
+
+运行 `/themes` 命令选择喜欢的主题。
+
+### 12.3 权限配置
 
 参考官方文档：[https://opencode.ai/docs/permissions/](https://opencode.ai/docs/permissions/)
 
