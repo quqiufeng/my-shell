@@ -369,7 +369,90 @@ cargo install cargo-nextest
 
 ---
 
-## 15. 视频解码器安装
+## 15. OCaml 开发环境
+
+### 15.1 安装 OCaml 和 opam
+
+```bash
+sudo apt install -y ocaml opam
+```
+
+### 15.2 初始化 opam
+
+```bash
+opam init --disable-sandboxing --yes
+```
+
+初始化后会创建默认 switch（OCaml 4.14.1），并更新 `~/.profile` 环境变量。
+
+加载环境变量：
+```bash
+eval $(opam env --switch=default)
+```
+
+### 15.3 安装核心开发工具
+
+```bash
+opam install -y dune ocaml-lsp-server odoc merlin utop
+```
+
+工具说明：
+| 工具 | 用途 |
+|------|------|
+| `dune` | 官方构建系统 |
+| `ocaml-lsp-server` | LSP 语言服务器（IDE 支持）|
+| `merlin` | 代码补全、类型推断 |
+| `utop` | 增强版交互式 REPL |
+| `odoc` | 文档生成器 |
+
+### 15.4 验证安装
+
+```bash
+ocaml --version    # The OCaml toplevel, version 4.14.1
+dune --version     # 3.23.1
+opam --version     # 2.1.5
+```
+
+### 15.5 量化交易常用库
+
+```bash
+# 数学/统计
+opam install -y owl
+
+# JSON 处理
+opam install -y yojson
+
+# HTTP 客户端
+opam install -y cohttp-lwt-unix
+
+# 异步编程（Jane Street 风格）
+opam install -y core async
+```
+
+### 15.6 创建第一个项目
+
+```bash
+# 创建项目
+dune init project my_quant
+
+# 编译
+cd my_quant
+dune build
+
+# 运行
+dune exec my_quant
+```
+
+### 15.7 本机配置建议
+
+- **OCaml 4.14.1**：Ubuntu 24.04 自带版本，稳定可靠
+- **内存占用**：编译大型项目时 OCaml 比 Rust 更省内存，12GB 足够
+- **编译速度**：比 Rust 快很多，适合本机配置
+- **推荐编辑器**：VS Code + OCaml Platform 插件，或 Vim + Merlin
+
+---
+
+## 16. 视频解码器安装
 
 ### 14.1 核心解码库
 ```bash
@@ -569,6 +652,7 @@ uname -r
 | 调试器 | GDB 15.1, LLDB |
 | 开发库 | Boost, OpenCV, Eigen3, HDF5, NetCDF, Protobuf, gRPC, ZeroMQ |
 | **Rust 工具链** | **rustc 1.95.0, cargo 1.95.0, rustup 1.29.0** |
+| **OCaml 工具链** | **OCaml 4.14.1, opam 2.1.5, dune 3.23.1** |
 | 字体 | **更纱黑体 SC** (Sarasa Gothic), **霞鹜文楷** (LXGW WenKai), Noto CJK, 文泉驿, AR PL |
 
 ---
