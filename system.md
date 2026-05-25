@@ -300,7 +300,76 @@ sudo apt install -y libssl-dev libffi-dev zlib1g-dev libbz2-dev \
 
 ---
 
-## 14. 视频解码器安装
+## 14. Rust 开发环境
+
+### 14.1 安装 Rust
+
+使用官方 rustup 安装脚本：
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+```
+
+安装完成后，加载环境变量（或重新登录）：
+```bash
+source "$HOME/.cargo/env"
+```
+
+验证安装：
+```bash
+rustc --version   # rustc 1.95.0 (59807616e 2026-04-14)
+cargo --version   # cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustup --version  # rustup 1.29.0 (28d1352db 2026-03-21)
+```
+
+### 14.2 安装 GUI 开发依赖
+
+Rust GUI 框架（如 egui、iced、slint）通常需要以下系统库：
+
+```bash
+sudo apt install -y libfontconfig1-dev libfreetype6-dev libxcb1-dev \
+  libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libwayland-egl1 \
+  libegl1-mesa-dev libvulkan-dev libasound2-dev pkg-config cmake
+```
+
+### 14.3 常用 Cargo 工具
+
+```bash
+# 代码格式化
+cargo install rustfmt
+
+# 静态分析
+cargo install clippy
+
+# 交互式测试运行器
+cargo install cargo-watch
+
+# 更快编译（替代 cargo build）
+cargo install cargo-nextest
+```
+
+### 14.4 本机配置建议
+
+由于本机为 **i5-2400（4核4线程）+ 12GB DDR3**，建议：
+
+- **选择轻量级框架**：推荐 `egui` 或 `iced`，避免 `Tauri`（编译 Chromium 极慢）
+- **使用 release 编译时耐心等待**：首次编译可能需要 5-15 分钟
+- **限制并行编译任务**：可在 `~/.cargo/config.toml` 中设置：
+  ```toml
+  [build]
+  jobs = 2  # 限制为 2 个并行任务，避免内存不足
+  ```
+- **可选：安装 mold 链接器加速编译**：
+  ```bash
+  sudo apt install -y mold
+  echo '[target.x86_64-unknown-linux-gnu]
+  linker = "clang"
+  rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold"]' >> ~/.cargo/config.toml
+  ```
+
+---
+
+## 15. 视频解码器安装
 
 ### 14.1 核心解码库
 ```bash
@@ -499,6 +568,7 @@ uname -r
 | 构建工具 | CMake 3.28, Make, Autotools |
 | 调试器 | GDB 15.1, LLDB |
 | 开发库 | Boost, OpenCV, Eigen3, HDF5, NetCDF, Protobuf, gRPC, ZeroMQ |
+| **Rust 工具链** | **rustc 1.95.0, cargo 1.95.0, rustup 1.29.0** |
 | 字体 | **更纱黑体 SC** (Sarasa Gothic), **霞鹜文楷** (LXGW WenKai), Noto CJK, 文泉驿, AR PL |
 
 ---
@@ -595,4 +665,4 @@ sudo apt-get clean
 
 ---
 
-*文档更新：2026-05-24*
+*文档更新：2026-05-25*
