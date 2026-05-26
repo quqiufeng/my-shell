@@ -14,10 +14,50 @@
 #   - 内核: 6.6.114.1-microsoft-standard-WSL2
 #
 # 【编译目标】
-#   - 源码: linux-6.6.x.tar.xz (推荐与当前 WSL2 内核版本接近)
-#   - 版本: 6.6.x-3080-$(date +%Y%m%d)
-#   - 位置: /opt/linux/src/linux-6.6.x/
+#   - 源码: Microsoft WSL2-Linux-Kernel (git clone)  【必须使用 WSL2 专用源码】
+#   - 版本: 6.6.123.2-3080-$(date +%Y%m%d)
+#   - 位置: /opt/linux/src/linux-6.6.141/
 #   - 输出: arch/x86/boot/bzImage
+#
+# 【WSL2 专用源码说明 - 重要】
+#
+# 必须使用微软官方 WSL2 内核源码，不能直接用 kernel.org 的标准源码：
+#
+# 1. 为什么必须用微软源码：
+#    - 标准 kernel.org 源码缺少 WSL2 专用补丁
+#    - 缺少 dxgkrnl（GPU 直通驱动）
+#    - 缺少 WSLg GUI 支持所需的特定补丁
+#    - 9P 文件系统、Hyper-V 集成在微软源码中有针对 WSL2 的优化
+#    - 标准源码编译的 bzImage 在 WSL2 中启动会直接失败（无错误提示，WSL2 无法启动）
+#
+# 2. 如何获取微软源码：
+#    git clone --depth 1 --branch linux-msft-wsl-6.6.y \
+#      https://github.com/microsoft/WSL2-Linux-Kernel.git \
+#      /opt/linux/src/linux-6.6.141
+#
+# 3. 与标准源码的区别：
+#    - 微软源码基于 kernel.org 6.6.x，但包含额外补丁
+#    - 版本号格式: 6.6.123.2 (kernel + Microsoft patch level)
+#    - 源码目录里有 Microsoft/、MSFT-Merge/ 等微软专用目录
+#
+# 4. 实测教训：
+#    - 使用 linux-6.6.141.tar.xz（标准源码）编译 -> WSL2 无法启动
+#    - 使用 WSL2-Linux-Kernel（微软源码）编译 -> 正常启动
+#
+# 【精简驱动注意事项】
+#
+# WSL2 是虚拟机，看不到物理硬件：
+# - 不需要物理网卡驱动（e1000e/r8169/igb 等）
+# - 不需要 SATA/NVMe 驱动（磁盘由 VirtIO 提供）
+# - 不需要 USB/声卡/蓝牙/WiFi（WSL2 默认不支持）
+# - 不需要硬件监控/看门狗/RTC（虚拟化环境）
+#
+# 但以下必须保留（WSL2 生存必需）：
+# - VirtIO（blk, net, pci, console, scsi）
+# - Hyper-V（net, storage, utils, balloon, vsockets）
+# - 9P 文件系统（Windows 目录挂载）
+# - ext4 + tmpfs/proc/sysfs/devtmpfs（基本文件系统）
+# - TTY/PTY（终端必需）
 #
 # 【WSL2 使用方式】
 #   1. 编译完成后复制 bzImage 到 Windows 目录
