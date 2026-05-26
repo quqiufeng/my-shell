@@ -108,6 +108,22 @@ for vendor in 3COM ADAPTEC ALTEON AMD AQUANTIA ATHEROS BROADCOM CADENCE CAVIUM C
     scripts/config --set-val CONFIG_NET_VENDOR_${vendor} n 2>/dev/null || true
 done
 
+# ===== 物理 GPU 驱动（WSL2 通过 dxgkrnl 使用宿主机 GPU，不需要这些）=====
+echo "  - 关闭物理 GPU 驱动 (amdgpu/nouveau/radeon/i915)"
+# 关闭所有物理 GPU DRM 驱动
+scripts/config --set-val CONFIG_DRM_AMDGPU n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_AMDGPU_CIK n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_AMDGPU_SI n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_AMDGPU_USERPTR n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_RADEON n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_NOUVEAU n 2>/dev/null || true
+scripts/config --set-val CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_I915 n 2>/dev/null || true
+scripts/config --set-val CONFIG_DRM_VIRTIO_GPU n 2>/dev/null || true
+# 保留 CONFIG_DRM（dxgkrnl 依赖的基础 DRM 子系统）
+# 保留 CONFIG_DRM_KMS_HELPER
+# 保留 CONFIG_DRM_SIMPLEDRM（WSL2 虚拟显卡需要）
+
 # ===== Wi-Fi / 蓝牙（WSL2 网络不走这些）=====
 echo "  - 关闭 Wi-Fi / 蓝牙芯片驱动"
 scripts/config --set-val CONFIG_IWLWIFI n 2>/dev/null || true
