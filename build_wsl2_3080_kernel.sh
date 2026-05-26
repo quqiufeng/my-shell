@@ -83,41 +83,27 @@
 #   #   https://github.com/microsoft/WSL2-Linux-Kernel.git \
 #   #   /opt/linux/src/linux-6.6.141
 #
-# 步骤2: 安装编译依赖
-#   sudo apt install -y build-essential libncurses-dev bison flex \
-#       libssl-dev libelf-dev bc dwarves
+# 步骤2: 安装编译依赖（微软推荐）
+#   sudo apt install -y build-essential flex bison dwarves libssl-dev libelf-dev cpio qemu-utils
 #
-# 步骤3: 修复内核签名证书缺失问题
+# 步骤3: 运行编译脚本（使用微软官方配置）
 #   cd /opt/linux/src/linux-6.6.141
-#   scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
-#   scripts/config --set-str CONFIG_SYSTEM_REVOCATION_KEYS ""
-#   scripts/config --set-val CONFIG_MODULE_SIG_KEY ""
-#   make olddefconfig
+#   bash ~/my-shell/build_wsl2_3080_kernel.sh
 #
-# 步骤4: 运行编译脚本（后台模式）
-#   cd /opt/linux/src/linux-6.6.141
-#   setsid bash ~/my-shell/build_3080_kernel.sh > /tmp/build_kernel_nohup.log 2>&1 < /dev/null &
-#   echo $! > /tmp/build_kernel.pid
+# 步骤4: 监控编译进度
+#   tail -f /tmp/build_3080_kernel_*.log
 #
-# 步骤5: 监控编译进度
-#   tail -f /tmp/build_kernel_nohup.log
-#
-# 步骤6: 编译完成后
+# 步骤5: 编译完成后
 #   ls -lh arch/x86/boot/bzImage
 #   cp arch/x86/boot/bzImage /mnt/c/Users/Administrator/wsl2-kernel
 #
 # 【关键问题与解决方案】
 #
 # 问题1: 缺少编译依赖
-#   解决: 预先运行 sudo apt install -y build-essential libncurses-dev bison flex \
-#         libssl-dev libelf-dev bc dwarves
+#   解决: 预先运行 sudo apt install -y build-essential flex bison dwarves \
+#         libssl-dev libelf-dev cpio lz4 qemu-utils
 #
-# 问题2: 内核签名证书缺失
-#   解决: scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
-#         scripts/config --set-str CONFIG_SYSTEM_REVOCATION_KEYS ""
-#         make olddefconfig
-#
-# 问题3: 编译中断
+# 问题2: 编译中断
 #   解决: 使用 setsid 启动独立会话
 #
 # 【编译优化项】
@@ -203,7 +189,7 @@ echo "========================================" | tee -a "$LOG_FILE"
 # 1. 检查编译依赖
 echo "[1/7] 检查编译依赖..." | tee -a "$LOG_FILE"
 MISSING_DEPS=""
-for pkg in build-essential libncurses-dev bison flex libssl-dev libelf-dev bc dwarves cpio lz4; do
+for pkg in build-essential flex bison dwarves libssl-dev libelf-dev cpio lz4 qemu-utils; do
     if ! dpkg -l | awk '{print $2}' | grep -qE "^${pkg}(:amd64|:all)?$"; then
         MISSING_DEPS="$MISSING_DEPS $pkg"
     fi
@@ -241,16 +227,18 @@ if [ "$INCREMENTAL" = true ] && [ "$FORCE_RECONFIGURE" = false ]; then
     cp .config "$CURRENT_CONFIG"
     echo "  备份完成" | tee -a "$LOG_FILE"
 else
-    echo "  从当前运行内核复制标准配置..." | tee -a "$LOG_FILE"
-    if [ -f /proc/config.gz ]; then
+    echo "  使用微软 WSL2 官方配置 (Microsoft/config-wsl)..." | tee -a "$LOG_FILE"
+    if [ -f Microsoft/config-wsl ]; then
+        cp Microsoft/config-wsl .config
+        echo "  已复制 Microsoft/config-wsl" | tee -a "$LOG_FILE"
+    elif [ -f /proc/config.gz ]; then
+        # 降级方案：如果没有微软官方配置，才用 /proc/config.gz
         zcat /proc/config.gz > .config
-        echo "  已从 /proc/config.gz 提取配置" | tee -a "$LOG_FILE"
-    elif [ -f /boot/config-$(uname -r) ]; then
-        cp /boot/config-$(uname -r) .config
-        echo "  已复制 /boot/config-$(uname -r)" | tee -a "$LOG_FILE"
+        echo "  警告: 未找到 Microsoft/config-wsl，已从 /proc/config.gz 提取配置" | tee -a "$LOG_FILE"
+        echo "  强烈建议使用 git clone 的微软 WSL2 内核源码" | tee -a "$LOG_FILE"
     else
-        echo "  错误: 找不到当前内核配置文件" | tee -a "$LOG_FILE"
-        echo "  请确保 /proc/config.gz 或 /boot/config-* 存在" | tee -a "$LOG_FILE"
+        echo "  错误: 找不到内核配置文件" | tee -a "$LOG_FILE"
+        echo "  请确保源码目录中有 Microsoft/config-wsl" | tee -a "$LOG_FILE"
         exit 1
     fi
     
@@ -1326,11 +1314,19 @@ else
     echo "    完整编译，预计 15-30 分钟 (6核 Ryzen)..." | tee -a "$LOG_FILE"
 fi
 
-make -j$JOBS 2>&1 | tee -a "$LOG_FILE"
+make KCONFIG_CONFIG=Microsoft/config-wsl -j$JOBS 2>&1 | tee -a "$LOG_FILE"
 
-# 6. 安装模块 (可选，WSL2 内有用)
+# 6. 安装模块
+# 微软推荐方式：安装到本地 modules 目录，然后可选生成 VHDX
 echo "[7/7] 安装内核模块..." | tee -a "$LOG_FILE"
-sudo make modules_install >> "$LOG_FILE" 2>&1 || true
+make INSTALL_MOD_PATH="$PWD/modules" modules_install >> "$LOG_FILE" 2>&1 || true
+echo "  模块已安装到: $PWD/modules/" | tee -a "$LOG_FILE"
+
+# 可选：生成 VHDX 模块文件（如需使用 kernelModules 配置）
+# if [ -f Microsoft/scripts/gen_modules_vhdx.sh ]; then
+#     sudo ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
+#     echo "  VHDX 模块文件: $PWD/modules.vhdx" | tee -a "$LOG_FILE"
+# fi
 
 # 获取内核版本
 KERNEL_RELEASE=$(make kernelrelease 2>/dev/null || echo "")
