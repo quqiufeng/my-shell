@@ -72,11 +72,16 @@
 #
 # 【完整编译流程】
 #
-# 步骤1: 下载并解压内核源码
-#   wget -c https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.141.tar.xz
-#   sudo mkdir -p /opt/linux/src
-#   sudo tar -xf linux-6.6.141.tar.xz -C /opt/linux/src/
-#   sudo chown -R $(id -un):$(id -gn) /opt/linux/src/linux-6.6.141
+# 步骤1: 获取 WSL2 专用内核源码（不要用 kernel.org 的标准源码！）
+#   git clone --depth 1 --branch linux-msft-wsl-6.6.y \
+#     https://github.com/microsoft/WSL2-Linux-Kernel.git \
+#     /opt/linux/src/linux-6.6.141
+#   
+#   # 或者如果之前下载了标准源码，替换为微软源码：
+#   # rm -rf /opt/linux/src/linux-6.6.141
+#   # git clone --depth 1 --branch linux-msft-wsl-6.6.y \
+#   #   https://github.com/microsoft/WSL2-Linux-Kernel.git \
+#   #   /opt/linux/src/linux-6.6.141
 #
 # 步骤2: 安装编译依赖
 #   sudo apt install -y build-essential libncurses-dev bison flex \
