@@ -158,7 +158,7 @@ echo "========================================" | tee -a "$LOG_FILE"
 # 1. 检查编译依赖
 echo "[1/7] 检查编译依赖..." | tee -a "$LOG_FILE"
 MISSING_DEPS=""
-for pkg in build-essential libncurses-dev bison flex libssl-dev libelf-dev bc dwarves; do
+for pkg in build-essential libncurses-dev bison flex libssl-dev libelf-dev bc dwarves cpio lz4; do
     if ! dpkg -l | awk '{print $2}' | grep -qE "^${pkg}(:amd64|:all)?$"; then
         MISSING_DEPS="$MISSING_DEPS $pkg"
     fi
