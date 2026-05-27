@@ -18,6 +18,14 @@
 #   - 版本: 6.8.12-rtx3080-$(date +%Y%m%d)
 #   - 位置: /opt/linux/src/linux-6.8.12/
 #
+# 【配置文件】
+#   - 编译配置: /home/quqiufeng/my-shell/config-6.8.12-rtx3080-current
+#   - 说明: 此文件为当前实际编译用的 .config 备份，包含所有针对本机的优化选项
+#   - 使用方法:
+#       cp ~/my-shell/config-6.8.12-rtx3080-current /opt/linux/src/linux-6.8.12/.config
+#       cd /opt/linux/src/linux-6.8.12 && make olddefconfig
+#   - 每次编译后脚本会自动更新此备份文件
+#
 # 【NVIDIA 驱动注意事项】
 #   - 本脚本关闭 nouveau，使用 NVIDIA 官方专有驱动
 #   - 编译前请确保已安装 nvidia-driver-xxx 并重启验证可正常工作
@@ -635,6 +643,11 @@ if [ -n "$KERNEL_RELEASE" ]; then
     USER_CONFIG="$CONFIG_BACKUP_DIR/config-$KERNEL_RELEASE"
     cp .config "$USER_CONFIG"
     echo "  配置已备份到: $USER_CONFIG" | tee -a "$LOG_FILE"
+    
+    # 复制到 my-shell 目录作为当前编译配置
+    MY_SHELL_CONFIG="$HOME/my-shell/config-6.8.12-rtx3080-current"
+    cp .config "$MY_SHELL_CONFIG"
+    echo "  配置已同步到: $MY_SHELL_CONFIG" | tee -a "$LOG_FILE"
 fi
 
 # 更新 GRUB
