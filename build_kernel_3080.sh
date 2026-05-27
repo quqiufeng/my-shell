@@ -21,8 +21,17 @@
 # 【NVIDIA 驱动注意事项】
 #   - 本脚本关闭 nouveau，使用 NVIDIA 官方专有驱动
 #   - 编译前请确保已安装 nvidia-driver-xxx 并重启验证可正常工作
-#   - NVIDIA 驱动通过 DKMS 自动编译内核模块，无需内核源码中包含 NVIDIA 驱动
+#   - NVIDIA 驱动通过 DKMS 自动编译内核模块
+#   - 注意：如果 make install 时 DKMS 自动构建失败，需要手动运行：
+#       sudo dkms build nvidia/$(nvidia-smi | grep "Driver Version" | awk '{print $3}') -k $(make kernelrelease)
+#       sudo dkms install nvidia/$(nvidia-smi | grep "Driver Version" | awk '{print $3}') -k $(make kernelrelease)
+#       sudo update-initramfs -u -k $(make kernelrelease)
 #   - 但需保留 CONFIG_MODULES, CONFIG_PCI, CONFIG_ACPI 等基础支持
+#
+# 【6.8.12 内核特殊说明】
+#   - CONFIG_DM_LINEAR 在 6.8.x 中已不存在，功能内置在 dm-mod 中
+#   - 只需确保 CONFIG_BLK_DEV_DM=y 即可支持 LVM
+#   - 之前误以为缺少 dm-linear 导致启动失败，实际是 NVIDIA DKMS 未编译成功
 #
 # 【使用方式】
 #   cd /opt/linux/src/linux-6.8.12
@@ -260,6 +269,12 @@ else
     scripts/config --set-val CONFIG_SATA_MOBILE_LPM_POLICY 0
     scripts/config --set-val CONFIG_ATA_ACPI y
     scripts/config --set-val CONFIG_SATA_PMP y
+    
+    # LVM 根分区需要 device-mapper
+    # 注意：6.8.x 内核中 CONFIG_DM_LINEAR 已不存在，功能内置在 dm-mod 中
+    # 只需确保 CONFIG_BLK_DEV_DM=y 即可支持 LVM 根分区
+    scripts/config --set-val CONFIG_BLK_DEV_DM y
+    scripts/config --set-val CONFIG_BLK_DEV_DM_BUILTIN y
     
     # 禁用老旧 PATA/IDE
     scripts/config --set-val CONFIG_ATA_SFF n
@@ -584,6 +599,29 @@ if [ -n "$KERNEL_RELEASE" ]; then
     else
         echo "  initramfs 已存在: $INITRAMFS" | tee -a "$LOG_FILE"
     fi
+fi
+
+# 手动编译 NVIDIA DKMS 模块（解决 make install 时 DKMS 自动构建失败问题）
+# 经验：台式机无显示输出的真正原因是 NVIDIA 模块未编译，而非 LVM/dm-linear
+if [ -n "$KERNEL_RELEASE" ]; then
+    echo "编译 NVIDIA DKMS 模块..." | tee -a "$LOG_FILE"
+    NVIDIA_VER=$(dpkg -l | grep "nvidia-driver-" | grep -v "nvidia-driver-\(open\|server" | awk '{print $3}' | head -1)
+    if [ -n "$NVIDIA_VER" ]; then
+        echo "  检测到 NVIDIA 驱动版本: $NVIDIA_VER" | tee -a "$LOG_FILE"
+        # 清理之前失败的构建缓存
+        sudo rm -rf "/var/lib/dkms/nvidia/$NVIDIA_VER/$KERNEL_RELEASE" 2>/dev/null || true
+        sudo dkms build "nvidia/$NVIDIA_VER" -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
+        sudo dkms install "nvidia/$NVIDIA_VER" -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
+        echo "  NVIDIA 模块编译完成" | tee -a "$LOG_FILE"
+    else
+        echo "  未检测到 NVIDIA 驱动，跳过 DKMS 编译" | tee -a "$LOG_FILE"
+    fi
+fi
+
+# 重新生成 initramfs（包含刚编译的 NVIDIA 模块）
+if [ -n "$KERNEL_RELEASE" ]; then
+    echo "更新 initramfs（包含 NVIDIA 模块）..." | tee -a "$LOG_FILE"
+    sudo update-initramfs -u -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
 fi
 
 # 保存最终配置
