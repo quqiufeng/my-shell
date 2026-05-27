@@ -653,6 +653,7 @@ uname -r
 | 开发库 | Boost, OpenCV, Eigen3, HDF5, NetCDF, Protobuf, gRPC, ZeroMQ |
 | **Rust 工具链** | **rustc 1.95.0, cargo 1.95.0, rustup 1.29.0** |
 | **OCaml 工具链** | **OCaml 4.14.1, opam 2.1.5, dune 3.23.1** |
+| **CUDA 环境** | **CUDA 12.6.3, PyTorch 2.12.0+cu126, Transformers 5.9.0** |
 | 字体 | **更纱黑体 SC** (Sarasa Gothic), **霞鹜文楷** (LXGW WenKai), Noto CJK, 文泉驿, AR PL |
 
 ---
@@ -749,7 +750,136 @@ sudo apt-get clean
 
 ---
 
-## 22. 远程桌面连接（xrdp）
+## 22. CUDA 大模型开发环境配置
+
+本章节记录 RTX 3080 显卡 + CUDA 12.6 + PyTorch 2.12 大模型开发环境的搭建过程。
+
+### 22.1 硬件环境
+
+- **GPU**: NVIDIA GeForce RTX 3080 (20GB)
+- **驱动**: nvidia-driver-595 (595.71.05)
+- **CUDA**: 12.6.3
+- **cuDNN**: 9.x
+
+### 22.2 CUDA Toolkit 安装
+
+CUDA Toolkit 安装在 `/data/cuda` 目录（NVMe SSD 数据盘）。
+
+**添加 NVIDIA 软件源：**
+
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt update
+```
+
+**安装 CUDA Toolkit：**
+
+```bash
+sudo apt install -y cuda-toolkit-12-6
+```
+
+**移动到 /data 目录：**
+
+```bash
+sudo mv /usr/local/cuda-12.6 /data/cuda
+sudo ln -sf /data/cuda /usr/local/cuda-12.6
+sudo ln -sf /data/cuda /usr/local/cuda
+```
+
+**环境变量配置**（已写入 `~/.bashrc`）：
+
+```bash
+export PATH=/data/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/data/cuda/lib64:$LD_LIBRARY_PATH
+export CUDA_HOME=/data/cuda
+```
+
+**验证安装：**
+
+```bash
+nvcc --version
+# 输出: Cuda compilation tools, release 12.6, V12.6.85
+```
+
+### 22.3 Python 虚拟环境
+
+Ubuntu 24.04 限制系统 Python 的 pip 直接安装（PEP 668），使用虚拟环境是正确做法。
+
+**创建虚拟环境：**
+
+```bash
+python3 -m venv /data/venv
+source /data/venv/bin/activate
+pip install --upgrade pip
+```
+
+### 22.4 PyTorch + Transformers 安装
+
+```bash
+source /data/venv/bin/activate
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+```
+
+**安装大模型开发库：**
+
+```bash
+pip install transformers accelerate datasets peft bitsandbytes
+pip install sentencepiece protobuf safetensors scipy scikit-learn
+pip install pandas matplotlib jupyterlab
+```
+
+**验证 PyTorch CUDA 支持：**
+
+```bash
+python -c "
+import torch
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA: {torch.version.cuda}')
+print(f'GPU: {torch.cuda.get_device_name(0)}')
+print(f'CUDA Available: {torch.cuda.is_available()}')
+"
+```
+
+**预期输出：**
+```
+PyTorch: 2.12.0+cu126
+CUDA: 12.6
+GPU: NVIDIA GeForce RTX 3080
+CUDA Available: True
+```
+
+### 22.5 使用方式
+
+**激活环境：**
+
+```bash
+source /data/venv/bin/activate
+```
+
+**启动 JupyterLab：**
+
+```bash
+jupyter lab --ip=0.0.0.0 --port=8888 --no-browser
+```
+
+**运行大模型推理：**
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# 使用 RTX 3080 进行推理
+model = AutoModelForCausalLM.from_pretrained(
+    "your-model-name",
+    torch_dtype=torch.float16,
+    device_map="cuda"
+)
+```
+
+---
+
+## 23. 远程桌面连接（xrdp）
 
 安装 xrdp 以支持 Windows 远程桌面连接（RDP）。
 
@@ -799,4 +929,4 @@ ip addr show | grep "inet "
 
 ---
 
-*文档更新：2026-05-26*
+*文档更新：2026-05-27*
