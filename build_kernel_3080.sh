@@ -36,6 +36,13 @@
 #       sudo update-initramfs -u -k $(make kernelrelease)
 #   - 但需保留 CONFIG_MODULES, CONFIG_PCI, CONFIG_ACPI 等基础支持
 #
+# 【重要：CONFIG_PREEMPT 与 NVIDIA 兼容性】
+#   - 本脚本将 CONFIG_PREEMPT_VOLUNTARY 改为 CONFIG_PREEMPT（更低延迟）
+#   - 这会更改内核 ABI，导致之前编译的 NVIDIA 模块符号不匹配：
+#       nvidia: disagrees about version of symbol fd_install
+#   - 因此每次修改 PREEMPT 设置后，必须重新编译 NVIDIA DKMS 模块
+#   - 脚本已自动处理此问题，在 make install 后强制重新编译 NVIDIA
+#
 # 【6.8.12 内核特殊说明】
 #   - CONFIG_DM_LINEAR 在 6.8.x 中已不存在，功能内置在 dm-mod 中
 #   - 只需确保 CONFIG_BLK_DEV_DM=y 即可支持 LVM
@@ -217,6 +224,12 @@ else
     echo "  - 开启透明大页" | tee -a "$LOG_FILE"
     scripts/config --set-val CONFIG_TRANSPARENT_HUGEPAGE y
     scripts/config --set-val CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
+    
+    # 抢占模式: 设为 PREEMPT 获得更低延迟（注意：会更改内核 ABI，需重新编译 NVIDIA）
+    echo "  - 设置低延迟抢占模式 (PREEMPT)" | tee -a "$LOG_FILE"
+    scripts/config --set-val CONFIG_PREEMPT_NONE n
+    scripts/config --set-val CONFIG_PREEMPT_VOLUNTARY n
+    scripts/config --set-val CONFIG_PREEMPT y
     
     # ========== 显卡优化: NVIDIA RTX 3080 ==========
     echo "  - 配置 NVIDIA RTX 3080 (关闭 nouveau, 保留 DRM 基础框架)" | tee -a "$LOG_FILE"
@@ -535,6 +548,51 @@ else
     # 关闭 FireWire/Thunderbolt
     scripts/config --set-val CONFIG_FIREWIRE n
     scripts/config --set-val CONFIG_THUNDERBOLT n
+    
+    # ========== 精简无用模块（减少编译时间和 initramfs 大小）==========
+    echo "  - 精简无用模块..." | tee -a "$LOG_FILE"
+    
+    # 禁用非 Intel WiFi 芯片
+    for drv in RTLWIFI RT2X00 ATH10K ATH11K ATH9K BRCMFMAC B43 B43LEGACY MT76 MWLWIFI RSI_91X WL; do
+        scripts/config --set-val "CONFIG_${drv}" n 2>/dev/null || true
+    done
+    
+    # 禁用未用的声卡编解码器（保留 Realtek/Intel/HDMI）
+    for codec in ANALOG SIGMATEL VIA CIRRUS CONEXANT CA0110 CA0132 CMEDIA SI3054; do
+        scripts/config --set-val "CONFIG_SND_HDA_CODEC_${codec}" n 2>/dev/null || true
+    done
+    
+    # 禁用 TV/Radio/SDR（保留基础 V4L2 用于摄像头）
+    scripts/config --set-val CONFIG_MEDIA_ANALOG_TV_SUPPORT n
+    scripts/config --set-val CONFIG_MEDIA_DIGITAL_TV_SUPPORT n
+    scripts/config --set-val CONFIG_MEDIA_RADIO_SUPPORT n
+    scripts/config --set-val CONFIG_MEDIA_SDR_SUPPORT n
+    scripts/config --set-val CONFIG_DVB_CORE n
+    
+    # 禁用老旧网络协议
+    scripts/config --set-val CONFIG_IPX n
+    scripts/config --set-val CONFIG_ATALK n
+    scripts/config --set-val CONFIG_X25 n
+    scripts/config --set-val CONFIG_LAPB n
+    scripts/config --set-val CONFIG_PHONET n
+    scripts/config --set-val CONFIG_IEEE802154 n
+    scripts/config --set-val CONFIG_MAC802154 n
+    
+    # 禁用网络 QoS/分类（桌面不需要流量控制）
+    scripts/config --set-val CONFIG_NET_SCHED n
+    
+    # 禁用工业 I/O 和传感器（不是嵌入式/PLC 系统）
+    scripts/config --set-val CONFIG_IIO n
+    scripts/config --set-val CONFIG_HWMON n
+    
+    # 禁用 RAID（除非使用软 RAID）
+    scripts/config --set-val CONFIG_MD_RAID0 n
+    scripts/config --set-val CONFIG_MD_RAID1 n
+    scripts/config --set-val CONFIG_MD_RAID10 n
+    scripts/config --set-val CONFIG_MD_RAID456 n
+    scripts/config --set-val CONFIG_MD_MULTIPATH n
+    scripts/config --set-val CONFIG_MD_FAULTY n
+    scripts/config --set-val CONFIG_BLK_DEV_DM_RAID n
     
     # ========== 内核压缩与版本 ==========
     echo "  - 设置内核压缩为 zstd" | tee -a "$LOG_FILE"
