@@ -749,4 +749,54 @@ sudo apt-get clean
 
 ---
 
-*文档更新：2026-05-25*
+## 22. 远程桌面连接（xrdp）
+
+安装 xrdp 以支持 Windows 远程桌面连接（RDP）。
+
+### 22.1 安装 xrdp
+
+```bash
+sudo apt update
+sudo apt install -y xrdp
+```
+
+安装包说明：
+- `xrdp` — RDP 服务端
+- `xorgxrdp` — Xorg 后端驱动
+- `pipewire-module-xrdp` — 音频重定向支持
+
+### 22.2 启动并启用服务
+
+```bash
+sudo systemctl start xrdp
+sudo systemctl enable xrdp
+```
+
+验证服务状态：
+```bash
+systemctl status xrdp --no-pager
+ss -tlnp | grep 3389
+```
+
+**预期输出**：
+- 服务状态：`active (running)`
+- 监听端口：`*:3389`
+
+### 22.3 Windows 连接方式
+
+1. 按 `Win + R`，输入 `mstsc` 打开**远程桌面连接**
+2. 输入本机 **IP 地址**
+3. 使用系统登录账号（用户名/密码）连接
+
+查看本机 IP：
+```bash
+ip addr show | grep "inet "
+```
+
+### 22.4 桌面环境适配
+
+本机使用 **LXQt** 桌面环境（`$XDG_CURRENT_DESKTOP=LXQt`），xrdp 默认通过 `/etc/X11/Xsession` 启动当前桌面，无需额外配置。
+
+---
+
+*文档更新：2026-05-26*
