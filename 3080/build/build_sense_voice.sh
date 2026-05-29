@@ -15,8 +15,9 @@ set -e
 #       https://huggingface.co/lovemefan/sense-voice-gguf/resolve/main/sense-voice-small-q4_k.gguf
 #
 # 运行方式:
-#   ./bin/sense-voice-main -m /data/models/sense-voice-small-q4_k.gguf \
-#     -t 6 -p /path/to/audio.wav
+#   /opt/SenseVoice.cpp/bin/sense-voice-main \
+#     -m /data/models/sense-voice-small-q4_k.gguf \
+#     -t 6 -f /path/to/audio.wav
 # =============================================================================
 
 echo "=== 编译 SenseVoice.cpp (语音转文字) ==="

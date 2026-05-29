@@ -62,10 +62,12 @@ sudo DEBIAN_FRONTEND=noninteractive apt update && sudo DEBIAN_FRONTEND=nonintera
 echo "安装 Python 依赖..."
 $VENV_PIP install --upgrade pip
 
-# Matcha-TTS 依赖
-$VENV_PIP install -r third_party/Matcha-TTS/requirements.txt
+# Matcha-TTS 依赖 (piper_phonemize 的 Linux cp312 wheel 不在 PyPI 上)
+$VENV_PIP install piper_phonemize -f https://k2-fsa.github.io/icefall/piper_phonemize.html
+# 使用 --no-deps 避免 pip 依赖解析卡死及误升级 torch
+$VENV_PIP install --no-deps -r third_party/Matcha-TTS/requirements.txt
 
-# CosyVoice 核心依赖 (torchaudio 必须 pin 到 2.9.x 匹配 torch 2.9.0)
+# CosyVoice 核心依赖
 $VENV_PIP install \
   hyperpyyaml \
   onnxruntime \
@@ -74,11 +76,11 @@ $VENV_PIP install \
   x-transformers \
   pyarrow \
   pyworld \
-  torchcodec \
   pytorch-lightning \
   torchmetrics
 
-$VENV_PIP install torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu126
+# torch/torchvision/torchaudio 必须从 cu126 源安装, 匹配 flash-attn wheel (torch 2.9)
+$VENV_PIP install torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu126
 
 # 4. 下载模型到 /data/models (若已存在则跳过)
 echo "下载预训练模型到 /data/models..."
