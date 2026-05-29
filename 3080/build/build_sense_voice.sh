@@ -1,5 +1,23 @@
 #!/bin/bash
 set -e
+# =============================================================================
+# SenseVoice.cpp 编译脚本 (语音转文字 ASR)
+#
+# 本脚本只编译二进制, 模型需单独下载。
+#
+# 模型文件目录: /data/models/ (GGUF 格式)
+#   下载方式 (HuggingFace):
+#     git lfs clone https://huggingface.co/lovemefan/sense-voice-gguf
+#     mv sense-voice-gguf/*.gguf /data/models/
+#
+#   或使用较小的 SenseVoiceSmall 模型:
+#     wget -O /data/models/sense-voice-small-q4_k.gguf \
+#       https://huggingface.co/lovemefan/sense-voice-gguf/resolve/main/sense-voice-small-q4_k.gguf
+#
+# 运行方式:
+#   ./bin/sense-voice-main -m /data/models/sense-voice-small-q4_k.gguf \
+#     -t 6 -p /path/to/audio.wav
+# =============================================================================
 
 echo "=== 编译 SenseVoice.cpp (语音转文字) ==="
 echo "CUDA: /data/cuda | GPU: RTX 3080 (sm_86)"
@@ -17,6 +35,8 @@ if [ ! -d "$SENSE_DIR" ]; then
 fi
 
 cd "$SENSE_DIR"
+git pull
+git submodule update --init --recursive
 
 # 创建 build 目录
 echo "创建 build 目录..."
