@@ -49,21 +49,23 @@ $VENV_PIP install \
   pytorch-lightning \
   torchmetrics
 
-# 4. 下载模型到 /opt/image
-echo "下载预训练模型到 /opt/image..."
-mkdir -p /opt/image
+# 4. 下载模型到 /data/models
+echo "下载预训练模型到 /data/models..."
+# 模型文件目录
+mkdir -p /data/models
 $VENV_PIP install modelscope
 $VENV_PYTHON -c "
 from modelscope import snapshot_download
-snapshot_download('FunAudioLLM/Fun-CosyVoice3-0.5B-2512', local_dir='/opt/image/Fun-CosyVoice3-0.5B')
+snapshot_download('FunAudioLLM/Fun-CosyVoice3-0.5B-2512', local_dir='/data/models/Fun-CosyVoice3-0.5B')
 "
 $VENV_PYTHON -c "
 from modelscope import snapshot_download
-snapshot_download('FunAudioLLM/CosyVoice-300M-SFT', local_dir='/opt/image/CosyVoice-300M-SFT')
+snapshot_download('FunAudioLLM/CosyVoice-300M-SFT', local_dir='/data/models/CosyVoice-300M-SFT')
 "
 
 echo "=== CosyVoice 环境设置完成 ==="
 echo ""
 echo "运行 webui:"
 echo "  cd $COSY_DIR"
-echo "  $VENV_PYTHON webui.py --port 50000 --model_dir /opt/image/Fun-CosyVoice3-0.5B"
+# 模型文件目录
+echo "  $VENV_PYTHON webui.py --port 50000 --model_dir /data/models/Fun-CosyVoice3-0.5B"

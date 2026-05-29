@@ -29,7 +29,7 @@ CYAN="\033[0;36m"
 NC="\033[0m"
 
 # 模型路径
-MODEL_DIR="${MODEL_DIR:-/opt/image/model}"
+MODEL_DIR="${MODEL_DIR:-/data/models/model}"
 SD_CLI="${SD_CLI:-/home/dministrator/my-img/build/myimg-cli}"
 DIFFUSION_MODEL="$MODEL_DIR/z_image_turbo-Q5_K_M.gguf"
 VAE_MODEL="$MODEL_DIR/ae.safetensors"

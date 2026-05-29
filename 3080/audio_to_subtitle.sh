@@ -8,7 +8,7 @@
 #   $4 输出字幕: 输出字幕文件路径
 #
 # 示例:
-#   ./audio_to_subtitle.sh "/opt/image/audios/" 0.3 "第一句|第二句|第三句" /opt/image/subtitle.ass
+#   ./audio_to_subtitle.sh "/data/models/audios/" 0.3 "第一句|第二句|第三句" /data/models/subtitle.ass
 
 AUDIO_DIR="$1"
 PAUSE="${2:-0.3}"

@@ -12,7 +12,7 @@
 #   $5 输出视频: 输出文件路径，默认 output.mp4
 #
 # 示例:
-#   ./img_to_video_v2.sh '/opt/image/' 2 '文案1|文案2|文案3' ./voice.wav output.mp4
+#   ./img_to_video_v2.sh '/data/models/' 2 '文案1|文案2|文案3' ./voice.wav output.mp4
 
 # 保存脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

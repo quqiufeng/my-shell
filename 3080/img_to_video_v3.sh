@@ -18,16 +18,16 @@
 #
 # 使用示例:
 #   # 基础用法
-#   ./img_to_video_v3.sh '/opt/image/' 2 '文案一|文案二|文案三' './voice.wav' output.mp4
+#   ./img_to_video_v3.sh '/data/models/' 2 '文案一|文案二|文案三' './voice.wav' output.mp4
 #
 #   # 完整示例 - 高山流水成语故事
-#   ./img_to_video_v3.sh '/opt/image/' 2 \
+#   ./img_to_video_v3.sh '/data/models/' 2 \
 #       '战国时期俞伯牙是著名的琴师琴艺高超|一天伯牙在山间弹琴遇到砍柴的钟子期|子期听出伯牙琴中之意两人成为知音|伯牙弹高山子期曰巍巍乎若泰山|子期病逝后伯牙再无知音可寻|伯牙摔琴断弦高山流水比喻知音难觅' \
 #       '/home/dministrator/video/voice.wav' \
-#       '/opt/image/gaoshan_v3.mp4'
+#       '/data/models/gaoshan_v3.mp4'
 #
 #   # 使用默认系统音源
-#   ./img_to_video_v3.sh '/opt/image/' 2 '文案一|文案二' '/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav' output.mp4
+#   ./img_to_video_v3.sh '/data/models/' 2 '文案一|文案二' '/home/dministrator/CosyVoice/asset/zero_shot_prompt.wav' output.mp4
 #
 # 注意事项:
 #   - 文案不要包含标点符号，会影响配音节奏和字幕对齐

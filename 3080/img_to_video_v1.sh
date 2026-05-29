@@ -12,7 +12,7 @@
 # 注意: 使用 TensorRT 加速需先编译引擎 (见 build_cosy_voice_3080.sh)
 #
 # 示例:
-#   ./img_to_video_v1.sh '/opt/image/story/' 2 '第一句|第二句|第三句' output.mp4
+#   ./img_to_video_v1.sh '/data/models/story/' 2 '第一句|第二句|第三句' output.mp4
 
 # 保存脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
