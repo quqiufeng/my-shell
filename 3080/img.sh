@@ -17,9 +17,6 @@ set -euo pipefail
 #
 # =============================================================================
 
-# 设置 ONNX Runtime 库路径
-export LD_LIBRARY_PATH=/home/dministrator/onnxruntime-linux-x64-1.20.1/lib:${LD_LIBRARY_PATH:-}
-
 # 颜色定义
 RED="\033[0;31m"
 GREEN="\033[0;32m"
@@ -29,11 +26,12 @@ CYAN="\033[0;36m"
 NC="\033[0m"
 
 # 模型路径
-MODEL_DIR="${MODEL_DIR:-/data/models/model}"
-SD_CLI="${SD_CLI:-/home/dministrator/my-img/build/myimg-cli}"
-DIFFUSION_MODEL="$MODEL_DIR/z_image_turbo-Q5_K_M.gguf"
+# 图像生成模型放在 /data/models/image/ 子目录下
+MODEL_DIR="${MODEL_DIR:-/data/models/image}"
+SD_CLI="${SD_CLI:-/opt/stable-diffusion.cpp/bin/sd-cli}"
+DIFFUSION_MODEL="$MODEL_DIR/z-image-turbo-Q6_K.gguf"
 VAE_MODEL="$MODEL_DIR/ae.safetensors"
-LLM_MODEL="$MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+LLM_MODEL="$MODEL_DIR/qwen2.5-coder-14b-instruct-q5_k_m.gguf"
 
 PROMPT="${1:-A beautiful landscape}"
 OUTPUT_FILE="${2:-}"
