@@ -7,27 +7,25 @@ echo "=========================================="
 echo "stable-diffusion.cpp CUDA 编译脚本"
 echo "=========================================="
 
-# 检查 CUDA
-if ! command -v nvcc &> /dev/null; then
-    echo "错误: 未找到 nvcc，请先安装 CUDA Toolkit"
-    exit 1
-fi
+export CC=/usr/bin/gcc-12
+export CXX=/usr/bin/g++-12
+export CUDA_HOME=/data/cuda
+export PATH=$CUDA_HOME/bin:/data/venv/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}
 
-NVCC_PATH=$(which nvcc)
-CUDA_VERSION=$(nvcc --version | grep "release" | awk '{print $5}' | cut -d',' -f1)
+NVCC_PATH=$CUDA_HOME/bin/nvcc
+CUDA_VERSION=$($NVCC_PATH --version | grep "release" | awk '{print $5}' | cut -d',' -f1)
 echo "检测到 CUDA: $CUDA_VERSION"
 echo "NVCC 路径: $NVCC_PATH"
 
-# 自动检测 CUDA_HOME
-if [ -z "${CUDA_HOME:-}" ]; then
-    CUDA_HOME=$(dirname "$NVCC_PATH")/..
-    export CUDA_HOME
+if [ ! -d "/opt/stable-diffusion.cpp" ]; then
+    echo "错误: /opt/stable-diffusion.cpp 不存在"
+    exit 1
 fi
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 PROJECT_DIR=/opt/stable-diffusion.cpp
 cd "$PROJECT_DIR"
+git pull
 
 # 确保子模块完整
 if [ ! -f "ggml/CMakeLists.txt" ]; then
@@ -68,18 +66,17 @@ cmake .. \
     -DSD_CUDA=ON \
     -DSD_FLASH_ATTN=ON \
     -DSD_FAST_SOFTMAX=ON \
-    -DGGML_NATIVE=ON \
+    -DGGML_NATIVE=OFF \
     -DGGML_LTO=ON \
     -DGGML_CUDA_FA_ALL_QUANTS=ON \
     -DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCH \
-    -DCMAKE_CUDA_COMPILER="$NVCC_PATH" \
+    -DCMAKE_CUDA_COMPILER="$CUDA_HOME/bin/nvcc" \
     -DCMAKE_BUILD_TYPE=Release
 
 # 编译
-JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 echo ""
-echo "=== 编译中 (使用 $JOBS 线程) ==="
-make -j"$JOBS"
+echo "=== 编译中 (使用 4 线程) ==="
+make -j$(nproc)
 
 # 移动 bin 目录
 cd "$PROJECT_DIR"

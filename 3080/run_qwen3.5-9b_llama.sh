@@ -69,7 +69,7 @@ if [[ ! -x "$HOME/llama.cpp/build/bin/llama-server" ]]; then
     exit 1
 fi
 
-export LD_LIBRARY_PATH=/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
 
 # 3080 10GB 显存优化参数
 MODEL_DIR="/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q5_K_S.gguf"

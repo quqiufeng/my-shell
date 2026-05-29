@@ -17,6 +17,13 @@ echo "=========================================="
 echo "llama.cpp CUDA 编译脚本"
 echo "=========================================="
 
+# 设置 CUDA 环境变量
+export CUDA_HOME=/data/cuda
+export PATH=$CUDA_HOME/bin:/data/venv/bin:$PATH
+export LD_LIBRARY_PATH=/data/cuda/lib64:$LD_LIBRARY_PATH
+export CC=/usr/bin/gcc-12
+export CXX=/usr/bin/g++-12
+
 # 检查 CUDA
 if ! command -v nvcc &> /dev/null; then
     echo "错误: 未找到 nvcc，请先安装 CUDA Toolkit"
@@ -26,21 +33,14 @@ fi
 echo "检测到 CUDA:"
 nvcc --version | grep "release"
 
-# 设置 CUDA 环境变量（兼容 WSL2）
-export CUDA_HOME=/usr/local/cuda-12.0
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-
 # 克隆或更新 llama.cpp
-if [ ! -d "$HOME/llama.cpp" ]; then
+if [ ! -d "/opt/llama.cpp" ]; then
     echo ""
     echo "=== 克隆 llama.cpp ==="
-    git clone --depth 1 https://github.com/ggerganov/llama.cpp.git $HOME/llama.cpp
+    git clone --depth 1 https://github.com/ggerganov/llama.cpp.git /opt/llama.cpp
 fi
+cd /opt/llama.cpp && git pull
 
-cd $HOME/llama.cpp
-
-# 清理并配置
 echo ""
 echo "=== 配置 CMake ==="
 mkdir -p build && cd build
@@ -80,21 +80,21 @@ cmake .. \
 # 编译
 echo ""
 echo "=== 编译中 (使用 6 线程) ==="
-make -j6
+make -j$(nproc)
 
 # 检查是否成功
-if [ -f "$HOME/llama.cpp/build/bin/llama-cli" ]; then
+if [ -f "/opt/llama.cpp/build/bin/llama-cli" ]; then
     echo ""
     echo "=========================================="
     echo "✅ 编译成功！"
     echo "=========================================="
-    echo "可执行文件: $HOME/llama.cpp/build/bin/llama-cli"
-    echo "API 服务:   $HOME/llama.cpp/build/bin/llama-server"
-    echo "多模态CLI:  $HOME/llama.cpp/build/bin/llama-llava-cli"
+    echo "可执行文件: /opt/llama.cpp/build/bin/llama-cli"
+    echo "API 服务:   /opt/llama.cpp/build/bin/llama-server"
+    echo "多模态CLI:  /opt/llama.cpp/build/bin/llama-llava-cli"
     
     # 检查多模态库
-    if [ -f "$HOME/llama.cpp/build/bin/libmtmd.so" ]; then
-        echo "多模态库:   $HOME/llama.cpp/build/bin/libmtmd.so ✅"
+    if [ -f "/opt/llama.cpp/build/bin/libmtmd.so" ]; then
+        echo "多模态库:   /opt/llama.cpp/build/bin/libmtmd.so ✅"
     else
         echo "⚠️ 多模态库 libmtmd.so 未生成"
     fi
@@ -102,7 +102,7 @@ if [ -f "$HOME/llama.cpp/build/bin/llama-cli" ]; then
     # 测试 GPU
     echo ""
     echo "=== 测试 GPU 支持 ==="
-    $HOME/llama.cpp/build/bin/llama-cli --verbose -m /dev/null -n 1 2>&1 | grep -i cuda
+    /opt/llama.cpp/build/bin/llama-cli --verbose -m /dev/null -n 1 2>&1 | grep -i cuda
 else
     echo ""
     echo "❌ 编译失败"

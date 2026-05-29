@@ -1,4 +1,5 @@
 #!/bin/bash
+# nvcc wrapper: 过滤掉 gcc-13 不兼容的 math flags + 允许不支持的编译器
 args=()
 for arg in "$@"; do
     case "$arg" in
@@ -6,4 +7,4 @@ for arg in "$@"; do
         *) args+=("$arg") ;;
     esac
 done
-exec /usr/lib/nvidia-cuda-toolkit/bin/nvcc --allow-unsupported-compiler "${args[@]}"
+exec /data/cuda/bin/nvcc --allow-unsupported-compiler "${args[@]}"

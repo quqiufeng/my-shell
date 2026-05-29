@@ -11,40 +11,36 @@ set -e
 echo "=== 编译 koboldcpp (CUDA 版本 for RTX 3080) ==="
 echo ""
 
+export CC=/usr/bin/gcc-12
+export CXX=/usr/bin/g++-12
+
+if [ ! -d "/opt/koboldcpp" ]; then
+    echo "错误: /opt/koboldcpp 不存在, 请先克隆"
+    exit 1
+fi
+
 cd /opt/koboldcpp
+git pull
 
 echo "=== 清理旧的编译文件 ==="
 make clean 2>/dev/null || true
 rm -f *.so *.o
 
-cat > /opt/koboldcpp/nvcc_wrapper.sh << 'WRAPPER'
-#!/bin/bash
-args=()
-for arg in "$@"; do
-    case "$arg" in
-        -fno-finite-math-only|-fno-unsafe-math-optimizations|-fno-math-errno) continue ;;
-        *) args+=("$arg") ;;
-    esac
-done
-exec /usr/lib/nvidia-cuda-toolkit/bin/nvcc --allow-unsupported-compiler "${args[@]}"
-WRAPPER
-chmod +x /opt/koboldcpp/nvcc_wrapper.sh
-mkdir -p /opt/koboldcpp_nvcc_path
-ln -sf /opt/koboldcpp/nvcc_wrapper.sh /opt/koboldcpp_nvcc_path/nvcc
-
 echo ""
 echo "=== 开始编译 (CUDA/cuBLAS for RTX 3080) ==="
 echo "架构: CUDA 8.6 (RTX 3080)"
 echo "NVCCFLAGS: -arch=sm_86 -O3 -use_fast_math"
-echo "LDFLAGS: -flto (链接时优化)"
-echo "使用 CUDA 12 nvcc + wrapper (绕过 GCC 13 兼容性检查)"
+echo "CUDA: /data/cuda"
 echo "这可能需要 10-20 分钟..."
 echo ""
 
+export CUDA_HOME=/data/cuda
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64
 export NVCCFLAGS="-arch=sm_86 -O3 -use_fast_math -extended-lambda --forward-unknown-to-host-compiler"
 export LDFLAGS="-flto"
 
-PATH="/opt/koboldcpp_nvcc_path:$PATH" make -j$(nproc) LLAMA_CUBLAS=1 koboldcpp_cublas
+make -j$(nproc) LLAMA_CUBLAS=1 koboldcpp_cublas
 
 echo ""
 echo "=== 编译完成 ==="
