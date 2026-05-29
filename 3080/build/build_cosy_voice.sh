@@ -39,6 +39,9 @@ echo "虚拟环境: /data/venv (Python 3.12, torch 2.9.0+cu126)"
 
 export CC=/usr/bin/gcc-12
 export CXX=/usr/bin/g++-12
+# 修复: 系统 cuDNN 9.22 与 PyTorch bundled cuDNN 9.10 混载导致 CUDNN_STATUS_SUBLIBRARY_VERSION_MISMATCH
+# 强制优先使用 PyTorch bundled 的 cuDNN，避免加载系统版本
+export LD_LIBRARY_PATH=/data/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 
 VENV_PYTHON=/data/venv/bin/python3
 VENV_PIP=/data/venv/bin/pip
