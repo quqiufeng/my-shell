@@ -127,6 +127,22 @@ echo ""
 SEED="${SEED:-$RANDOM}"
 echo "Generating..."
 
+# 显存管理: 高分辨率自动启用 CPU offloading
+VRAM_ARGS=()
+PIXEL_COUNT=$((WIDTH * HEIGHT))
+if [ "$PIXEL_COUNT" -gt $((1024 * 1024)) ]; then
+    VRAM_ARGS+=(--vae-on-cpu)
+    echo -e "${YELLOW}[VRAM] High resolution ${WIDTH}x${HEIGHT}, VAE -> CPU${NC}"
+fi
+if [ "$PIXEL_COUNT" -gt $((1280 * 1280)) ]; then
+    VRAM_ARGS+=(--clip-on-cpu)
+    echo -e "${YELLOW}[VRAM] Very high resolution, CLIP -> CPU${NC}"
+fi
+if [ "${FORCE_OFFLOAD:-0}" = "1" ]; then
+    VRAM_ARGS+=(--offload-to-cpu)
+    echo -e "${YELLOW}[VRAM] Force offload to CPU${NC}"
+fi
+
 SD_CMD=("$SD_CLI"
   --diffusion-model "$DIFFUSION_MODEL"
   --vae "$VAE_MODEL"
@@ -140,20 +156,12 @@ SD_CMD=("$SD_CLI"
   --vae-tiling
   --vae-tile-size 256x256
   --vae-tile-overlap 0.75
-  --freeu
-  --freeu-b1 1.4
-  --freeu-b2 1.5
-  --sag
-  --sag-scale 0.5
-  --auto-enhance
-  --clarity 0.4
-  --sharpen 1.2
-  --sharpen-radius 2
   --embd-dir "$MODEL_DIR/embeddings"
   -W "$WIDTH" -H "$HEIGHT"
   --steps "$STEPS"
   -s "$SEED"
   -o "$OUTPUT_PATH"
+  "${VRAM_ARGS[@]}"
 )
 
 "${SD_CMD[@]}"
