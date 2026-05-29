@@ -31,7 +31,7 @@ MODEL_DIR="${MODEL_DIR:-/data/models/image}"
 SD_CLI="${SD_CLI:-/opt/stable-diffusion.cpp/bin/sd-cli}"
 DIFFUSION_MODEL="$MODEL_DIR/z-image-turbo-Q6_K.gguf"
 VAE_MODEL="$MODEL_DIR/ae.safetensors"
-LLM_MODEL="$MODEL_DIR/qwen2.5-coder-14b-instruct-q5_k_m.gguf"
+LLM_MODEL="$MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
 
 PROMPT="${1:-A beautiful landscape}"
 OUTPUT_FILE="${2:-}"
