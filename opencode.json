@@ -4,6 +4,10 @@
     "*": "allow",
     "external_directory": "allow"
   },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 8
+  },
   "model": "openai/Qwen3-14B-Q4_K_M.gguf",
   "provider": {
     "openai": {
