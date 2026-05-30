@@ -1,0 +1,14 @@
+# OpenCode 忽略文件
+# 排除依赖库和生成文件
+
+node_modules/
+venv/
+.env/
+dist/
+build/
+*.log
+*.tmp
+.git/
+__pycache__/
+*.pyc
+.DS_Store

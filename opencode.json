@@ -15,7 +15,8 @@
       "name": "Local Models",
       "options": {
         "baseURL": "http://localhost:11434/v1",
-        "apiKey": "dummy"
+        "apiKey": "dummy",
+        "timeout": 300000
       },
       "models": {
         "qwen2.5-coder-14b-instruct-q4_k_m.gguf": {
