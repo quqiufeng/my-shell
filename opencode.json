@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "allow",
+    "external_directory": "allow"
+  },
+  "model": "openai/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+  "provider": {
+    "openai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Models",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "dummy"
+      },
+      "models": {
+        "qwen2.5-coder-14b-instruct-q4_k_m.gguf": {
+          "name": "Qwen2.5-Coder-14B Q4 (3080 20GB)",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 32768
+        }
+      }
+    }
+  }
+}
