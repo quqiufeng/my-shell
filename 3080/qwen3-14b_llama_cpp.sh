@@ -49,11 +49,11 @@ set -euo pipefail
 #
 # 【启动方式】
 #   cd /opt/my-shell/3080
-#   nohup ./qwen2.5-coder-14b_llama_cpp.sh > /tmp/qwen25_coder_14b_llama.log 2>&1 &
+#   nohup ./qwen3-14b_llama_cpp.sh > /tmp/qwen3_14b_llama.log 2>&1 &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
-#   tail -f /tmp/qwen25_coder_14b_llama.log
+#   tail -f /tmp/qwen3_14b_llama.log
 #
 # 【停止服务】
 #   pkill -f llama-server
