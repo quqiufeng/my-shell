@@ -8,7 +8,7 @@
     "auto": true,
     "tail_turns": 8
   },
-  "model": "openai/Qwen3-14B-Q4_K_M.gguf",
+  "model": "openai/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
