@@ -12,6 +12,11 @@ set -euo pipefail
 # 测试环境: NVIDIA GeForce RTX 3080 20GB, CUDA compute 8.6
 # 模型: Qwen3-14B-Q4_K_M.gguf
 #
+# 【Chat Template 来源】
+#   https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
+#   修复官方 Qwen template 的 agentic loop、KV cache 失效等问题
+#   使用方式: --jinja --chat-template-file chat_template.jinja
+#
 # 【基准测试数据】(2025-05-30, test_api.py 6/30题算法题, max_tokens=1024)
 # ┌──────────┬──────────┬────────────┬────────────────────────────────────┐
 # │ 平均速度 │ 总token数 │ 总耗时     │ 配置                               │
@@ -140,6 +145,8 @@ exec $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port $PORT \
   --reasoning off \
+  --jinja \
+  --chat-template-file /opt/my-shell/3080/chat_template.jinja \
   -ngl $NGL \
   -c $CTX \
   --batch-size $BATCH \
