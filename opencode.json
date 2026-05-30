@@ -8,7 +8,7 @@
     "auto": true,
     "tail_turns": 8
   },
-  "model": "openai/qwen-q4-fix:latest",
+  "model": "openai/qwen-q5-fix:latest",
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
@@ -19,9 +19,9 @@
         "timeout": 300000
       },
       "models": {
-        "qwen2.5-coder-14b:latest": {
-          "name": "Qwen2.5-Coder-14B Q4 (3080 20GB)",
-          "maxContextWindow": 131072,
+        "qwen-q5-fix:latest": {
+          "name": "Qwen2.5-Coder-14B Q5 (3080 20GB)",
+          "maxContextWindow": 32768,
           "maxOutputTokens": 32768
         }
       }
