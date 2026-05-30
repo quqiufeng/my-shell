@@ -139,6 +139,7 @@ exec $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port $PORT \
+  --system-prompt "/no_think" \
   -ngl $NGL \
   -c $CTX \
   --batch-size $BATCH \
