@@ -8,24 +8,19 @@
     "auto": true,
     "tail_turns": 8
   },
-  "model": "openai/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+  "model": "openai/qwen-q4-fix:latest",
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Local Models",
       "options": {
-        "baseURL": "http://localhost:11434/v1",
+        "baseURL": "http://localhost:11436/v1",
         "apiKey": "dummy",
         "timeout": 300000
       },
       "models": {
-        "qwen2.5-coder-14b-instruct-q4_k_m.gguf": {
+        "qwen2.5-coder-14b:latest": {
           "name": "Qwen2.5-Coder-14B Q4 (3080 20GB)",
-          "maxContextWindow": 131072,
-          "maxOutputTokens": 32768
-        },
-        "Qwen3-14B-Q4_K_M.gguf": {
-          "name": "Qwen3-14B Q4 (3080 20GB)",
           "maxContextWindow": 131072,
           "maxOutputTokens": 32768
         }

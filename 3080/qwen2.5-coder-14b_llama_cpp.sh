@@ -133,6 +133,8 @@ echo "KV Cache: q4_0"
 echo "=============================="
 echo ""
 
+CHAT_TEMPLATE_FILE="/opt/my-shell/3080/chat_template.jinja"
+
 exec $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
@@ -158,6 +160,6 @@ exec $LLAMA_SERVER \
   --cache-type-v q4_0 \
   --defrag-thold 0.1 \
   --timeout 300 \
-  --metrics
-
-# 注意: 使用模型内置的chat template，不指定自定义模板
+  --metrics \
+  --jinja \
+  --chat-template-file "$CHAT_TEMPLATE_FILE"

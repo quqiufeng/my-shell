@@ -1,0 +1,49 @@
+FROM /data/models/qwen2.5-coder-14b-instruct-q5_k_m.gguf
+
+# 1. 显式锁定 128k 上下文
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.0
+PARAMETER top_p 0.1
+
+# 2. 【核心修复】补齐千问 2.5 官方的 Tool Call 原生模板（骗过 Ollama 0.24.0 检查）
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{- end }}{{- if .Tools }}<|im_start|>system
+# Tools
+
+You have access to the following tools:
+
+{{- range .Tools }}
+## {{ .Function.Name }}
+
+{{ .Function.Description }}
+
+{{- if .Function.Parameters }}
+Use the following format to call the tool:
+{"name": "{{ .Function.Name }}", "arguments": {{ .Function.Parameters }}}
+{{- end }}
+{{- end }}<|im_end|>
+{{- end }}{{- range .Messages }}{{ if eq .Role "user" }}<|im_start|>user
+{{ .Content }}<|im_end|>
+{{- else if eq .Role "assistant" }}<|im_start|>assistant
+{{- if .Content }}{{ .Content }}{{- end }}
+{{- if .ToolCalls }}
+{{- range .ToolCalls }}
+{"name": "{{ .Function.Name }}", "arguments": {{ .Function.Arguments }}}
+{{- end }}
+{{- end }}<|im_end|>
+{{- else if eq .Role "tool" }}<|im_start|>user
+<|im_start|>tool_response
+{{ .Content }}<|im_end|>
+{{- end }}{{- end }}<|im_start|>assistant
+"""
+
+# 3. 【双重保险】强力约束提示词
+SYSTEM """You are a function-calling agent with 128k context. CRITICAL RULES:
+1. When calling tools, output ONLY valid JSON on a single line
+2. NO markdown blocks (```json), NO backticks, NO explanations
+3. NO conversational prefixes like "Sure" or "Here is"
+4. Output format must be: {"name":"tool_name","arguments":{"key":"value"}}
+5. If no tool is needed, reply normally without JSON"""
+
+PARAMETER stop <|im_end|>
