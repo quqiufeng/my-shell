@@ -2,8 +2,17 @@
 set -euo pipefail
 #
 # =============================================================
-# Qwopus3.5-27B-v3 (KoboldCpp 1.114) API 启动脚本 (4090D 24GB)
+# Qwopus3.5-27B-v3.5 (KoboldCpp 1.114) API 启动脚本 (4090D 24GB)
 # =============================================================
+#
+# 【模型主页】https://huggingface.co/Jackrong/Qwopus3.5-27B-v3.5-GGUF
+#
+# 【模型介绍】
+#   Qwopus3.5-27B-v3.5 是基于 Qwen3.5-27B 的推理增强微调模型
+#   - 训练数据: v3 的 2× SFT 数据扩展版
+#   - 核心能力: 结构化推理、工具增强工作流、多步 Agentic 任务
+#   - 特点: Token 高效推理，不引入新架构/RL/模板重设计
+#   - 评估: MMLU-Pro +1.07%, SWE 97.7% (43/44)
 #
 # 【Chat Template 来源】https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
 #
@@ -23,7 +32,7 @@ set -euo pipefail
 # └─────────────┴──────────┴────────────┴─────────────────────────────┘
 # 对比: llama.cpp 128K 44.4 tok/s, KoboldCpp 慢 ~9%
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
-# 模型: Qwopus3.5-27B-v3-Q4_K_S.gguf
+# 模型: Qwopus3.5-27B-v3.5-Q4_K_S.gguf
 #
 # 【关键优化参数】
 #   - contextsize: 131072 (128K)
@@ -41,31 +50,31 @@ set -euo pipefail
 #
 # 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/4090d
-#   setsid nohup ./run_qwopus3.5-27b-v3_koboldcpp.sh > /tmp/27b_qwopus_koboldcpp.log 2>&1 < /dev/null &
+#   setsid nohup ./run_qwopus3.5-27b-v3.5_koboldcpp.sh > /tmp/27b_qwopus_koboldcpp.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
 #   tail -f /tmp/27b_qwopus_koboldcpp.log
 #
 # 【停止服务】
-#   pkill -f "koboldcpp.py.*Qwopus3.5-27B-v3"
+#   pkill -f "koboldcpp.py.*Qwopus3.5-27B-v3.5"
 #
 # 【测试API】
 #   curl http://localhost:11434/v1/models
 #   curl -s http://localhost:11434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
-#     -d '{"model": "Qwopus3.5-27B-v3-Q4_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
+#     -d '{"model": "Qwopus3.5-27B-v3.5-Q4_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
 #
 # 【性能测试】
 #   cd /opt/my-shell
-#   MODEL="openai/Qwopus3.5-27B-v3-Q4_K_S.gguf" python3 test_api.py
+#   MODEL="openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf" python3 test_api.py
 #
 # =============================================================
 # OpenCode 配置文件 (~/.config/opencode/opencode.json)
 # =============================================================
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "openai/Qwopus3.5-27B-v3-Q4_K_S.gguf",
+#   "model": "openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf",
 #   "provider": {
 #     "openai": {
 #       "npm": "@ai-sdk/openai-compatible",
@@ -75,7 +84,7 @@ set -euo pipefail
 #         "apiKey": "dummy"
 #       },
 #       "models": {
-#         "Qwopus3.5-27B-v3-Q4_K_S.gguf": {
+#         "Qwopus3.5-27B-v3.5-Q4_K_S.gguf": {
 #           "name": "Qwopus3.5-27B-v3 Q4_K_S (KoboldCpp)",
 #           "maxContextWindow": 131072,
 #           "maxOutputTokens": 32768
@@ -86,7 +95,7 @@ set -euo pipefail
 # }
 #
 # 【使用 opencode】
-#   opencode -m openai/Qwopus3.5-27B-v3-Q4_K_S.gguf
+#   opencode -m openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf
 #
 # =============================================================
 
@@ -106,7 +115,7 @@ fi
 # 设置库路径, 确保能加载 CUDA 共享库
 export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
-MODEL="/opt/gguf/Qwopus3.5-27B-v3-Q4_K_S.gguf"
+MODEL="/opt/gguf/Qwopus3.5-27B-v3.5-Q4_K_S.gguf"
 KOBOLDCPP_DIR="/opt/koboldcpp"
 CHAT_TEMPLATE="/opt/my-shell/4090d/qwopus35-27b-chat-template.jinja"
 

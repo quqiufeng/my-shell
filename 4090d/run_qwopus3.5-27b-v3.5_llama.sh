@@ -2,13 +2,22 @@
 set -euo pipefail
 #
 # =============================================================
-# Qwopus3.5-27B-v3 (llama.cpp) API 启动脚本 (4090D 24GB)
+# Qwopus3.5-27B-v3.5 (llama.cpp) API 启动脚本 (4090D 24GB)
 # =============================================================
+#
+# 【模型主页】https://huggingface.co/Jackrong/Qwopus3.5-27B-v3.5-GGUF
+# 
+# 【模型介绍】
+#   Qwopus3.5-27B-v3.5 是基于 Qwen3.5-27B 的推理增强微调模型
+#   - 训练数据: v3 的 2× SFT 数据扩展版
+#   - 核心能力: 结构化推理、工具增强工作流、多步 Agentic 任务
+#   - 特点: Token 高效推理，不引入新架构/RL/模板重设计
+#   - 评估: MMLU-Pro +1.07%, SWE 97.7% (43/44)
 #
 # 【Chat Template 来源】https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
 #
 # 【推荐首选】4090D 上 27B 模型最优方案
-# llama.cpp > KoboldCpp (快 ~20%)
+# llama.cpp > KoboldCpp (快 ~10%)
 # =============================================================
 #
 # 【基准测试数据】(2025-05-31, test_api.py 30题算法题, max_tokens=1024)
@@ -19,7 +28,7 @@ set -euo pipefail
 # │             │          │            │ cache-type-k/v=q4_0, fa=on   │
 # └─────────────┴──────────┴────────────┴──────────────────────────────┘
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
-# 模型: Qwopus3.5-27B-v3-Q4_K_S.gguf
+# 模型: Qwopus3.5-27B-v3.5-Q4_K_S.gguf
 # 速度范围: 31.5 - 45.5 tok/s
 # 对比 KoboldCpp: 快 ~10% (44.4 vs 40.3 tok/s)
 #
@@ -50,7 +59,7 @@ set -euo pipefail
 #
 # 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/4090d
-#   setsid nohup ./run_qwopus3.5-27b-v3_llama.sh > /tmp/27b_qwopus_llama.log 2>&1 < /dev/null &
+#   setsid nohup ./run_qwopus3.5-27b-v3.5_llama.sh > /tmp/27b_qwopus_llama.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
@@ -63,18 +72,18 @@ set -euo pipefail
 #   curl http://localhost:11434/v1/models
 #   curl -s http://localhost:11434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
-#     -d '{"model": "Qwopus3.5-27B-v3-Q4_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
+#     -d '{"model": "Qwopus3.5-27B-v3.5-Q4_K_S.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
 #
 # 【性能测试】
 #   cd /opt/my-shell
-#   MODEL="openai/Qwopus3.5-27B-v3-Q4_K_S.gguf" python3 test_api.py
+#   MODEL="openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf" python3 test_api.py
 #
 # =============================================================
 # OpenCode 配置文件 (~/.config/opencode/opencode.json)
 # =============================================================
 # {
 #   "$schema": "https://opencode.ai/config.json",
-#   "model": "openai/Qwopus3.5-27B-v3-Q4_K_S.gguf",
+#   "model": "openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf",
 #   "provider": {
 #     "openai": {
 #       "npm": "@ai-sdk/openai-compatible",
@@ -84,7 +93,7 @@ set -euo pipefail
 #         "apiKey": "dummy"
 #       },
 #       "models": {
-#         "Qwopus3.5-27B-v3-Q4_K_S.gguf": {
+#         "Qwopus3.5-27B-v3.5-Q4_K_S.gguf": {
 #           "name": "Qwopus3.5-27B-v3 Q4_K_S (4090D)",
 #           "maxContextWindow": 131072,
 #           "maxOutputTokens": 32768
@@ -95,7 +104,7 @@ set -euo pipefail
 # }
 #
 # 【使用 opencode】
-#   opencode -m openai/Qwopus3.5-27B-v3-Q4_K_S.gguf
+#   opencode -m openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf
 #
 # =============================================================
 
@@ -111,7 +120,7 @@ fi
 export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 # 4090D 24GB 显存优化参数
-MODEL_DIR="/opt/gguf/Qwopus3.5-27B-v3-Q4_K_S.gguf"
+MODEL_DIR="/opt/gguf/Qwopus3.5-27B-v3.5-Q4_K_S.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
 CHAT_TEMPLATE="/opt/my-shell/4090d/qwopus35-27b-chat-template.jinja"
 
@@ -127,7 +136,7 @@ PORT=11434
 echo "=============================="
 echo "启动 Qwopus3.5-27B-v3 Q4_K_S (llama.cpp) API 服务"
 echo "地址: http://0.0.0.0:$PORT"
-echo "模型: Qwopus3.5-27B-v3-Q4_K_S.gguf"
+echo "模型: Qwopus3.5-27B-v3.5-Q4_K_S.gguf"
 echo "上下文: $CTX"
 echo "GPU层数: $NGL"
 echo "Batch Size: $BATCH"
