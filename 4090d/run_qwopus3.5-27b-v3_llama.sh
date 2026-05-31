@@ -11,16 +11,17 @@ set -euo pipefail
 # llama.cpp > KoboldCpp (快 ~20%)
 # =============================================================
 #
-# 【基准测试数据】(2025-04-14, test_api.py 算法题, max_tokens=1024)
+# 【基准测试数据】(2025-05-31, test_api.py 30题算法题, max_tokens=1024)
 # ┌─────────────┬──────────┬────────────┬──────────────────────────────┐
 # │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                         │
 # ├─────────────┼──────────┼────────────┼──────────────────────────────┤
-# │ 128K        │ ~39.9    │ ~19456     │ batch=512, threads=16,       │
+# │ 128K        │ 44.4     │ 23463      │ batch=512, threads=16,       │
 # │             │          │            │ cache-type-k/v=q4_0, fa=on   │
 # └─────────────┴──────────┴────────────┴──────────────────────────────┘
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
 # 模型: Qwopus3.5-27B-v3-Q4_K_S.gguf
-# 速度波动: 39.0 - 40.4 tok/s (极差仅 1.4 tok/s, 稳定性极高)
+# 速度范围: 31.5 - 45.5 tok/s
+# 对比 KoboldCpp: 快 ~10% (44.4 vs 40.3 tok/s)
 #
 # 【上下文配置】(4090D 24GB)
 #   - 128K: 可行, 依赖 KV cache 量化 (-ctk/-ctv q4_0)
@@ -47,9 +48,9 @@ set -euo pipefail
 #   - --repeat-penalty 1.1: 防止长循环代码陷入死循环
 # =============================================================
 #
-# 【启动方式】
+# 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/4090d
-#   nohup ./run_qwopus3.5-27b-v3_llama.sh > /tmp/27b_qwopus_llama.log 2>&1 &
+#   setsid nohup ./run_qwopus3.5-27b-v3_llama.sh > /tmp/27b_qwopus_llama.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
@@ -107,7 +108,7 @@ if [[ ! -x "/opt/llama.cpp/bin/llama-server" ]]; then
     exit 1
 fi
 
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
+export LD_LIBRARY_PATH=/opt/llama.cpp/bin:/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx-15.2.0-h39759b7_7/lib:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 # 4090D 24GB 显存优化参数
 MODEL_DIR="/opt/gguf/Qwopus3.5-27B-v3-Q4_K_S.gguf"
@@ -149,7 +150,6 @@ exec $LLAMA_SERVER \
   --threads-batch $THREADS \
   --prio 2 \
   --no-mmap \
-  --mlock \
   --no-warmup \
   --parallel 1 \
   --temp 0.2 \
@@ -159,7 +159,6 @@ exec $LLAMA_SERVER \
   --repeat-penalty 1.1 \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
-  --chat-template "$CHAT_TEMPLATE" \
   --metrics
 
-# 使用自定义 Qwen Fixed Chat Template (froggeric)
+# 使用模型内置的 Qwen3.5 chat template (GGUF 自带)

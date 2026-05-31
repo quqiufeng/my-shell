@@ -14,14 +14,14 @@ set -euo pipefail
 #   - mmap: 默认关闭, 无需 --nommap
 # =============================================================
 #
-# 【基准测试数据】(参考, 待实测)
+# 【基准测试数据】(2025-05-31, test_api.py 30题算法题, max_tokens=1024)
 # ┌─────────────┬──────────┬────────────┬─────────────────────────────┐
 # │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                        │
 # ├─────────────┼──────────┼────────────┼─────────────────────────────┤
-# │ 128K        │ ~33.0    │ ~19456     │ batch=512, threads=14,      │
+# │ 128K        │ 40.3     │ 30720      │ batch=512, threads=14,      │
 # │             │          │            │ quantkv=q4_0, fa=on         │
 # └─────────────┴──────────┴────────────┴─────────────────────────────┘
-# 对比: llama.cpp 128K 约 39.9 tok/s, KoboldCpp 预计慢 ~17%
+# 对比: llama.cpp 128K 44.4 tok/s, KoboldCpp 慢 ~9%
 # 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
 # 模型: Qwopus3.5-27B-v3-Q4_K_S.gguf
 #
@@ -30,7 +30,7 @@ set -euo pipefail
 #   - gpulayers: 99 (全载GPU)
 #   - batchsize: 512 (27B在128K下的平衡值)
 #   - threads: 14 (KoboldCpp对27B的最佳线程数)
-#   - blasththreads: 14 (批处理线程)
+#   - blasthreads: 14 (批处理线程)
 #   - quantkv: q4_0 (KV cache量化, 24GB跑128K的关键)
 #   - usemlock: 防止模型被交换到磁盘
 #   - highpriority: 提升进程优先级
@@ -39,7 +39,7 @@ set -euo pipefail
 #   - quiet: 静默模式
 # =============================================================
 #
-# 【启动方式】
+# 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/4090d
 #   setsid nohup ./run_qwopus3.5-27b-v3_koboldcpp.sh > /tmp/27b_qwopus_koboldcpp.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
@@ -147,6 +147,5 @@ exec python3 koboldcpp.py \
   --highpriority \
   --quantkv q4_0 \
   --jinja \
-  --jinjatemplate "$CHAT_TEMPLATE" \
   --skiplauncher \
   --quiet
