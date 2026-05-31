@@ -969,8 +969,81 @@ if (ctx.extracting_reasoning && ctx.reasoning &&
 
 ```bash
 cd /opt/llama.cpp
-./build_llama_cpp.sh
+make -j$(nproc) llama-server
 ```
+
+---
+
+## Qwen3-14B Tool Call 修复（Chat Template 方案）
+
+### 修复时间：2025-05-31
+
+### 修复原因
+
+Qwen3-14B 模型原生 chat template 存在多个 tool call 相关问题：
+- `<think>` 块未关闭就输出 `<tool_call>`，导致 parser 解析失败
+- Agent 循环中模型提前输出 `<|im_end|>` 终止（Premature Stalls）
+- 工具错误时模型反复输出相同的失败 `<tool_call>`（Retry Stall）
+- 历史记录中空的 `<think></think>` 块误导模型行为
+
+### 修复方案
+
+使用 [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates) 修复版 chat template，替代 GGUF 内置模板。
+
+### 修复内容
+
+该模板修复了以下关键问题：
+
+| 问题类型 | 具体问题 | 修复方式 |
+|---------|---------|---------|
+| **Agentic Loop** | Premature Stalls（提前终止） | 移除 System Prompt 逻辑陷阱，消除 Empty Think Poisoning |
+| **Agentic Loop** | Retry Stall & Reasoning Spiral | 两级错误升级系统（Two-tier escalation） |
+| **Agentic Loop** | Post-Tool Overthinking | 将 `<think>` 定义为规划或综合的双用途空间 |
+| **兼容性** | Unclosed Thinking Before Tool | 在 tool 边界前自动注入关闭标签 |
+| **性能** | KV Cache Invalidation | 保留历史思考块，保证 100% KV Cache 命中率 |
+| **兼容性** | Legacy Engine Crashes | 使用通用 Jinja 语法替代 Python 特性 |
+
+### 使用方法
+
+1. **下载修复版 template：**
+
+```bash
+curl -L -o /opt/my-shell/3080/qwen-template/chat_template.jinja \
+  "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/main/chat_template.jinja"
+```
+
+2. **启动脚本添加 `--chat-template-file` 参数：**
+
+```bash
+exec $LLAMA_SERVER \
+  -m "$MODEL_DIR" \
+  --jinja \
+  --chat-template-file /opt/my-shell/3080/qwen-template/chat_template.jinja \
+  ...其他参数
+```
+
+### 验证修复
+
+测试 tool call：
+
+```bash
+curl -s http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen3-14B-Q4_K_M.gguf",
+    "messages": [{"role": "user", "content": "创建一个文件 /tmp/test.txt"}],
+    "tools": [{"type": "function", "function": {"name": "write_file", "description": "写文件"}}]
+  }'
+```
+
+预期返回 `finish_reason: "tool_calls"` 和正确的 `tool_calls` 数组。
+
+### 双重保险
+
+- **Template 层**：froggeric 修复版正确处理 `<think>` 和 `<tool_call>` 边界
+- **Parser 层**：llama.cpp 源码修改（见上文）支持在 thinking block 内解析 tool call
+
+两层修复配合，Qwen3-14B 的 tool call 功能完全正常。
 
 ### 验证修改
 
