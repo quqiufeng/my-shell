@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# 图像生成脚本 - RTX 3080 20GB 优化版 (ESRGAN 放大方案)
+# 图像生成脚本 - 基于 stable-diffusion.cpp (快速版，无 HiRes Fix)
 # =============================================================================
 #
 # 【用法】
@@ -10,13 +10,14 @@ set -euo pipefail
 #
 # 【示例】
 #   ./img.sh "A beautiful landscape"
-#   ./img.sh "portrait" ~/portrait.png 2560 1440
+#   ./img.sh "A sunset" /mnt/e/app/sunset.png 1280 720
 #
 # 【环境变量覆盖】
-#   STEPS=30 ./img.sh "..."
+#   SAMPLING_METHOD=euler CFG_SCALE=3.2 STEPS=25 ./img.sh "..."
 #
 # =============================================================================
 
+# 颜色定义
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
@@ -25,25 +26,19 @@ CYAN="\033[0;36m"
 NC="\033[0m"
 
 # 模型路径
+# 图像生成模型放在 /data/models/image/ 子目录下
 MODEL_DIR="${MODEL_DIR:-/data/models/image}"
-SD_CLI="${SD_CLI:-/opt/my-img/build/myimg-cli}"
-
-# 自动选择模型：优先使用 Q4_K_M（显存更小）
-if [ -f "$MODEL_DIR/z-image-turbo-Q4_K_M.gguf" ]; then
-    DIFFUSION_MODEL="${DIFFUSION_MODEL:-$MODEL_DIR/z-image-turbo-Q4_K_M.gguf}"
-else
-    DIFFUSION_MODEL="${DIFFUSION_MODEL:-$MODEL_DIR/z-image-turbo-Q6_K.gguf}"
-fi
-
-VAE_MODEL="${VAE_MODEL:-$MODEL_DIR/ae.safetensors}"
-LLM_MODEL="${LLM_MODEL:-$MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf}"
-UPSCALE_MODEL="${UPSCALE_MODEL:-$MODEL_DIR/2x_ESRGAN.gguf}"
+SD_CLI="${SD_CLI:-/opt/stable-diffusion.cpp/bin/sd-cli}"
+DIFFUSION_MODEL="$MODEL_DIR/z-image-turbo-Q6_K.gguf"
+VAE_MODEL="$MODEL_DIR/ae.safetensors"
+LLM_MODEL="$MODEL_DIR/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
 
 PROMPT="${1:-A beautiful landscape}"
 OUTPUT_FILE="${2:-}"
 WIDTH="${3:-1280}"
 HEIGHT="${4:-720}"
 
+# 展开 ~ 路径
 if [[ "$OUTPUT_FILE" == ~* ]]; then
     OUTPUT_FILE="${HOME}${OUTPUT_FILE:1}"
 fi
@@ -64,40 +59,19 @@ done
 
 echo -e "${GREEN}✓ All checks passed${NC}"
 
-# =============================================================================
-# 高分辨率策略：RTX 3080 20GB 安全方案
-# =============================================================================
-# 问题：直接生成 1920x1080+ 时 VAE decode 需要 13GB+，会 OOM
-# 方案：生成安全分辨率 + 2x ESRGAN 放大
-# =============================================================================
-
-PIXEL_COUNT=$((WIDTH * HEIGHT))
-USE_UPSCALE=0
-BASE_W=$WIDTH
-BASE_H=$HEIGHT
-
-# 超过 1280x720 时，使用 ESRGAN 放大
-if [ "$PIXEL_COUNT" -gt $((1280 * 720)) ]; then
-    USE_UPSCALE=1
-    # 计算基础分辨率（目标的一半，对齐到 64）
-    BASE_W=$(((WIDTH / 2 + 63) / 64 * 64))
-    BASE_H=$(((HEIGHT / 2 + 63) / 64 * 64))
-    
-    # 最小 512
-    if [ "$BASE_W" -lt 512 ]; then BASE_W=512; fi
-    if [ "$BASE_H" -lt 512 ]; then BASE_H=512; fi
-    
-    echo -e "${YELLOW}[ESRGAN] ${WIDTH}x${HEIGHT} 超出直接生成范围${NC}"
-    echo -e "${YELLOW}[ESRGAN] 先生成 ${BASE_W}x${BASE_H}，再 2x 放大${NC}"
-fi
+# 验证尺寸参数
+if ! [[ "$WIDTH" =~ ^[0-9]+$ ]] || [ "$WIDTH" -le 0 ]; then echo -e "${RED}Error: width must be positive integer${NC}"; exit 1; fi
+if ! [[ "$HEIGHT" =~ ^[0-9]+$ ]] || [ "$HEIGHT" -le 0 ]; then echo -e "${RED}Error: height must be positive integer${NC}"; exit 1; fi
 
 # =============================================================================
-# 参数配置
+# 参数配置（支持环境变量覆盖）
 # =============================================================================
 SAMPLING_METHOD="${SAMPLING_METHOD:-euler}"
 SCHEDULER="${SCHEDULER:-discrete}"
 CFG_SCALE="${CFG_SCALE:-3.2}"
 STEPS="${STEPS:-25}"
+
+echo -e "${BLUE}[INFO] Mode: steps=$STEPS, cfg=$CFG_SCALE, sampler=$SAMPLING_METHOD${NC}"
 
 # 自动添加质量前缀词
 QUALITY_PREFIX="masterpiece, best quality, ultra-detailed, sharp focus, 8k uhd, photorealistic, highly detailed, crisp, clear, centered composition, complete face, full head, professional portrait"
@@ -105,10 +79,11 @@ if [[ "$PROMPT" != *"masterpiece"* ]]; then
     PROMPT="$QUALITY_PREFIX, $PROMPT"
 fi
 
+# 默认负面提示词
 NEGATIVE_PROMPT="${NEGATIVE_PROMPT:-blurry, low quality, worst quality, jpeg artifacts, noise, grain, soft focus, out of focus, hazy, unclear, bad anatomy, deformed, border artifacts, edge distortion, tiling artifacts, edge artifacts, frame distortion, warped edges, stretched proportions, asymmetrical face, off-center, cropped, out of frame, partial face, cut off, incomplete head, cropped head, watermark, text, logo, signature, cropped shoulders, embedding:EasyNegative, embedding:bad-hands-5}"
 
 # =============================================================================
-# 输出路径
+# 输出路径处理
 # =============================================================================
 if [ -n "$OUTPUT_FILE" ]; then
     if [[ "$OUTPUT_FILE" == *"/"* ]]; then
@@ -129,20 +104,16 @@ mkdir -p "$OUTPUT_DIR"
 OUTPUT_PATH="$OUTPUT_DIR/$OUTPUT"
 
 # =============================================================================
-# 生成信息
+# 生成信息输出
 # =============================================================================
 echo ""
 echo "========================================"
 echo "  Image Generation"
 echo "========================================"
-echo -e "Target: ${GREEN}${WIDTH}x${HEIGHT}${NC}"
-if [ "$USE_UPSCALE" -eq 1 ]; then
-    echo -e "Base:   ${GREEN}${BASE_W}x${BASE_H}${NC}"
-    echo -e "Mode:   ${CYAN}ESRGAN 2x Upscale${NC}"
-fi
-echo -e "Steps:  $STEPS"
-echo -e "CFG:    ${CYAN}$CFG_SCALE${NC}"
-echo -e "Sampler: ${CYAN}$SAMPLING_METHOD${NC}"
+echo -e "Size: ${GREEN}${WIDTH}x${HEIGHT}${NC}"
+echo -e "Steps: $STEPS"
+echo -e "CFG Scale: ${CYAN}$CFG_SCALE${NC}"
+echo -e "Sampler: ${CYAN}$SAMPLING_METHOD${NC} + ${CYAN}$SCHEDULER${NC}"
 echo "----------------------------------------"
 echo -e "Prompt: ${YELLOW}${PROMPT:0:120}${NC}"
 if [ ${#PROMPT} -gt 120 ]; then echo -e "        ${YELLOW}...${NC}"; fi
@@ -156,6 +127,22 @@ echo ""
 SEED="${SEED:-$RANDOM}"
 echo "Generating..."
 
+# 显存管理: 高分辨率自动启用 CPU offloading
+VRAM_ARGS=()
+PIXEL_COUNT=$((WIDTH * HEIGHT))
+if [ "$PIXEL_COUNT" -gt $((1024 * 1024)) ]; then
+    VRAM_ARGS+=(--vae-on-cpu)
+    echo -e "${YELLOW}[VRAM] High resolution ${WIDTH}x${HEIGHT}, VAE -> CPU${NC}"
+fi
+if [ "$PIXEL_COUNT" -gt $((1280 * 1280)) ]; then
+    VRAM_ARGS+=(--clip-on-cpu)
+    echo -e "${YELLOW}[VRAM] Very high resolution, CLIP -> CPU${NC}"
+fi
+if [ "${FORCE_OFFLOAD:-0}" = "1" ]; then
+    VRAM_ARGS+=(--offload-to-cpu)
+    echo -e "${YELLOW}[VRAM] Force offload to CPU${NC}"
+fi
+
 SD_CMD=("$SD_CLI"
   --diffusion-model "$DIFFUSION_MODEL"
   --vae "$VAE_MODEL"
@@ -166,30 +153,21 @@ SD_CMD=("$SD_CLI"
   --sampling-method "$SAMPLING_METHOD"
   --scheduler "$SCHEDULER"
   --diffusion-fa
-  -W "$BASE_W" -H "$BASE_H"
+  --vae-tiling
+  --vae-tile-size 256x256
+  --vae-tile-overlap 0.75
+  --embd-dir "$MODEL_DIR/embeddings"
+  -W "$WIDTH" -H "$HEIGHT"
   --steps "$STEPS"
   -s "$SEED"
   -o "$OUTPUT_PATH"
+  "${VRAM_ARGS[@]}"
 )
-
-# ESRGAN 放大
-if [ "$USE_UPSCALE" -eq 1 ]; then
-    if [ ! -f "$UPSCALE_MODEL" ]; then
-        echo -e "${RED}Error: Upscale model not found: $UPSCALE_MODEL${NC}"
-        echo -e "${YELLOW}Falling back to base resolution ${BASE_W}x${BASE_H}${NC}"
-    else
-        SD_CMD+=(
-            --upscale-model "$UPSCALE_MODEL"
-            --upscale-repeats 1
-        )
-        echo -e "${CYAN}Using ESRGAN: $UPSCALE_MODEL${NC}"
-    fi
-fi
 
 "${SD_CMD[@]}"
 
 # =============================================================================
-# 结果
+# 结果输出
 # =============================================================================
 if [ -f "$OUTPUT_PATH" ]; then
     FILE_SIZE=$(du -h "$OUTPUT_PATH" | cut -f1)
@@ -199,12 +177,13 @@ if [ -f "$OUTPUT_PATH" ]; then
     echo -e "File: ${GREEN}$OUTPUT_PATH${NC}"
     echo -e "Size: ${BLUE}$FILE_SIZE${NC}"
     echo -e "Seed: ${YELLOW}$SEED${NC}"
+    echo -e "CFG: ${CYAN}$CFG_SCALE${NC}"
     echo -e "Resolution: ${GREEN}${WIDTH}x${HEIGHT}${NC}"
     echo "========================================"
 else
     echo ""
     echo "========================================"
-    echo -e "${RED}✗ Generation failed!${NC}"
+    echo -e "${RED}✗ Generation failed! Output file not found${NC}"
     echo "========================================"
     exit 1
 fi
