@@ -854,6 +854,145 @@ SCRIPT=$(python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/in
 
 ---
 
+## llama.cpp 源码修改记录
+
+### 修改时间：2025-05-31
+
+### 修改原因
+
+Qwen2.5-14B-Instruct 模型在 llama.cpp 中使用 Tool Call 时，会将 tool call 包裹在 `<think>` reasoning block 中，导致 opencode 客户端无法识别和解析。
+
+GitHub Issues:
+- [ggml-org/llama.cpp#22684](https://github.com/ggml-org/llama.cpp/issues/22684) - Qwen tool call emitted in reasoning_content instead of delta.tool_calls
+- [ggml-org/llama.cpp#20837](https://github.com/ggml-org/llama.cpp/issues/20837) - Tool calls inside thinking block
+
+相关修复 PR:
+- [ggml-org/llama.cpp#23773](https://github.com/ggml-org/llama.cpp/pull/23773) - Improve tagged tool parsing with reasoning (Draft, not merged)
+
+### 修改文件
+
+**`common/chat-auto-parser-generator.cpp`**
+
+#### 修改 1：添加 tool_call_item 变量（第 457 行）
+
+```cpp
+common_peg_parser tool_calls = p.eps();
+common_peg_parser tool_call_item = p.eps();  // 新增：单个 tool call 项
+```
+
+#### 修改 2：注册 lazy grammar trigger（第 461-469 行）
+
+当 `format.section_start` 为空时（即使用 per_call 格式），注册 lazy grammar trigger，允许 tool call 后面还有其他内容（如 `</think>`）：
+
+```cpp
+if (format.section_start.empty()) {
+    // Lazy grammars are activated from the first tool-call marker in the
+    // generated suffix. The trigger grammar must validate the tool call,
+    // but it should not require the tool call to be the last segment in
+    // the completion. Tagged tool calls can appear inside reasoning
+    // blocks, followed by </think>, content, or more segments that the
+    // full parser will handle afterwards.
+    p.trigger_rule("tool-call", wrapped_call + p.rest());
+}
+```
+
+#### 修改 3：修改 tool_calls 构建逻辑（第 470-476 行）
+
+移除 `trigger_rule` 包装，将 `wrapped_call` 赋值给 `tool_call_item`：
+
+```cpp
+tool_call_item = wrapped_call + p.space();  // 新增
+if (inputs.parallel_tool_calls) {
+    tool_calls = wrapped_call + p.zero_or_more(p.space() + wrapped_call) + p.space();  // 移除 trigger_rule
+} else {
+    tool_calls = wrapped_call + p.space();  // 移除 trigger_rule
+}
+```
+
+#### 修改 4：添加 reasoning + tool call 混合解析逻辑（第 501-549 行）
+
+当检测到 `<think>`  reasoning 块和 `<tool_call>` 标签时，使用特殊的混合解析模式：
+
+```cpp
+// Treat tag-based reasoning markers as mode switches rather than containers that
+// hide tools. Text inside the reasoning markers is emitted as reasoning_content,
+// text outside is emitted as content, and valid tool calls can appear in either
+// mode. This path applies to tagged-argument tool formats, such as:
+//
+//   <tool_call>
+//   <function=name>
+//   <parameter=arg>value</parameter>
+//   </function>
+//   </tool_call>
+//
+// Use a specific tool boundary that includes the function-name prefix when
+// possible, so prose such as "I might call <tool_call> later" remains text.
+if (ctx.extracting_reasoning && ctx.reasoning &&
+    !trim_whitespace(ctx.reasoning->start).empty() &&
+    !trim_whitespace(ctx.reasoning->end).empty() &&
+    format.section_start.empty() &&
+    !trim_whitespace(format.per_call_start).empty() &&
+    !trim_whitespace(format.per_call_end).empty()) {
+    
+    const std::string think_start = trim_whitespace(ctx.reasoning->start);
+    const std::string think_end   = trim_whitespace(ctx.reasoning->end);
+    const std::string tool_start  = trim_whitespace(format.per_call_start) +
+        (function.name_prefix.empty() ? "" : "\n" + function.name_prefix);
+
+    // 定义边界解析器
+    auto in_think_boundary = p.choice({ p.literal(tool_start), p.literal(think_end) });
+    auto root_boundary = p.choice({ p.literal(think_start), p.literal(think_end), p.literal(tool_start) });
+
+    // reasoning 块内的内容解析为 reasoning_content
+    auto reasoning_chunk = p.reasoning(
+        p.negate(in_think_boundary) + p.any() + p.until_one_of({ tool_start, think_end }));
+    
+    // reasoning 块外的内容解析为 content
+    auto content_chunk = p.content(
+        p.negate(root_boundary) + p.any() + p.until_one_of({ think_start, think_end, tool_start }));
+
+    // 构建 think 块解析器：允许内部包含 tool call 和 reasoning text
+    auto stale_think_end = p.literal(think_end) + p.space();
+    auto think_block =
+        p.literal(think_start) + p.space() +
+        p.zero_or_more(p.choice({ tool_call_item, reasoning_chunk })) +
+        p.optional(stale_think_end);
+
+    // 返回混合解析器：可以匹配 think_block、tool_call、或 content
+    return p.zero_or_more(p.choice({ think_block, tool_call_item, stale_think_end, content_chunk })) + p.end();
+}
+```
+
+### 编译方法
+
+使用项目自带的编译脚本：
+
+```bash
+cd /opt/llama.cpp
+./build_llama_cpp.sh
+```
+
+### 验证修改
+
+启动 14B 模型后，测试 tool call：
+
+```bash
+# 启动 14B 模型
+cd /opt/my-shell/4090d
+setsid nohup ./run_qwen25-14b-instruct_llama.sh > /tmp/14b_qwen25_llama.log 2>&1 < /dev/null &
+
+# 测试 API
+curl -s http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+    "messages": [{"role": "user", "content": "创建一个文件"}],
+    "tools": [{"type": "function", "function": {"name": "write", "description": "写文件"}}]
+  }'
+```
+
+---
+
 ## 脚本关系图
 
 ```
