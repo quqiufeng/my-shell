@@ -76,9 +76,9 @@ set -euo pipefail
 #   3. 代码生成任务建议明确指定语言和框架
 # =============================================================
 #
-# 【启动方式】
+# 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/3080
-#   nohup ./run_qwen25-14b-instruct_llama.sh > /tmp/14b_qwen25_llama.log 2>&1 &
+#   setsid nohup ./run_qwen25-14b-instruct_llama.sh > /tmp/14b_qwen25_llama.log 2>&1 < /dev/null &
 #   echo $!  # 记录PID
 #
 # 【查看日志】
