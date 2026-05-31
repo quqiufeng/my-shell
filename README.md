@@ -1,6 +1,6 @@
 # My Shell Scripts
 
-本地 AI 工具脚本集合，针对 **RTX 3080 10GB** 显存优化。
+本地 AI 工具脚本集合，针对 **RTX 3080 20GB** 显存优化。
 
 ## 📋 系统初始化文档
 
@@ -410,97 +410,6 @@ cp ~/.config/opencode/opencode.json ~/my-shell/opencode.json
 
 ---
 
-## Aider - AI 辅助编码工具
-
-[Aider](https://aider.chat/) 是专为代码开发设计的 AI 助手，支持自动 diff 编辑、git 集成和文件级上下文管理。相比 opencode，aider 更适合纯代码开发场景，且不会因为对话历史过长导致上下文溢出。
-
-### 安装
-
-```bash
-# 创建虚拟环境安装（避免污染系统 Python）
-python3 -m venv ~/.local/aider-venv
-~/.local/aider-venv/bin/pip install aider-chat
-```
-
-### 配置本地模型
-
-配置文件：`~/.aider.conf.yml`
-
-```yaml
-# Aider 本地模型配置（Qwen3-14B）
-model: openai/Qwen3-14B-Q4_K_M.gguf
-openai-api-base: http://localhost:11434/v1
-openai-api-key: dummy
-weak-model: openai/Qwen3-14B-Q4_K_M.gguf
-auto-commits: false
-watch-files: false
-```
-
-**配置说明**：
-- `model`: 主模型（代码生成/编辑）
-- `weak-model`: 轻量级任务模型（如提交信息生成）
-- `openai-api-base`: 本地 llama.cpp 服务地址
-- `auto-commits`: 是否自动 git commit（建议关闭，手动确认）
-
-### 启动模型服务
-
-```bash
-# 启动 Qwen3-14B 服务（如果未运行）
-nohup ~/my-shell/3080/qwen3-14b_llama_cpp.sh > /tmp/qwen3_14b_llama.log 2>&1 &
-```
-
-### 使用方法
-
-```bash
-# 基本用法：进入代码目录启动
-cd /your/project
-~/.local/aider-venv/bin/aider
-
-# 指定文件启动（推荐）
-~/.local/aider-venv/bin/aider src/main.py src/utils.py
-
-# 一次性提问（非交互式）
-~/.local/aider-venv/bin/aider --no-git --message "给这个函数添加错误处理" src/main.py
-
-# 使用特定模型启动
-~/.local/aider-venv/bin/aider --model openai/Qwen3-14B-Q4_K_M.gguf
-```
-
-### 与 Opencode 对比
-
-| 特性 | Aider | Opencode |
-|------|-------|----------|
-| **代码编辑** | ✅ 自动 diff，直接修改文件 | ⚠️ 需要手动调用 edit 工具 |
-| **上下文管理** | ✅ 文件级，不累积对话历史 | ❌ 对话级，容易爆上下文 |
-| **Git 集成** | ✅ 自动 diff / commit | ❌ 无 |
-| **系统操作** | ❌ 只能代码 | ✅ 文件/系统/网络均可 |
-| **适用场景** | 专注代码开发 | 通用 AI 助手 |
-
-**推荐分工**：
-- **代码开发** → Aider（上下文管理更好，编辑更高效）
-- **系统管理/配置/通用问答** → Opencode
-
-### 快捷命令
-
-已自动添加到 `~/.bash_aliases`，可用别名：
-
-```bash
-# AI 编码助手
-aider                          # 启动 aider
-
-# 模型服务管理
-llama-start                    # 启动 Qwen3-14B 服务
-llama-status                   # 查看服务状态
-llama-log                      # 实时查看日志
-llama-kill                     # 停止服务
-
-# Opencode 快速切换
-oc-qwen3                       # 使用 Qwen3-14B
-oc-coder                       # 使用 Qwen2.5-Coder
-```
-
-生效方式：重新打开终端或执行 `source ~/.bashrc`
-
 ---
 
 ## img.sh - AI 图像生成脚本
@@ -558,147 +467,6 @@ SAMPLING_METHOD=dpm++ CFG_SCALE=4.0 STEPS=30 ./3080/img.sh "A cat"
 - `/opt/image/model/ae.safetensors` (VAE)
 - `/opt/image/model/Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (提示词理解)
 - ONNX Runtime
-
----
-
-## run_qwen3.5-9b_llama.sh - llama.cpp API 服务启动脚本
-
-启动 Qwen3.5-9B 模型的 llama.cpp API 服务，提供 OpenAI 兼容的 API 接口。
-
-### 功能
-
-- 在 RTX 3080 10GB 上运行 Qwen3.5-9B (Q5_K_S) 模型
-- 提供 OpenAI 兼容的 `/v1/chat/completions` API
-- 支持 128K 上下文长度
-- 使用 Flash Attention 和 KV Cache 量化优化显存
-
-### 参数
-
-无命令行参数，所有配置在脚本内定义：
-
-| 配置项 | 值 | 说明 |
-|--------|-----|------|
-| GPU 层数 | 33 | 全部加载到 GPU |
-| 上下文 | 131072 | 128K |
-| Batch Size | 1024 | 批量大小 |
-| KV Cache | q4_0 | KV 缓存量化 |
-| 端口 | 11434 | API 服务端口 |
-
-### 用法
-
-```bash
-# 启动服务
-cd ~/my-shell/3080
-setsid ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_3080.log 2>&1 &
-echo $!  # 记录 PID
-
-# 查看日志
-tail -f /tmp/9b_llama_3080.log
-
-# 测试 API
-curl http://localhost:11434/v1/models
-
-# 停止服务
-pkill -f llama-server
-```
-
-### 原理
-
-1. 使用 llama.cpp 的 `llama-server` 二进制文件
-2. 加载 Qwopus3.5-9B-v3.Q5_K_S.gguf 模型
-3. 启用 CUDA 加速 (`-ngl 33`)
-4. 使用 Flash Attention 提升推理速度
-5. KV Cache 量化 (q4_0) 控制显存占用约 8GB
-
-### 性能
-
-- RTX 3080 10GB 上约 **75 tok/s** (Q5_K_S, BATCH=1024)
-- 显存占用约 8136 MiB
-
-### 依赖
-
-- `~/llama.cpp/build/bin/llama-server`
-- `/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q5_K_S.gguf`
-- CUDA 12.0+
-
----
-
-## run_qwen3.5-9b_koboldcpp.sh - KoboldCpp API 服务启动脚本
-
-使用 KoboldCpp 框架启动 Qwen3.5-9B API 服务，作为 llama.cpp 的替代方案。
-
-### 功能
-
-- 提供与 llama.cpp 相同的 OpenAI 兼容 API
-- 支持 KoboldCpp 特有的功能（如智能缓存）
-- 显存占用略低 (~7.5GB vs ~8.0GB)
-
-### 参数
-
-| 配置项 | 值 | 说明 |
-|--------|-----|------|
-| GPU 层数 | 33 | 全部加载到 GPU |
-| 上下文 | 131072 | 128K |
-| Batch Size | 1024 | 批量大小 |
-| KV Cache | q4_0 | KV 缓存量化 |
-| 端口 | 11434 | API 服务端口 |
-
-### 用法
-
-```bash
-# 启动服务
-cd ~/my-shell/3080
-setsid ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp_3080.log 2>&1 &
-echo $!  # 记录 PID
-
-# 停止服务
-pkill -f koboldcpp.py
-```
-
-### 性能对比
-
-| 框架 | 速度 | 显存占用 | 推荐度 |
-|------|------|----------|--------|
-| llama.cpp | ~75 tok/s | ~8.0GB | ⭐⭐⭐⭐⭐ |
-| KoboldCpp | ~57 tok/s | ~7.5GB | ⭐⭐⭐ |
-
-### 依赖
-
-- `/opt/koboldcpp/koboldcpp.py`
-- Python 3
-- 模型文件同 llama.cpp
-
----
-
-## test_api_performance.sh - API 性能测试脚本
-
-自动测试 llama.cpp 和 KoboldCpp 的性能表现。
-
-### 功能
-
-- 自动启动 llama.cpp 和 KoboldCpp 服务
-- 使用 `test_api.py` 进行标准化性能测试
-- 对比两种框架的推理速度
-- 自动清理服务进程
-
-### 用法
-
-```bash
-cd ~/my-shell/3080
-./test_api_performance.sh
-```
-
-### 测试流程
-
-1. 停止现有服务
-2. 启动 llama.cpp → 测试性能 → 停止服务
-3. 启动 KoboldCpp → 测试性能 → 停止服务
-4. 输出对比结果
-
-### 依赖
-
-- `~/my-shell/test_api.py` (性能测试脚本)
-- 两个启动脚本 (`run_qwen3.5-9b_llama.sh`, `run_qwen3.5-9b_koboldcpp.sh`)
 
 ---
 
@@ -793,64 +561,6 @@ cd ~/my-shell/3080
 2. 累加时间计算字幕起止时间
 3. 自动换行（每行约 12 字）
 4. 输出标准 ASS 格式字幕文件
-
----
-
-## generate_script.py - 视频字幕文案生成工具
-
-调用本地 Qwen 模型，根据产品介绍素材自动生成短视频字幕文案。
-
-### 功能
-
-- 根据视频时长自动计算文案段数和字数
-- 读取产品介绍素材（info.txt）
-- 调用本地 Qwen API 生成文案
-- 自动过滤英文、数字、标点符号
-- 去重和长度校验
-
-### 参数
-
-| 参数 | 说明 |
-|------|------|
-| 参数1 | 视频文件路径（用于计算时长） |
-| 参数2 | 素材文件路径（产品介绍文本） |
-| `--output` | 输出文案文件路径（可选） |
-
-### 用法
-
-```bash
-# 基础用法
-python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt
-
-# 保存到文件
-python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt --output ~/video/script.txt
-
-# 生成后直接用于视频合成
-SCRIPT=$(python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt | tail -1)
-./3080/video_subtitle_voice.sh ~/video/orgin.mp4 "$SCRIPT"
-```
-
-### 原理
-
-1. 使用 ffprobe 获取视频时长
-2. 按语速 3.1 字/秒计算总字数和段数
-3. 构建 prompt 调用本地 Qwen API (`localhost:11434`)
-4. 处理 reasoning 模型的输出（提取最终文案）
-5. 清理：去掉英文、数字、标点，去重
-6. 验证每段长度（10-40 字）
-
-### 文案要求
-
-- 无标点符号
-- 无英文字母和数字
-- 用 `|` 分隔段落
-- 顺序：品牌介绍 → 核心卖点 → 功能特点 → 行动号召
-
-### 依赖
-
-- 本地 llama.cpp 服务（`./run_qwen3.5-9b_llama.sh`）
-- Python 3 + requests
-- ffmpeg (ffprobe)
 
 ---
 
@@ -969,8 +679,81 @@ if (ctx.extracting_reasoning && ctx.reasoning &&
 
 ```bash
 cd /opt/llama.cpp
-./build_llama_cpp.sh
+make -j$(nproc) llama-server
 ```
+
+---
+
+## Qwen3-14B Tool Call 修复（Chat Template 方案）
+
+### 修复时间：2025-05-31
+
+### 修复原因
+
+Qwen3-14B 模型原生 chat template 存在多个 tool call 相关问题：
+- `<think>` 块未关闭就输出 `<tool_call>`，导致 parser 解析失败
+- Agent 循环中模型提前输出 `<|im_end|>` 终止（Premature Stalls）
+- 工具错误时模型反复输出相同的失败 `<tool_call>`（Retry Stall）
+- 历史记录中空的 `<think></think>` 块误导模型行为
+
+### 修复方案
+
+使用 [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates) 修复版 chat template，替代 GGUF 内置模板。
+
+### 修复内容
+
+该模板修复了以下关键问题：
+
+| 问题类型 | 具体问题 | 修复方式 |
+|---------|---------|---------|
+| **Agentic Loop** | Premature Stalls（提前终止） | 移除 System Prompt 逻辑陷阱，消除 Empty Think Poisoning |
+| **Agentic Loop** | Retry Stall & Reasoning Spiral | 两级错误升级系统（Two-tier escalation） |
+| **Agentic Loop** | Post-Tool Overthinking | 将 `<think>` 定义为规划或综合的双用途空间 |
+| **兼容性** | Unclosed Thinking Before Tool | 在 tool 边界前自动注入关闭标签 |
+| **性能** | KV Cache Invalidation | 保留历史思考块，保证 100% KV Cache 命中率 |
+| **兼容性** | Legacy Engine Crashes | 使用通用 Jinja 语法替代 Python 特性 |
+
+### 使用方法
+
+1. **下载修复版 template：**
+
+```bash
+curl -L -o /opt/my-shell/3080/qwen-template/chat_template.jinja \
+  "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/main/chat_template.jinja"
+```
+
+2. **启动脚本添加 `--chat-template-file` 参数：**
+
+```bash
+exec $LLAMA_SERVER \
+  -m "$MODEL_DIR" \
+  --jinja \
+  --chat-template-file /opt/my-shell/3080/qwen-template/chat_template.jinja \
+  ...其他参数
+```
+
+### 验证修复
+
+测试 tool call：
+
+```bash
+curl -s http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen3-14B-Q4_K_M.gguf",
+    "messages": [{"role": "user", "content": "创建一个文件 /tmp/test.txt"}],
+    "tools": [{"type": "function", "function": {"name": "write_file", "description": "写文件"}}]
+  }'
+```
+
+预期返回 `finish_reason: "tool_calls"` 和正确的 `tool_calls` 数组。
+
+### 双重保险
+
+- **Template 层**：froggeric 修复版正确处理 `<think>` 和 `<tool_call>` 边界
+- **Parser 层**：llama.cpp 源码修改（见上文）支持在 thinking block 内解析 tool call
+
+两层修复配合，Qwen3-14B 的 tool call 功能完全正常。
 
 ### 验证修改
 
@@ -998,17 +781,14 @@ curl -s http://localhost:11434/v1/chat/completions \
 ```
 图像生成: img.sh → stable-diffusion.cpp → PNG 图片
            ↓
-文案生成: generate_script.py → Qwen API (localhost:11434) → 字幕文案
-           ↓
 视频合成: img_to_video_v1/v2/v3.sh → CosyVoice TTS + ffmpeg → 带配音字幕视频
            ↓
 后期处理: video_subtitle_voice.sh → 为现有视频添加配音字幕
            ↓
 字幕工具: audio_to_subtitle.sh → 根据配音生成 ASS 字幕
 
-模型服务: run_qwen3.5-9b_llama.sh → llama.cpp API (推荐)
-          run_qwen3.5-9b_koboldcpp.sh → KoboldCpp API (备选)
-          test_api_performance.sh → 性能测试对比
+模型服务: run_qwen3-14b_llama.sh → llama.cpp API (Qwen3-14B)
+          run_qwen25-14b-instruct_llama.sh → llama.cpp API (Qwen2.5-14B)
 ```
 
 ---
