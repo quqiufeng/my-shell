@@ -24,17 +24,29 @@ set -euo pipefail
 #
 # 【推荐】4090D 上 14B 模型高效方案
 # llama.cpp 全载 GPU，128K 上下文无压力
+#
+# 【基准测试数据】(2025-05-31, test_api.py 20题算法题, max_tokens=1024)
+# ┌─────────────┬──────────┬────────────┬──────────────────────────────┐
+# │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                         │
+# ├─────────────┼──────────┼────────────┼──────────────────────────────┤
+# │ 128K        │ 70.0     │ ~19000     │ batch=1024, threads=16,      │
+# │             │          │            │ cache-type-k/v=q8_0, fa=on   │
+# └─────────────┴──────────┴────────────┴──────────────────────────────┘
+# 速度范围: 69.2 - 71.0 tok/s (非常稳定)
+# 测试环境: NVIDIA GeForce RTX 4090 D 24GB, CUDA compute 8.9
+# 模型: DeepSeek-R1-Distill-Qwen-14B-Q5_K_M.gguf
 # =============================================================
 #
 # 【上下文配置】(4090D 24GB)
-#   - 128K: 轻松运行, 14B Q5_K_M 权重约 9.5GB
-#   - 无需 KV cache 量化即可跑满 128K
-#   - 若需更大上下文可尝试 192K 或 256K
+#   - 128K: 可行, 14B Q5_K_M 权重约 10.5GB
+#   - 需要 KV cache 量化 (--cache-type-k/v q8_0) 才能在 24GB 跑 128K
+#   - 若启动时 OOM，可降级为 q4_0 或将上下文降为 96K
 #
 # 【优化要点】
-#   - ctx-size: 131072 (128K, 4090D 24GB 轻松胜任)
+#   - ctx-size: 131072 (128K)
 #   - batch-size: 1024 (14B 模型可适当增大)
 #   - ubatch-size: 1024
+#   - cache-type-k/v: q8_0 (128K 下需要 KV cache 量化, 官方推荐)
 #   - flash-attn on: 必须开启
 #   - threads: 16
 #   --parallel 1 --slots 1
@@ -160,6 +172,7 @@ echo "Batch Size: $BATCH"
 echo "uBatch Size: $UBATCH"
 echo "Threads: $THREADS"
 echo "Chat Template: $CHAT_TEMPLATE"
+echo "KV Cache: q8_0"
 echo "=============================="
 echo ""
 
@@ -184,6 +197,8 @@ LLAMA_ARGS=(
   --top-k 20
   --min-p 0.05
   --repeat-penalty 1.1
+  --cache-type-k q8_0
+  --cache-type-v q8_0
   --metrics
   --jinja
 )
