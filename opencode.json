@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf",
+  "model": "openai/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
   "permission": {
     "*": "allow",
     "read": {

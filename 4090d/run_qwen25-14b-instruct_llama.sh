@@ -87,15 +87,15 @@ set -euo pipefail
 #   pkill -f "llama-server.*Qwen2.5-14B-Instruct"
 #
 # 【测试API】
-#   curl http://localhost:11435/v1/models
+#   curl http://localhost:11434/v1/models
 #
 #   # 基础对话
-#   curl -s http://localhost:11435/v1/chat/completions \
+#   curl -s http://localhost:11434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
 #     -d '{"model": "Qwen2.5-14B-Instruct-Q4_K_M.gguf", "messages": [{"role": "user", "content": "你好"}], "max_tokens": 50}'
 #
 #   # Tool Call 测试 (函数调用)
-#   curl -s http://localhost:11435/v1/chat/completions \
+#   curl -s http://localhost:11434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
 #     -d '{
 #       "model": "Qwen2.5-14B-Instruct-Q4_K_M.gguf",
@@ -126,7 +126,7 @@ set -euo pipefail
 #       "npm": "@ai-sdk/openai-compatible",
 #       "name": "Local Models",
 #       "options": {
-#         "baseURL": "http://localhost:11435/v1",
+#         "baseURL": "http://localhost:11434/v1",
 #         "apiKey": "dummy"
 #       },
 #       "models": {
@@ -167,7 +167,7 @@ BATCH=1024          # batch size (14B模型可适当增大)
 UBATCH=1024         # micro batch size
 THREADS=16          # CPU线程数
 
-PORT=11435
+PORT=11434
 
 echo "=============================="
 echo "启动 Qwen2.5-14B-Instruct Q4_K_M (llama.cpp) API 服务"
