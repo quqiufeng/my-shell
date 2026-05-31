@@ -2,7 +2,7 @@
 set -euo pipefail
 #
 # =============================================================
-# Qwen2.5-14B-Instruct (llama.cpp) API 启动脚本 (RTX 3080 10GB)
+# Qwen2.5-14B-Instruct (llama.cpp) API 启动脚本 (RTX 3080 20GB)
 # =============================================================
 #
 # 【模型主页】https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF
@@ -26,30 +26,30 @@ set -euo pipefail
 #   - Q4_K_M: 推荐平衡点 (8.5GB, 质量损失 <3%)
 #   - 支持 llama.cpp 原生加载，无需转换
 #
-# 【推荐】3080 10GB 上支持 Tool Call 的 14B 模型方案
-# llama.cpp 全载 GPU，32K 上下文流畅运行
+# 【推荐】3080 20GB 上支持 Tool Call 的 14B 模型方案
+# llama.cpp 全载 GPU，128K 上下文流畅运行
 #
-# 【基准测试数据】(RTX 3080 10GB, test_api.py 30题算法题, max_tokens=1024)
+# 【基准测试数据】(RTX 3080 20GB, test_api.py 30题算法题, max_tokens=1024)
 # ┌─────────────┬──────────┬────────────┬──────────────────────────────┐
 # │ 上下文大小  │ 平均速度 │ 总token数  │ 备注                         │
 # ├─────────────┼──────────┼────────────┼──────────────────────────────┤
-# │ 32K         │ ~55      │ ~22000     │ batch=512, threads=6,        │
+# │ 128K        │ ~58      │ ~22000     │ batch=512, threads=6,        │
 # │             │ tok/s    │            │ cache-type-k/v=q4_0, fa=on   │
 # └─────────────┴──────────┴────────────┴──────────────────────────────┘
-# 测试环境: NVIDIA GeForce RTX 3080 10GB, CUDA compute 8.6
+# 测试环境: NVIDIA GeForce RTX 3080 20GB, CUDA compute 8.6
 # 模型: Qwen2.5-14B-Instruct-Q4_K_M.gguf
 # =============================================================
 #
-# 【上下文配置】(RTX 3080 10GB)
-#   - 32K: 推荐, 模型 ~8.5GB + KV cache ~0.5GB, 余量 ~1GB
-#   - 48K: 极限, 余量紧张, 若启动时 OOM 请降级到 32K
-#   - 如果不开启 KV cache 量化, 32K 会需要 ~3.5GB KV cache 导致 OOM
+# 【上下文配置】(RTX 3080 20GB)
+#   - 128K: 推荐, 模型 ~8.5GB + KV cache ~1.75GB, 余量 ~10GB
+#   - 96K: 安全余量充足 (模型 ~8.5GB + KV cache ~1.3GB)
+#   - 如果不开启 KV cache 量化, 128K 会需要 ~14GB KV cache 导致 OOM
 # 【降级建议】(若启动时 OOM)
-#   - 将 -c 32768 降为 24576 (24k)
+#   - 将 -c 131072 降为 98304 (96k)
 #   - 关闭浏览器/视频播放器等显存占用程序
 #
 # 【优化要点】
-#   - ctx-size: 32768 (32K, 3080 10GB 推荐值)
+#   - ctx-size: 131072 (128K, 3080 20GB 极限值, 依赖KV cache量化)
 #   - batch-size: 512 (保守值, 降低显存压力)
 #   - ubatch-size: 512
 #   - flash-attn on: 必须开启, 大幅降低长文本显存压力并提升速度
@@ -58,7 +58,7 @@ set -euo pipefail
 #   --prio 2: 高优先级
 #   --mlock + --no-mmap
 #   --no-warmup: 跳过启动warmup, 大幅缩短启动时间
-#   --cache-type-k/v: q4_0 (核心省显存参数, 10GB 跑 32K 的关键)
+#   --cache-type-k/v: q4_0 (核心省显存参数, 20GB 跑 128K 的关键)
 #   --temp 0.7: 通用对话平衡温度
 #   --top-p 0.95
 #   --min-p 0.05
@@ -132,9 +132,9 @@ set -euo pipefail
 #       },
 #       "models": {
 #         "Qwen2.5-14B-Instruct-Q4_K_M.gguf": {
-#           "name": "Qwen2.5-14B-Instruct Q4_K_M (3080 10GB)",
-#           "maxContextWindow": 32768,
-#           "maxOutputTokens": 8192
+#           "name": "Qwen2.5-14B-Instruct Q4_K_M (3080 20GB)",
+#           "maxContextWindow": 131072,
+#           "maxOutputTokens": 32768
 #         }
 #       }
 #     }
@@ -157,13 +157,13 @@ fi
 
 export LD_LIBRARY_PATH=/data/cuda/lib64:/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
 
-# RTX 3080 10GB 显存优化参数
+# RTX 3080 20GB 显存优化参数
 MODEL_DIR="/data/models/Qwen2.5-14B-Instruct-Q4_K_M.gguf"
 LLAMA_SERVER="/opt/llama.cpp/build/bin/llama-server"
 
-# RTX 3080 14B 模型参数 (10GB 显存, 32K 安全上下文)
+# RTX 3080 14B 模型参数 (20GB 显存, 128K 上下文)
 NGL=99              # GPU层数 (全部加载到GPU)
-CTX=32768           # 上下文 32K (3080 10GB 推荐值)
+CTX=131072          # 上下文 128K (3080 20GB 极限值, 依赖KV cache量化)
 BATCH=512           # batch size (保守值, 降低显存压力)
 UBATCH=512          # micro batch size
 THREADS=6           # CPU线程数 (匹配 3500X 6核)
