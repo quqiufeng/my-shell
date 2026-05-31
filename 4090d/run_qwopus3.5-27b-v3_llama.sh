@@ -5,6 +5,8 @@ set -euo pipefail
 # Qwopus3.5-27B-v3 (llama.cpp) API 启动脚本 (4090D 24GB)
 # =============================================================
 #
+# 【Chat Template 来源】https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
+#
 # 【推荐首选】4090D 上 27B 模型最优方案
 # llama.cpp > KoboldCpp (快 ~20%)
 # =============================================================
@@ -110,6 +112,7 @@ export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/root/miniconda3/pkgs/libstdcxx
 # 4090D 24GB 显存优化参数
 MODEL_DIR="/opt/gguf/Qwopus3.5-27B-v3-Q4_K_S.gguf"
 LLAMA_SERVER="/opt/llama.cpp/bin/llama-server"
+CHAT_TEMPLATE="/opt/my-shell/4090d/qwopus35-27b-chat-template.jinja"
 
 # 4090D 27B 模型参数 (24GB 显存极限, 128K 上下文)
 NGL=99              # GPU层数 (全部加载到GPU)
@@ -156,6 +159,7 @@ exec $LLAMA_SERVER \
   --repeat-penalty 1.1 \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
+  --chat-template "$CHAT_TEMPLATE" \
   --metrics
 
-# 注意: 使用模型内置的chat template，不指定自定义模板
+# 使用自定义 Qwen Fixed Chat Template (froggeric)

@@ -1,0 +1,96 @@
+{# Qwopus3.5-27B-v3 专用 Chat Template
+   基于 froggeric/Qwen-Fixed-Chat-Templates v19 简化
+   适配 llama.cpp / KoboldCpp，优化代码/推理场景
+#}
+
+{%- set ns = namespace(enable_thinking=true) -%}
+{%- if enable_thinking is defined -%}
+    {%- set ns.enable_thinking = enable_thinking -%}
+{%- endif -%}
+
+{%- if not messages -%}
+    {{- raise_exception('对话历史为空') }}
+{%- endif -%}
+
+{# 处理 system prompt 和 thinking toggle -#}
+{%- set system_content = '' -%}
+{%- set has_system = false -%}
+{%- if messages[0].role == 'system' or messages[0].role == 'developer' -%}
+    {%- set has_system = true -%}
+    {%- set system_content = messages[0].content | trim -%}
+    {%- if '<|think_off|>' in system_content -%}
+        {%- set ns.enable_thinking = false -%}
+        {%- set system_content = system_content | replace('<|think_off|>', '') | trim -%}
+    {%- elif '<|think_on|>' in system_content -%}
+        {%- set ns.enable_thinking = true -%}
+        {%- set system_content = system_content | replace('<|think_on|>', '') | trim -%}
+    {%- endif -%}
+{%- endif -%}
+
+{# 输出 system message -#}
+{%- if has_system and system_content -%}
+    {{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' -}}
+{%- endif -%}
+
+{# 处理对话历史 -#}
+{%- for message in messages -%}
+    {%- set is_system = (message.role == 'system' or message.role == 'developer') -%}
+    {%- set content = message.content | trim -%}
+    
+    {# 检查 thinking toggle -#}
+    {%- if '<|think_off|>' in content -%}
+        {%- set ns.enable_thinking = false -%}
+        {%- set content = content | replace('<|think_off|>', '') | trim -%}
+    {%- elif '<|think_on|>' in content -%}
+        {%- set ns.enable_thinking = true -%}
+        {%- set content = content | replace('<|think_on|>', '') | trim -%}
+    {%- endif -%}
+    
+    {%- if is_system -%}
+        {# 跳过第一个 system message（已处理）-#}
+        {%- if not loop.first and content -%}
+            {{- '<|im_start|>system\n' + content + '<|im_end|>\n' -}}
+        {%- endif -%}
+    {%- elif message.role == 'user' -%}
+        {{- '<|im_start|>user\n' + content + '<|im_end|>\n' -}}
+    {%- elif message.role == 'assistant' -%}
+        {# 提取 reasoning content -#}
+        {%- set reasoning_content = '' -%}
+        {%- if message.reasoning_content is string -%}
+            {%- set reasoning_content = message.reasoning_content | trim -%}
+        {%- elif '<think>' in content and '</think>' in content -%}
+            {%- set think_parts = content.split('</think>') -%}
+            {%- if think_parts | length > 1 -%}
+                {%- set reasoning_content = think_parts[0].split('<think>')[1:] | join('<think>') | trim -%}
+                {%- set content = think_parts[1:] | join('</think>') | trim -%}
+            {%- endif -%}
+        {%- endif -%}
+        
+        {# 决定是否保留 thinking block -#}
+        {%- set show_think = true -%}
+        {%- if preserve_thinking is defined and preserve_thinking == false -%}
+            {%- set show_think = false -%}
+        {%- endif -%}
+        {%- if not reasoning_content -%}
+            {%- set show_think = false -%}
+        {%- endif -%}
+        
+        {%- if show_think and ns.enable_thinking is not false -%}
+            {{- '<|im_start|>assistant\n<think>\n' + reasoning_content + '\n</think>\n' + content + '<|im_end|>\n' -}}
+        {%- else -%}
+            {{- '<|im_start|>assistant\n' + content + '<|im_end|>\n' -}}
+        {%- endif -%}
+    {%- else -%}
+        {{- raise_exception('未知角色: ' + message.role) -}}
+    {%- endif -%}
+{%- endfor -%}
+
+{# 生成 assistant 前缀 -#}
+{%- if add_generation_prompt -%}
+    {{- '<|im_start|>assistant\n' -}}
+    {%- if ns.enable_thinking is false -%}
+        {{- '<think>\n</think>\n' -}}
+    {%- else -%}
+        {{- '<think>\n' -}}
+    {%- endif -%}
+{%- endif -%}
