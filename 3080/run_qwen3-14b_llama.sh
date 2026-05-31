@@ -80,7 +80,10 @@ set -euo pipefail
 #   {"role": "user", "content": "你好 /no_think"}
 #
 # 【Chat Template】
-#   使用 GGUF 内置的 Qwen3 chat template（--jinja 自动加载）
+#   使用 froggeric 修复版 Qwen chat template
+#   - 下载: https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
+#   - 位置: /opt/my-shell/3080/qwen-template/chat_template.jinja
+#   - 修复内容: tool call 提前终止、think 块未关闭、agent 循环停滞等
 #   - 原生支持 <tool> 和 <tool_call> 标签
 #   - 兼容 OpenAI function calling schema
 #   - 支持思考模式和非思考模式切换
@@ -224,11 +227,14 @@ if [[ ! -f "$MODEL_DIR" ]]; then
     exit 1
 fi
 
+CHAT_TEMPLATE="/opt/my-shell/3080/qwen-template/chat_template.jinja"
+
 exec $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port $PORT \
   --jinja \
+  --chat-template-file "$CHAT_TEMPLATE" \
   -ngl $NGL \
   -c $CTX \
   --batch-size $BATCH \
