@@ -52,10 +52,10 @@ set -euo pipefail
 #   - --repeat-penalty 1.0: 轻微或不设置
 # =============================================================
 #
-# 【启动方式】
+# 【启动方式】(必须用 setsid，否则终端关闭会终止服务)
 #   cd /opt/my-shell/3080
-#   nohup ./qwen3-14b_llama_cpp.sh > /tmp/qwen3_14b_llama.log 2>&1 &
-#   echo $!  # 记录PID
+#   setsid ./qwen3-14b_llama_cpp.sh > /tmp/qwen3_14b_llama.log 2>&1 &
+#   echo $!  # 记录 PID
 #
 # 【查看日志】
 #   tail -f /tmp/qwen3_14b_llama.log
