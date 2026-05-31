@@ -1,36 +1,51 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "openai/Qwopus3.5-27B-v3.5-Q4_K_S.gguf",
   "permission": {
     "*": "allow",
-    "external_directory": "allow"
+    "read": {
+      "*": "allow",
+      "*.env": "allow",
+      "*.env.*": "allow"
+    },
+    "edit": "allow",
+    "write": "allow",
+    "bash": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "task": "allow",
+    "skill": "allow",
+    "lsp": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "codesearch": "allow",
+    "external_directory": "allow",
+    "doom_loop": "allow",
+    "todowrite": "allow",
+    "question": "allow",
+    "list": "allow"
   },
-  "compaction": {
-    "auto": true,
-    "tail_turns": 8
-  },
-  "model": "openai/qwen-q5-fix:latest",
   "provider": {
     "openai": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Local Models",
       "options": {
-        "baseURL": "http://localhost:11436/v1",
-        "apiKey": "dummy",
-        "timeout": 300000
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "dummy"
       },
       "models": {
-        "qwen-q5-fix:latest": {
-          "name": "Qwen2.5-Coder-14B Q5 (3080 20GB)",
-          "maxContextWindow": 32768,
-          "maxOutputTokens": 32768
-        },
-        "Qwopus3.5-27B-v3-Q4_K_S.gguf": {
-          "name": "Qwopus3.5-27B-v3 Q4_K_S (4090D llama.cpp)",
+        "Qwopus3.5-27B-v3.5-Q4_K_S.gguf": {
+          "name": "Qwopus3.5-27B-v3.5 Q4_K_S (4090D llama.cpp)",
           "maxContextWindow": 131072,
           "maxOutputTokens": 32768
         },
-        "koboldcpp/Qwopus3.5-27B-v3-Q4_K_S.gguf": {
-          "name": "Qwopus3.5-27B-v3 Q4_K_S (4090D KoboldCpp)",
+        "koboldcpp/Qwopus3.5-27B-v3.5-Q4_K_S.gguf": {
+          "name": "Qwopus3.5-27B-v3.5 Q4_K_S (4090D KoboldCpp)",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 32768
+        },
+        "openai/DeepSeek-R1-Distill-Qwen-14B-Q5_K_M.gguf": {
+          "name": "DeepSeek-R1-Distill-Qwen-14B Q5_K_M (4090D llama.cpp)",
           "maxContextWindow": 131072,
           "maxOutputTokens": 32768
         }
