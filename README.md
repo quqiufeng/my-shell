@@ -470,147 +470,6 @@ SAMPLING_METHOD=dpm++ CFG_SCALE=4.0 STEPS=30 ./3080/img.sh "A cat"
 
 ---
 
-## run_qwen3.5-9b_llama.sh - llama.cpp API 服务启动脚本
-
-启动 Qwen3.5-9B 模型的 llama.cpp API 服务，提供 OpenAI 兼容的 API 接口。
-
-### 功能
-
-- 在 RTX 3080 10GB 上运行 Qwen3.5-9B (Q5_K_S) 模型
-- 提供 OpenAI 兼容的 `/v1/chat/completions` API
-- 支持 128K 上下文长度
-- 使用 Flash Attention 和 KV Cache 量化优化显存
-
-### 参数
-
-无命令行参数，所有配置在脚本内定义：
-
-| 配置项 | 值 | 说明 |
-|--------|-----|------|
-| GPU 层数 | 33 | 全部加载到 GPU |
-| 上下文 | 131072 | 128K |
-| Batch Size | 1024 | 批量大小 |
-| KV Cache | q4_0 | KV 缓存量化 |
-| 端口 | 11434 | API 服务端口 |
-
-### 用法
-
-```bash
-# 启动服务
-cd ~/my-shell/3080
-setsid ./run_qwen3.5-9b_llama.sh > /tmp/9b_llama_3080.log 2>&1 &
-echo $!  # 记录 PID
-
-# 查看日志
-tail -f /tmp/9b_llama_3080.log
-
-# 测试 API
-curl http://localhost:11434/v1/models
-
-# 停止服务
-pkill -f llama-server
-```
-
-### 原理
-
-1. 使用 llama.cpp 的 `llama-server` 二进制文件
-2. 加载 Qwopus3.5-9B-v3.Q5_K_S.gguf 模型
-3. 启用 CUDA 加速 (`-ngl 33`)
-4. 使用 Flash Attention 提升推理速度
-5. KV Cache 量化 (q4_0) 控制显存占用约 8GB
-
-### 性能
-
-- RTX 3080 10GB 上约 **75 tok/s** (Q5_K_S, BATCH=1024)
-- 显存占用约 8136 MiB
-
-### 依赖
-
-- `~/llama.cpp/build/bin/llama-server`
-- `/opt/image/Qwopus3.5-9B-v3-GGUF/Qwopus3.5-9B-v3.Q5_K_S.gguf`
-- CUDA 12.0+
-
----
-
-## run_qwen3.5-9b_koboldcpp.sh - KoboldCpp API 服务启动脚本
-
-使用 KoboldCpp 框架启动 Qwen3.5-9B API 服务，作为 llama.cpp 的替代方案。
-
-### 功能
-
-- 提供与 llama.cpp 相同的 OpenAI 兼容 API
-- 支持 KoboldCpp 特有的功能（如智能缓存）
-- 显存占用略低 (~7.5GB vs ~8.0GB)
-
-### 参数
-
-| 配置项 | 值 | 说明 |
-|--------|-----|------|
-| GPU 层数 | 33 | 全部加载到 GPU |
-| 上下文 | 131072 | 128K |
-| Batch Size | 1024 | 批量大小 |
-| KV Cache | q4_0 | KV 缓存量化 |
-| 端口 | 11434 | API 服务端口 |
-
-### 用法
-
-```bash
-# 启动服务
-cd ~/my-shell/3080
-setsid ./run_qwen3.5-9b_koboldcpp.sh > /tmp/9b_koboldcpp_3080.log 2>&1 &
-echo $!  # 记录 PID
-
-# 停止服务
-pkill -f koboldcpp.py
-```
-
-### 性能对比
-
-| 框架 | 速度 | 显存占用 | 推荐度 |
-|------|------|----------|--------|
-| llama.cpp | ~75 tok/s | ~8.0GB | ⭐⭐⭐⭐⭐ |
-| KoboldCpp | ~57 tok/s | ~7.5GB | ⭐⭐⭐ |
-
-### 依赖
-
-- `/opt/koboldcpp/koboldcpp.py`
-- Python 3
-- 模型文件同 llama.cpp
-
----
-
-## test_api_performance.sh - API 性能测试脚本
-
-自动测试 llama.cpp 和 KoboldCpp 的性能表现。
-
-### 功能
-
-- 自动启动 llama.cpp 和 KoboldCpp 服务
-- 使用 `test_api.py` 进行标准化性能测试
-- 对比两种框架的推理速度
-- 自动清理服务进程
-
-### 用法
-
-```bash
-cd ~/my-shell/3080
-./test_api_performance.sh
-```
-
-### 测试流程
-
-1. 停止现有服务
-2. 启动 llama.cpp → 测试性能 → 停止服务
-3. 启动 KoboldCpp → 测试性能 → 停止服务
-4. 输出对比结果
-
-### 依赖
-
-- `~/my-shell/test_api.py` (性能测试脚本)
-- 两个启动脚本 (`run_qwen3.5-9b_llama.sh`, `run_qwen3.5-9b_koboldcpp.sh`)
-
----
-
 ## video_subtitle_voice.sh - 视频配音字幕生成工具
 
 为现有短视频添加 AI 配音和同步字幕。
@@ -702,64 +561,6 @@ cd ~/my-shell/3080
 2. 累加时间计算字幕起止时间
 3. 自动换行（每行约 12 字）
 4. 输出标准 ASS 格式字幕文件
-
----
-
-## generate_script.py - 视频字幕文案生成工具
-
-调用本地 Qwen 模型，根据产品介绍素材自动生成短视频字幕文案。
-
-### 功能
-
-- 根据视频时长自动计算文案段数和字数
-- 读取产品介绍素材（info.txt）
-- 调用本地 Qwen API 生成文案
-- 自动过滤英文、数字、标点符号
-- 去重和长度校验
-
-### 参数
-
-| 参数 | 说明 |
-|------|------|
-| 参数1 | 视频文件路径（用于计算时长） |
-| 参数2 | 素材文件路径（产品介绍文本） |
-| `--output` | 输出文案文件路径（可选） |
-
-### 用法
-
-```bash
-# 基础用法
-python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt
-
-# 保存到文件
-python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt --output ~/video/script.txt
-
-# 生成后直接用于视频合成
-SCRIPT=$(python3 ~/my-shell/3080/generate_script.py ~/video/orgin.mp4 ~/video/info.txt | tail -1)
-./3080/video_subtitle_voice.sh ~/video/orgin.mp4 "$SCRIPT"
-```
-
-### 原理
-
-1. 使用 ffprobe 获取视频时长
-2. 按语速 3.1 字/秒计算总字数和段数
-3. 构建 prompt 调用本地 Qwen API (`localhost:11434`)
-4. 处理 reasoning 模型的输出（提取最终文案）
-5. 清理：去掉英文、数字、标点，去重
-6. 验证每段长度（10-40 字）
-
-### 文案要求
-
-- 无标点符号
-- 无英文字母和数字
-- 用 `|` 分隔段落
-- 顺序：品牌介绍 → 核心卖点 → 功能特点 → 行动号召
-
-### 依赖
-
-- 本地 llama.cpp 服务（`./run_qwen3.5-9b_llama.sh`）
-- Python 3 + requests
-- ffmpeg (ffprobe)
 
 ---
 
@@ -980,17 +781,14 @@ curl -s http://localhost:11434/v1/chat/completions \
 ```
 图像生成: img.sh → stable-diffusion.cpp → PNG 图片
            ↓
-文案生成: generate_script.py → Qwen API (localhost:11434) → 字幕文案
-           ↓
 视频合成: img_to_video_v1/v2/v3.sh → CosyVoice TTS + ffmpeg → 带配音字幕视频
            ↓
 后期处理: video_subtitle_voice.sh → 为现有视频添加配音字幕
            ↓
 字幕工具: audio_to_subtitle.sh → 根据配音生成 ASS 字幕
 
-模型服务: run_qwen3.5-9b_llama.sh → llama.cpp API (推荐)
-          run_qwen3.5-9b_koboldcpp.sh → KoboldCpp API (备选)
-          test_api_performance.sh → 性能测试对比
+模型服务: run_qwen3-14b_llama.sh → llama.cpp API (Qwen3-14B)
+          run_qwen25-14b-instruct_llama.sh → llama.cpp API (Qwen2.5-14B)
 ```
 
 ---
