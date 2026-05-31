@@ -48,6 +48,11 @@
           "name": "DeepSeek-R1-Distill-Qwen-14B Q5_K_M (4090D llama.cpp)",
           "maxContextWindow": 131072,
           "maxOutputTokens": 32768
+        },
+        "openai/Qwen2.5-14B-Instruct-Q4_K_M.gguf": {
+          "name": "Qwen2.5-14B-Instruct Q4_K_M (4090D llama.cpp)",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 32768
         }
       }
     }
