@@ -25,7 +25,7 @@ fi
 
 PROJECT_DIR=/opt/stable-diffusion.cpp
 cd "$PROJECT_DIR"
-git pull
+# git pull (disabled to preserve local changes)
 
 # 确保子模块完整
 if [ ! -f "ggml/CMakeLists.txt" ]; then
