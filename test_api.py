@@ -9,6 +9,7 @@ API 性能测试脚本
 """
 
 import sys
+import os
 import time
 import json
 import urllib.request
@@ -22,6 +23,15 @@ MAX_TOKENS = 1024
 # 从命令行参数获取配置
 MODEL = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MODEL
 API_URL = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_API_URL
+
+# 尝试推断模型目录（用于加载 tokenizer）
+MODEL_DIR = None
+if MODEL and not MODEL.startswith("http"):
+    # 去掉可能的 provider 前缀（如 openai/）
+    model_name = MODEL.split("/")[-1]
+    candidate = os.path.join("/opt/gguf", model_name)
+    if os.path.isdir(candidate):
+        MODEL_DIR = candidate
 
 TESTS = [
     (
@@ -90,17 +100,21 @@ TESTS = [
 ]
 
 
-def count_tokens(text):
-    """用tokenizer计算token数"""
-    import sys
+def count_tokens(text, model_dir=None):
+    """用tokenizer计算token数，优先从模型目录加载"""
+    # 尝试从模型目录加载 tokenizer.json
+    if model_dir:
+        tokenizer_path = os.path.join(model_dir, "tokenizer.json")
+        if os.path.exists(tokenizer_path):
+            try:
+                from tokenizers import Tokenizer as HFTokenizer
+                tok = HFTokenizer.from_file(tokenizer_path)
+                return len(tok.encode(text).ids)
+            except Exception:
+                pass
 
-    sys.path.insert(0, "/opt/exllamav3")
-    from exllamav3 import Config, Tokenizer
-
-    c = Config.from_directory("/opt/gguf/Qwen3-14B-exl3")
-    t = Tokenizer.from_config(c)
-    ids = t.encode(text)
-    return len(ids) if hasattr(ids, "__len__") else 1
+    # 退回到简单估算（1个中文字符≈1 token，英文≈4字符/token）
+    return max(1, len(text))
 
 
 def call_api(prompt, max_tokens=MAX_TOKENS):
@@ -126,11 +140,20 @@ def call_api(prompt, max_tokens=MAX_TOKENS):
             elapsed = time.time() - start_time
 
             if result.get("choices") and len(result["choices"]) > 0:
-                content = result["choices"][0].get("message", {}).get("content", "")
-                # 直接用 API 返回的 usage
-                usage = result.get("usage", {})
+                message = result["choices"][0].get("message", {})
+                content = message.get("content", "") or ""
+                reasoning = message.get("reasoning_content", "") or ""
+                full_text = content + reasoning
+
+                # 优先用 API 返回的 usage
+                usage = result.get("usage") or {}
                 tokens = usage.get("completion_tokens", 0)
-                return elapsed, tokens, content
+
+                # 兼容 TabbyAPI/exl2: usage 为空时，用 tokenizer 计算
+                if tokens == 0 and full_text:
+                    tokens = count_tokens(full_text, MODEL_DIR)
+
+                return elapsed, tokens, full_text
             return elapsed, 0, ""
     except Exception as e:
         return time.time() - start_time, 0, f"Error: {e}"

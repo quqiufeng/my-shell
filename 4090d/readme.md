@@ -87,3 +87,123 @@ python3 test_api.py "模型名称"
 pkill -f llama-server
 pkill -f koboldcpp.py
 ```
+
+---
+
+## Qwen3-14B exl2 部署记录 (TabbyAPI)
+
+### 部署时间
+
+2025-06-03
+
+### 模型信息
+
+| 属性 | 值 |
+|------|-----|
+| 模型 | `TheMelonGod/Qwen3-14B-exl2` |
+| 量化 | `6hb-4.5bpw` |
+| 权重大小 | ~7.5GB |
+| 显存占用 | ~11GB (含 128K Q4 KV cache) |
+| 预估速度 | 80-110 tok/s |
+| 对比 27B GGUF | 快 **2-2.5x** (44 tok/s → ~100 tok/s) |
+
+### 部署步骤
+
+**1. 安装 TabbyAPI**
+
+```bash
+git clone --depth 1 https://github.com/theroyallab/tabbyAPI.git /opt/tabbyAPI
+cd /opt/tabbyAPI && pip install -e .
+```
+
+**2. 下载模型**
+
+```bash
+huggingface-cli download TheMelonGod/Qwen3-14B-exl2 \
+  --revision 6hb-4.5bpw \
+  --local-dir /opt/gguf/Qwen3-14B-exl2-4.5bpw \
+  --local-dir-use-symlinks False
+```
+
+**3. 配置文件**
+
+配置文件路径: `/opt/my-shell/4090d/tabby_qwen3_14b_config.yml`
+
+```yaml
+network:
+  host: 0.0.0.0
+  port: 11436
+  disable_auth: true
+  api_servers: ["OAI"]
+
+model:
+  model_dir: /opt/gguf
+  model_name: Qwen3-14B-exl2-4.5bpw
+  backend: exllamav2
+  max_seq_len: 131072
+  cache_size: 131072
+  cache_mode: Q4
+  chunk_size: 2048
+  reasoning: true
+  force_enable_thinking: true
+  prompt_template: qwen3
+```
+
+**4. 启动服务**
+
+```bash
+cd /opt/my-shell/4090d
+setsid nohup ./run_qwen3_14b_exl2_tabby.sh > /tmp/14b_qwen3_tabby.log 2>&1 < /dev/null &
+```
+
+**5. 测试 API**
+
+```bash
+curl http://localhost:11436/v1/models
+curl -s http://localhost:11436/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "Qwen3-14B-exl2-4.5bpw", "messages": [{"role": "user", "content": "你好"}]}'
+```
+
+**6. OpenCode 配置**
+
+```json
+{
+  "model": "openai/Qwen3-14B-exl2-4.5bpw",
+  "provider": {
+    "openai": {
+      "options": {
+        "baseURL": "http://localhost:11436/v1",
+        "apiKey": "dummy"
+      }
+    }
+  }
+}
+```
+
+### Chat Template (重要)
+
+本部署使用了 **froggeric 修复版 chat template** (v19)，解决了官方 Qwen 3.5/3.6 模板的多个严重 bug：
+
+| 修复项 | 影响 |
+|--------|------|
+| Agentic 过早停止 | 模型不再在工具调用时意外中止 (`<|im_end|>`) |
+| KV Cache 100% 命中 | 保留历史思考记录，避免重复处理，多轮对话速度稳定 |
+| 空 Think 污染 | 消除空的 `<think></think>` 标签导致的上下文学习偏差 |
+| C++ Jinja 兼容 | 支持 llama.cpp/minijinja 等 C++ 推理引擎 |
+
+**文件位置：**
+- `chat_template_qwen3_fixed_v19.jinja` - 修复版模板（本目录，git 管理）
+- `/opt/gguf/Qwen3-14B-exl2-4.5bpw/tokenizer_config.json` - 已嵌入模板（实际生效）
+
+**来源：** https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates
+
+### 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `run_qwen3_14b_exl2_tabby.sh` | 启动脚本 |
+| `tabby_qwen3_14b_config.yml` | TabbyAPI 配置文件 |
+| `chat_template_qwen3_fixed_v19.jinja` | 修复版 Qwen chat template (v19) |
+| `/opt/gguf/Qwen3-14B-exl2-4.5bpw/` | 模型目录 |
+| `/opt/tabbyAPI/` | TabbyAPI 安装目录 |

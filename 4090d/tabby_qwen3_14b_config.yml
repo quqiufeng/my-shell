@@ -1,0 +1,30 @@
+# TabbyAPI config for Qwen3-14B exl2 @ 4.5bpw
+# 128K context, 4090D 24GB optimized
+
+network:
+  host: 0.0.0.0
+  port: 11434
+  disable_auth: true
+  api_servers: ["OAI"]
+
+model:
+  model_dir: /opt/gguf
+  model_name: Qwen3-14B-exl2-4.5bpw
+  backend: exllamav2
+  max_seq_len: 131072
+  cache_size: 131072
+  cache_mode: Q4
+  chunk_size: 2048
+  gpu_split_auto: true
+  autosplit_reserve: [256]
+  reasoning: true
+  force_enable_thinking: true
+  prompt_template: qwen3
+
+sampling:
+  override_preset: safe_defaults
+
+logging:
+  log_prompt: false
+  log_generation_params: false
+  log_requests: false
