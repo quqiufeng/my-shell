@@ -125,15 +125,14 @@ free -h
 TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
 echo "总内存: ${TOTAL_MEM}MB"
 
-# 编译参数: 多核并行编译
-CPU_CORES=$(nproc)
-export NVCC_THREADS=2
-export MAX_JOBS=$CPU_CORES
+# 编译参数: 单线程编译（避免OOM和系统崩溃）
+# 23GB RAM 下，单线程最稳定，虽然慢一点
+export NVCC_THREADS=1
+export MAX_JOBS=1
 echo "=== 编译配置 ==="
-echo "CPU 核心数: $CPU_CORES"
-echo "NVCC_THREADS=2 (每个编译任务2线程)"
-echo "MAX_JOBS=$MAX_JOBS (并行编译任务数)"
-echo "预计时间: 10-20 分钟"
+echo "NVCC_THREADS=1 (单线程，避免内存耗尽)"
+echo "MAX_JOBS=1 (单任务，最稳定)"
+echo "预计时间: 30-60 分钟"
 
 echo "=== 清理旧 build ==="
 rm -rf build dist *.egg-info
@@ -187,7 +186,7 @@ echo "=== 预编译 wheel 不可用 ==="
 
 # === wheel 不可用, 回退到源码编译 ===
 echo "=== wheel 不可用, 走源码编译 ==="
-echo "编译时间较长(10-20分钟)，使用后台运行..."
+echo "编译时间较长(30-60分钟)，使用后台运行..."
 
 # 确保日志文件可写
 rm -f /tmp/flash_build.log
@@ -197,13 +196,13 @@ chmod 666 /tmp/flash_build.log
 # 后台编译，避免终端超时
 setsid bash -c "
     cd /opt/flash-attention
-    export PATH=/usr/local/cuda/bin:$PATH
+    export PATH=/usr/local/cuda/bin:\$PATH
     export CUDA_HOME=/usr/local/cuda
     export CC=/usr/bin/gcc-11
     export CXX=/usr/bin/g++-11
     export FLASH_ATTN_CUDA_ARCHS=\"80\"
-    export MAX_JOBS=$MAX_JOBS
-    export NVCC_THREADS=2
+    export MAX_JOBS=1
+    export NVCC_THREADS=1
     exec > /tmp/flash_build.log 2>&1
     /data/venv/bin/python setup.py install
 " &
