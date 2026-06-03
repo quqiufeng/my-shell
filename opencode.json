@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/Qwen3-14B-Q4_K_M.gguf",
+  "model": "openai/Qwen3-14B-exl2-4.5bpw",
   "permission": {
     "*": "allow",
     "read": {
@@ -47,6 +47,11 @@
 
         "Qwen3-14B-Q4_K_M.gguf": {
           "name": "Qwen3-14B Q4_K_M (3080 20GB llama.cpp)",
+          "maxContextWindow": 131072,
+          "maxOutputTokens": 32768
+        },
+        "Qwen3-14B-exl2-4.5bpw": {
+          "name": "Qwen3-14B exl2 4.5bpw (TabbyAPI)",
           "maxContextWindow": 131072,
           "maxOutputTokens": 32768
         }

@@ -3,29 +3,20 @@ set -e
 
 # =============================================================================
 # FlashAttention 安装脚本
-# 目标: RTX 3080 (sm_86), Ubuntu 24.04, CUDA 12.6, Python 3.12
+# 目标: RTX 3080 (sm_86), Ubuntu 24.04, CUDA 11.8 (PyTorch 2.4.0+cu118), Python 3.12
 # 策略: 优先装预编译 wheel, 没有则源码编译 (走 setup.py)
 # =============================================================================
 # 方法一: 预编译 wheel (推荐, ~30 秒)
 # -------------------------------------------------------------------------
 # flash-attn 在 GitHub releases 上提供预编译 wheel, 但需要 torch 版本匹配:
 #
-#   最新 wheel: flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-*.whl
-#   对应环境:  Python 3.12, torch 2.9.x, CUDA 12.x, CXX11ABI=True
+#   当前环境:  Python 3.12, torch 2.4.0+cu118, CUDA 11.8
 #
-# 如果当前 torch 版本太新 (如 2.12), 需先降级:
-#
-#   pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cu126
-#
-# 查看所有可用 wheel (按版本筛选):
+# 查看所有可用 wheel:
 #   curl -s "https://github.com/Dao-AILab/flash-attention/releases/expanded_assets/v2.8.3" \
 #     | grep -oP 'flash_attn-[^"]*\.whl' | sort -u
 #
-# 下载并安装:
-#   pip install \
-#     https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl
-#
-# 可用 torch 版本: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9 (cp39~cp313, cxx11abi 均有)
+# 当前环境没有预编译 wheel，必须源码编译
 # =============================================================================
 # 方法二: 源码编译 (如无匹配 wheel, ~1-2 小时)
 # -------------------------------------------------------------------------
@@ -82,10 +73,12 @@ echo "=== 清理旧 build ==="
 rm -rf build dist *.egg-info
 
 echo "=== 设置编译环境变量 ==="
+# 使用系统 CUDA 12.6 的 nvcc，但目标 CUDA 11.8 (匹配 PyTorch)
 export CUDA_HOME=/data/cuda
 export PATH=$CUDA_HOME/bin:/data/venv/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
+# GCC 12 兼容性最好
 export CC=/usr/bin/gcc-12
 export CXX=/usr/bin/g++-12
 
@@ -108,14 +101,13 @@ VENV_PYTHON=/data/venv/bin/python3
 VENV_PIP=/data/venv/bin/pip
 
 echo "=== 确保 torch 已安装 ==="
-$VENV_PYTHON -c "import torch" 2>/dev/null || $VENV_PIP install torch --index-url https://download.pytorch.org/whl/cu126
+$VENV_PYTHON -c "import torch" 2>/dev/null || $VENV_PIP install torch==2.4.0+cu118 --index-url https://download.pytorch.org/whl/cu118
 
 echo "=== 安装编译依赖 ==="
 $VENV_PIP install wheel setuptools pybind11
 
-# === 优先尝试预编译 wheel ===
-FA_VERSION=$($VENV_PYTHON -c "import torch; v = torch.__version__.split('+')[0]; print(f'cu12torch{v}')" 2>/dev/null || echo "cu12torch2.9")
-WHEEL_URL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+${FA_VERSION}cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
+# === 优先尝试预编译 wheel (cu118 torch2.4.0) ===
+WHEEL_URL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu118torch2.4.0-cp312-cp312-linux_x86_64.whl"
 echo "=== 尝试预编译 wheel: $WHEEL_URL ==="
 if curl -sI "$WHEEL_URL" 2>/dev/null | grep -q "200\|302"; then
     $VENV_PIP install "$WHEEL_URL" && {
@@ -125,6 +117,7 @@ if curl -sI "$WHEEL_URL" 2>/dev/null | grep -q "200\|302"; then
         exit 0
     }
 fi
+echo "=== 预编译 wheel 不可用 ==="
 
 # === wheel 不可用, 回退到源码编译 ===
 echo "=== wheel 不可用, 走源码编译 ==="
