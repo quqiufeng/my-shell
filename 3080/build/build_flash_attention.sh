@@ -187,7 +187,12 @@ echo "=== 预编译 wheel 不可用 ==="
 
 # === wheel 不可用, 回退到源码编译 ===
 echo "=== wheel 不可用, 走源码编译 ==="
-echo "编译时间较长(30-60分钟)，使用后台运行..."
+echo "编译时间较长(10-20分钟)，使用后台运行..."
+
+# 确保日志文件可写
+rm -f /tmp/flash_build.log
+touch /tmp/flash_build.log
+chmod 666 /tmp/flash_build.log
 
 # 后台编译，避免终端超时
 setsid bash -c "
@@ -199,7 +204,8 @@ setsid bash -c "
     export FLASH_ATTN_CUDA_ARCHS=\"80\"
     export MAX_JOBS=$MAX_JOBS
     export NVCC_THREADS=2
-    /data/venv/bin/python setup.py install > /tmp/flash_build.log 2>&1
+    exec > /tmp/flash_build.log 2>&1
+    /data/venv/bin/python setup.py install
 " &
 
 BUILD_PID=$!
