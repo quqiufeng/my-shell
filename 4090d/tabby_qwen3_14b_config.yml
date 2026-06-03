@@ -20,6 +20,7 @@ model:
   reasoning: true
   force_enable_thinking: true
   prompt_template: qwen3
+  tool_format: qwen3_coder
 
 sampling:
   override_preset: safe_defaults
