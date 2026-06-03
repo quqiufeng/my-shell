@@ -45,7 +45,8 @@ set -e
 # 【问题5: GPU 架构 compute_120 不支持】
 # 错误: "nvcc fatal: Unsupported gpu architecture 'compute_120'"
 # 原因: flash-attn setup.py 默认编译 80/90/100/110/120，但 CUDA 11.8 不支持 120
-# 解决: export FLASH_ATTN_CUDA_ARCHS="80" (只编译 sm_80，兼容 RTX 3080 sm_86)
+# 解决: 直接修改 setup.py 硬编码为只编译 ["80"] (兼容 RTX 3080 sm_86)
+#       文件: /opt/flash-attention/setup.py 第73-74行
 #
 # 【问题6: 编译超时】
 # 问题: 单个 .cu 文件编译需 2-5 分钟，bash 命令 120 秒超时杀死进程
@@ -59,13 +60,13 @@ set -e
 # 解决: pip install ninja (可选，没有也能编译，只是慢一点)
 #
 # 【完整环境变量总结】
-#   export CUDA_HOME=/usr/local/cuda        # CUDA 11.8
-#   export PATH=/usr/local/cuda/bin:$PATH   # 优先使用 CUDA 11.8 的 nvcc
+#   export CUDA_HOME=/data/cuda-11.8        # CUDA 11.8 (直接指向安装路径)
+#   export PATH=/data/cuda-11.8/bin:$PATH   # 优先使用 CUDA 11.8 的 nvcc
 #   export CC=/usr/bin/gcc-11               # GCC 11
 #   export CXX=/usr/bin/g++-11              # G++ 11
-#   export FLASH_ATTN_CUDA_ARCHS="80"       # 只编译 sm_80
-#   export MAX_JOBS=1                       # 单线程
-#   export NVCC_THREADS=1                   # 单线程
+#   # FLASH_ATTN_CUDA_ARCHS 不需要，setup.py 已硬编码 ["80"]
+#   export MAX_JOBS=2                       # 双线程
+#   export NVCC_THREADS=2                   # 双线程
 #
 # =============================================================================
 # 方法一: 预编译 wheel (推荐, ~30 秒)
@@ -91,25 +92,26 @@ set -e
 #    - 安装: sudo apt install gcc-11 g++-11
 #
 # 2. ptxas -O3 极慢:
-#    - fwd_split 内核的 .ptx 文件巨大, ptxas 默认 -O3 优化每个文件需 30-50 分钟
-#    - 且每个 ptxas 进程吃 ~5GB RAM, MAX_JOBS=3 时 ~15GB 会 OOM
-#    - 解决: 单线程编译 MAX_JOBS=1, NVCC_THREADS=1
+#    - setup.py 已硬编码只编译 sm_80，大幅减少了编译目标数量
+#    - ptxas -O3 极慢，已改为 -O1
+#    - 23GB RAM + 单架构: MAX_JOBS=2, NVCC_THREADS=2 稳定
 #
 # 3. MAX_JOBS 调优:
-#    - 23GB RAM + 单线程: MAX_JOBS=1, NVCC_THREADS=1
+#    - 23GB RAM + 单架构 (sm_80): MAX_JOBS=2, NVCC_THREADS=2
 #    - 避免超时: 使用 setsid 后台运行
-#    - 预计时间: 30-60 分钟
+#    - 预计时间: 20-40 分钟
 #
 # 4. 架构代码:
 #    - RTX 3080 = sm_86, 但 setup.py 默认编译 80/90/100/110/120
 #    - CUDA 11.8 不支持 compute_120
 #    - 错误: "nvcc fatal: Unsupported gpu architecture 'compute_120'"
-#    - 解决: FLASH_ATTN_CUDA_ARCHS="80" (sm_80 兼容 sm_86)
+#    - 解决: 直接修改 setup.py 硬编码 ["80"] (sm_80 兼容 sm_86)
 #
 # 5. CUDA 版本路径:
-#    - 必须确保 /usr/local/cuda 指向 CUDA 11.8 (不是 12.6)
+#    - 系统 /usr/local/cuda 可能指向 CUDA 12.6 (nvcc 12.6)
+#    - PyTorch 编译用 CUDA 11.8
 #    - 错误: "The detected CUDA version (12.6) mismatches the version that was used to compile PyTorch (11.8)"
-#    - 解决: rm -f /usr/local/cuda && ln -s /data/cuda-11.8 /usr/local/cuda
+#    - 解决: 直接使用 /data/cuda-11.8 路径，不依赖 /usr/local/cuda 符号链接
 # =============================================================================
 
 if [ ! -d "/opt/flash-attention" ]; then
@@ -125,21 +127,23 @@ free -h
 TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
 echo "总内存: ${TOTAL_MEM}MB"
 
-# 编译参数: 单线程编译（避免OOM和系统崩溃）
-# 23GB RAM 下，单线程最稳定，虽然慢一点
-export NVCC_THREADS=1
-export MAX_JOBS=1
+# 编译参数: 双线程编译（setup.py 已硬编码 sm_80，编译量大幅减少）
+# 23GB RAM + 修改后的 setup.py 只编译一个架构，双线程稳定
+export NVCC_THREADS=2
+export MAX_JOBS=2
 echo "=== 编译配置 ==="
-echo "NVCC_THREADS=1 (单线程，避免内存耗尽)"
-echo "MAX_JOBS=1 (单任务，最稳定)"
-echo "预计时间: 30-60 分钟"
+echo "NVCC_THREADS=2 (双线程)"
+echo "MAX_JOBS=2 (双任务)"
+echo "setup.py 已硬编码只编译 sm_80"
+echo "预计时间: 20-40 分钟"
 
 echo "=== 清理旧 build ==="
 rm -rf build dist *.egg-info
 
 echo "=== 设置编译环境变量 ==="
 # 使用 CUDA 11.8 (匹配 PyTorch 2.4.0+cu118)
-export CUDA_HOME=/usr/local/cuda
+# 注意: /usr/local/cuda 可能指向 CUDA 12.6，直接用 /data/cuda-11.8
+export CUDA_HOME=/data/cuda-11.8
 export PATH=$CUDA_HOME/bin:/data/venv/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
@@ -147,8 +151,8 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 export CC=/usr/bin/gcc-11
 export CXX=/usr/bin/g++-11
 
-# RTX 3080 架构 (8.6) - 只编译目标架构
-export FLASH_ATTN_CUDA_ARCHS="80"
+# RTX 3080 架构 (8.6) - setup.py 已硬编码为只编译 sm_80
+# export FLASH_ATTN_CUDA_ARCHS="80"  # 不需要，setup.py 已修改
 export TORCH_CUDA_ARCH_LIST="8.6"
 
 # 限制 CUDA 模块加载
@@ -157,7 +161,8 @@ export CUDA_MODULE_LOADING=LAZY
 echo "CUDA_HOME: $CUDA_HOME"
 echo "GCC: $CC (gcc-11 for CUDA 11.8 compatibility)"
 echo "MAX_JOBS: $MAX_JOBS"
-echo "FLASH_ATTN_CUDA_ARCHS: $FLASH_ATTN_CUDA_ARCHS"
+echo "NVCC_THREADS: $NVCC_THREADS"
+echo "架构: setup.py 硬编码 [80] (兼容 sm_86 RTX 3080)"
 
 echo "=== 开始编译并安装 ==="
 echo "如果编译中断，请尝试: export MAX_JOBS=1 后重新运行"
@@ -199,15 +204,15 @@ touch /tmp/flash_build.log
 chmod 666 /tmp/flash_build.log
 
 # 后台编译，避免终端超时
+# 注意: setup.py 已硬编码为只编译 sm_80，无需 FLASH_ATTN_CUDA_ARCHS
 setsid bash -c "
     cd /opt/flash-attention
-    export PATH=/usr/local/cuda/bin:\$PATH
-    export CUDA_HOME=/usr/local/cuda
+    export CUDA_HOME=/data/cuda-11.8
+    export PATH=/data/cuda-11.8/bin:\$PATH
     export CC=/usr/bin/gcc-11
     export CXX=/usr/bin/g++-11
-    export FLASH_ATTN_CUDA_ARCHS=\"80\"
-    export MAX_JOBS=1
-    export NVCC_THREADS=1
+    export MAX_JOBS=2
+    export NVCC_THREADS=2
     exec > /tmp/flash_build.log 2>&1
     /data/venv/bin/python setup.py install
 " &
@@ -246,10 +251,10 @@ done
 # =============================================================================
 # 手动编译命令（如需直接执行）
 # =============================================================================
-# cd /opt/flash-attention
-# sed -i 's/-O3/-O1/g' setup.py
-# PATH=/usr/local/cuda/bin:$PATH CUDA_HOME=/usr/local/cuda \
-#   CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 \
-#   FLASH_ATTN_CUDA_ARCHS="80" MAX_JOBS=2 NVCC_THREADS=2 \
-#   /data/venv/bin/python setup.py install
+# 注意: setup.py 已硬编码为只编译 sm_80，无需 FLASH_ATTN_CUDA_ARCHS 环境变量
+# cd /opt/flash-attention && rm -rf build
+# export CUDA_HOME=/data/cuda-11.8
+# export PATH=/data/cuda-11.8/bin:$PATH
+# source /data/venv/bin/activate
+# MAX_JOBS=2 NVCC_THREADS=2 python setup.py install
 # =============================================================================
