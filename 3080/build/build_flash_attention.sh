@@ -188,6 +188,11 @@ echo "=== 预编译 wheel 不可用 ==="
 echo "=== wheel 不可用, 走源码编译 ==="
 echo "编译时间较长(30-60分钟)，使用后台运行..."
 
+# 修改编译优化级别：-O3 → -O1（编译更快，运行稍慢）
+echo "=== 修改编译优化级别: -O3 → -O1 ==="
+sed -i 's/-O3/-O1/g' /opt/flash-attention/setup.py
+echo "优化级别已改为 -O1（编译速度提升 30-50%）"
+
 # 确保日志文件可写
 rm -f /tmp/flash_build.log
 touch /tmp/flash_build.log
@@ -238,4 +243,13 @@ while true; do
     sleep 30
 done
 
-# 验证和完成信息在上方循环中输出
+# =============================================================================
+# 手动编译命令（如需直接执行）
+# =============================================================================
+# cd /opt/flash-attention
+# sed -i 's/-O3/-O1/g' setup.py
+# PATH=/usr/local/cuda/bin:$PATH CUDA_HOME=/usr/local/cuda \
+#   CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 \
+#   FLASH_ATTN_CUDA_ARCHS="80" MAX_JOBS=2 NVCC_THREADS=2 \
+#   /data/venv/bin/python setup.py install
+# =============================================================================
