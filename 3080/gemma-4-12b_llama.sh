@@ -242,7 +242,7 @@ LLAMA_SERVER="/opt/llama.cpp/build/bin/llama-server"
 # RTX 3080 12B 模型参数 (20GB 显存, 128K 上下文)
 NGL=99              # GPU层数 (全部加载到GPU)
 CTX=131072          # 上下文 128K (3080 20GB 跑 7.12GB 模型, 依赖KV cache量化)
-BATCH=512           # batch size (保守值, 降低显存压力)
+BATCH=512           # batch size (保守值, 长跑比 1024 更稳, 散热压力小)
 UBATCH=512          # micro batch size
 THREADS=6           # CPU线程数 (匹配 3500X 6核)
 
@@ -303,6 +303,5 @@ exec $LLAMA_SERVER \
   --min-p 0.0 \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
-  --defrag-thold 0.1 \
   --timeout 300 \
   --metrics
