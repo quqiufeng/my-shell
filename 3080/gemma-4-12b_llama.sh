@@ -278,13 +278,16 @@ if [[ ! -f "$MODEL_DIR" ]]; then
     exit 1
 fi
 
-# 使用 GGUF 内置的 Gemma 4 chat template
-# Gemma 4 chat template 由 llama.cpp 内置支持 (--jinja 自动识别)
+# 使用自定义 chat template 禁用 thinking mode
+# (llama.cpp 内置 gemma4 模板会在有 system role 时自动开启思考,
+#  导致 opencode 一直循环输出 "draft 1, draft 2..." 推理内容)
+CHAT_TEMPLATE="/opt/my-shell/3080/gemma-template/gemma-4-12b-chat.jinja"
 exec $LLAMA_SERVER \
   -m "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port $PORT \
   --jinja \
+  --chat-template-file "$CHAT_TEMPLATE" \
   -ngl $NGL \
   -c $CTX \
   --batch-size $BATCH \
