@@ -307,4 +307,5 @@ exec $LLAMA_SERVER \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
   --timeout 300 \
-  --metrics
+  --metrics \
+  --reasoning-format none
