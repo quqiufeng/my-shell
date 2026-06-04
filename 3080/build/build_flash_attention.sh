@@ -11,8 +11,7 @@ set -e
 #   PyTorch: 2.4.0+cu118
 #   Python: 3.12
 #   venv:   /data/venv
-#   TabbyAPI: ~/tabbyAPI (exllamav2 0.3.2+cu118.torch2.4.0)
-#   模型:   Qwen3-14B-exl2-4.5bpw
+#   用途:   exllamav2 等 PyTorch CUDA 扩展启用 flash-attn
 # =============================================================================
 # 完整环境配置兼容性解决过程 (踩坑实录, 按时间顺序)
 # -------------------------------------------------------------------------
@@ -89,40 +88,24 @@ set -e
 #             5) disown 防止 shell 退出时 SIGHUP
 # 预计时间: 1.5 小时 (本次实测，73 个 .o)
 #
-# 【问题8: 不要 rm -rf build (大忌)】
+# 【问题8: 编译中断后的恢复 (避免 rm -rf build 大忌)】
 # 问题: build/ 目录里是已经编译的 .o 文件 (每个文件 10-100MB)
 #       rm -rf build 会丢失所有进度，必须从头开始 (4-8 小时)
-# 解决: 只删除 build.ninja 让 ninja 重新解析依赖图
+# 解决: 编译中断时不要 rm -rf build, 直接重跑脚本
+#       ninja 会自动检测缺失的 .o 并增量编译
+#       只在 build 目录真的损坏时才删除
+#
+# 【问题9: 修改 setup.py 后如何让 ninja 重新解析】
+# 问题: 改了 setup.py (如添加源文件) 后，ninja 不会重新解析依赖图
+# 解决: 删 build.ninja (不是 .o), 让 ninja 重新扫描 setup.py
 #       find /opt/flash-attention/build -name "build.ninja" -delete
 #       重新跑 python setup.py install
-#       ninja 会自动检测缺失的 .o 并增量编译
+#       ninja 会扫描 setup.py 的新 srcfiles 列表, 生成新依赖图
+#       已有的 .o 文件会被保留 (没改的源文件不需要重编译)
 #
-# 【问题9: ninja 构建工具】
+# 【问题10: ninja 构建工具】
 # 警告: "Attempted to use ninja as the BuildExtension backend but we could not find ninja"
 # 解决: pip install ninja (可选，没有也能编译，只是慢一点)
-#
-# 【问题10: TabbyAPI 启用 flash-attn 后的 RTX 3080 调优】
-# RTX 3080 20GB < 4090D 24GB，原配置 128K context 会 OOM
-# 解决:
-#   1. 修改 /data/gguf/tabby_qwen3_14b_config.yml:
-#        max_seq_len: 32768  (从 131072 改)
-#        cache_size: 32768
-#   2. 修改 /data/gguf/run_qwen3_14b_exl2_tabby.sh:
-#        unset EXLLAMA_NO_FLASH_ATTN     # 默认就是 0，显式 unset 防止继承
-#        export FLASH_ATTENTION_FORCE_BUILD=0
-#   3. 重启服务
-#
-# 【问题11: GPU 利用率 2% 但 CPU 100% (推理卡顿)】
-# 现象: TabbyAPI 启动后，chat completion 请求卡在 CPU 循环，GPU 利用率 2%
-# 原因: Qwen3 thinking mode 默认开启
-#        每次请求先产生 500-2000+ 个 thinking tokens
-#        每次 token 生成需要 CPU 做 sampling (token 选择) 占用 80%+ CPU
-#        而 exllamav2 的 forward pass 在 GPU 上很快 (单 token 几 ms)
-#        看起来是"卡住"，实际是 thinking 在循环
-# 解决:
-#   1. 等待 thinking 完成 (1+ 分钟)
-#   2. 或者配置中加 "reasoning: false" 禁用 thinking
-#   3. 或者 API 请求中 "chat_template_kwargs": {"enable_thinking": false}
 # =============================================================================
 # 【完整环境变量总结】（最终方案）
 #   export CUDA_HOME=/data/cuda-11.8        # CUDA 11.8 (直接绝对路径)
@@ -365,29 +348,17 @@ flash_attn_func(q, q, q, causal=True)
     sleep 30
 done
 
-# ---------------------- 9. 后续配置 (TabbyAPI) ----------------------
+# ---------------------- 9. 编译完成 ----------------------
 echo ""
 echo "================================================================"
 echo "FlashAttention 安装完成!"
 echo "================================================================"
 echo ""
-echo "【下一步】配置 TabbyAPI 启用 flash-attn (RTX 3080 20GB 优化):"
-echo ""
-echo "  1. 修改 /data/gguf/tabby_qwen3_14b_config.yml:"
-echo "       max_seq_len: 32768   (从 131072 改, 128K 在 20GB 会 OOM)"
-echo "       cache_size: 32768"
-echo ""
-echo "  2. 修改 /data/gguf/run_qwen3_14b_exl2_tabby.sh:"
-echo "       unset EXLLAMA_NO_FLASH_ATTN    # 启用 flash-attn"
-echo "       export FLASH_ATTENTION_FORCE_BUILD=0"
-echo ""
-echo "  3. 启动服务:"
-echo "       cd /data/gguf"
-echo "       setsid nohup ./run_qwen3_14b_exl2_tabby.sh > /tmp/14b_qwen3_tabby.log 2>&1 < /dev/null &"
-echo "       disown"
-echo ""
-echo "  4. 测试 API:"
-echo "       curl http://localhost:11434/v1/models"
+echo "验证命令:"
+echo "  /data/venv/bin/python -c \"import flash_attn; print(flash_attn.__version__)\""
+echo "  /data/venv/bin/python -c \"from flash_attn import flash_attn_func; \\"
+echo "    import torch; q = torch.randn(1, 32, 8, 64, device='cuda', dtype=torch.bfloat16);"
+echo "    print(flash_attn_func(q, q, q, causal=True).shape)\""
 echo ""
 
 # =============================================================================
@@ -415,7 +386,7 @@ echo ""
 #   sed -i "/flash_bwd_hdim256_bf16_sm80.cu/a\\    'flash_bwd_hdim256_bf16_causal_sm80.cu'," \
 #     /opt/flash-attention/setup.py
 #
-# 强制 ninja 重新解析依赖图 (改了 setup.py 后, 不要删 .o):
+# 修改 setup.py 后让 ninja 重新解析 (不删 .o):
 #   find /opt/flash-attention/build -name "build.ninja" -delete
 #   重新跑 python setup.py install
 #
