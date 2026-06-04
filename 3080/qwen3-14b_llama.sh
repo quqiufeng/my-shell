@@ -259,6 +259,7 @@ exec $LLAMA_SERVER \
   --rope-scale 4 \
   --yarn-orig-ctx 32768 \
   --timeout 300 \
-  --metrics
+  --metrics \
+  --chat-template-kwargs '{"enable_thinking": false}'
 
 # 使用 GGUF 内置的 Qwen3 chat template (原生支持 Tool Call 和 Thinking Mode)

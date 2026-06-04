@@ -76,7 +76,6 @@ cmake .. \
   -DGGML_NATIVE=OFF \
   -DLLAMA_BUILD_SERVER=ON \
   -DLLAMA_BUILD_EXAMPLES=ON \
-  -DLLAMA_JINJA=ON
 
 # 编译
 echo ""

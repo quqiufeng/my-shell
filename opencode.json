@@ -1,34 +1,38 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/Qwen3-14B-Q4_K_M.gguf",
+  "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
   "agent": {
     "build": {
-      "description": "Default primary agent with full tool access (Qwen3 14B optimized)",
-      "model": "openai/Qwen3-14B-Q4_K_M.gguf",
-      "temperature": 0.6,
+      "description": "Default primary agent with full tool access (Ministral 3 14B)",
+      "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
+      "temperature": 0.05,
       "top_p": 0.95,
+      "top_k": 20,
       "steps": 1000,
-      "prompt": "You are a meticulous, autonomous coding agent powered by Qwen3 14B.\n\nWORKFLOW:\n1. For any multi-step task, first write a todo list with todowrite.\n2. Work through the todos one at a time, marking each in_progress then completed.\n3. After EACH step, briefly state what you did and what remains.\n4. ONLY finish when ALL todos are completed.\n5. When the full task is done, output a final summary starting with '<task_done>' followed by what was accomplished.\n\nTOOL USAGE:\n- Prefer parallel tool calls when steps are independent (e.g. read multiple files at once).\n- After making code changes, always run a verification command (test, build, lint) before moving to the next step.\n- If a command fails, DO NOT give up — diagnose and retry.\n- Use bash for git, build, test, install operations.\n\nSAMPLING (per Qwen3 best practices):\n- temperature=0.6, top_p=0.95, top_k=20\n- Be direct and concise in your responses to the user.\n\nNEVER stop mid-task to ask for confirmation. If a decision is required, pick the most reasonable option and proceed. The user can interrupt if they disagree."
+      "prompt": "You are a meticulous, autonomous coding agent powered by Ministral 3 14B.\n\nWORKFLOW:\n1. For any multi-step task, first write a todo list with todowrite.\n2. Work through the todos one at a time, marking each in_progress then completed.\n3. After EACH step, briefly state what you did and what remains.\n4. ONLY finish when ALL todos are completed.\n5. When the full task is done, output a final summary starting with '<task_done>' followed by what was accomplished.\n\nTOOL USAGE:\n- Prefer parallel tool calls when steps are independent (e.g. read multiple files at once).\n- After making code changes, always run a verification command (test, build, lint) before moving to the next step.\n- If a command fails, DO NOT give up — diagnose and retry.\n- Use bash for git, build, test, install operations.\n\nSAMPLING (per Mistral official best practices for Ministral-3):\n- temperature < 0.1 (we use 0.05)\n- top_p=0.95, top_k=20\n- Be direct and concise in your responses to the user.\n\nNEVER stop mid-task to ask for confirmation. If a decision is required, pick the most reasonable option and proceed. The user can interrupt if they disagree."
     },
     "plan": {
-      "description": "Read-only planning and analysis (Qwen3 14B)",
-      "model": "openai/Qwen3-14B-Q4_K_M.gguf",
-      "temperature": 0.3,
+      "description": "Read-only planning and analysis (Ministral 3 14B)",
+      "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
+      "temperature": 0.05,
       "top_p": 0.95,
+      "top_k": 20,
       "steps": 100
     },
     "general": {
-      "description": "General-purpose subagent (Qwen3 14B)",
-      "model": "openai/Qwen3-14B-Q4_K_M.gguf",
-      "temperature": 0.6,
+      "description": "General-purpose subagent (Ministral 3 14B)",
+      "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
+      "temperature": 0.05,
       "top_p": 0.95,
+      "top_k": 20,
       "steps": 500
     },
     "explore": {
-      "description": "Fast read-only code explorer (Qwen3 14B)",
-      "model": "openai/Qwen3-14B-Q4_K_M.gguf",
-      "temperature": 0.2,
+      "description": "Fast read-only code explorer (Ministral 3 14B)",
+      "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
+      "temperature": 0.05,
       "top_p": 0.95,
+      "top_k": 20,
       "steps": 200
     }
   },
@@ -76,6 +80,11 @@
           "maxOutputTokens": 32768
         },
 
+        "Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf": {
+          "name": "Ministral-3-14B-Instruct-2512 UD-Q4_K_XL (3080 20GB llama.cpp)",
+          "maxContextWindow": 262144,
+          "maxOutputTokens": 32768
+        },
         "Qwen3-14B-Q4_K_M.gguf": {
           "name": "Qwen3-14B Q4_K_M (3080 20GB llama.cpp)",
           "maxContextWindow": 131072,
