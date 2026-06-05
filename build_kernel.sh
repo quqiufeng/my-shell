@@ -246,7 +246,7 @@ else
 fi
 
 # 编译(注意:6.8+ KCFLAGS 已经在 optimize_cpu_modern 中 export)
-make -j"$JOBS" >> "$LOG_FILE" 2>&1
+make -j"$JOBS" 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # [6/9] 安装内核模块
