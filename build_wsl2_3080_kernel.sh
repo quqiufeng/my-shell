@@ -77,11 +77,9 @@ echo "========================================" | tee -a "$LOG_FILE"
 # -----------------------------------------------------------------------------
 # [1/5] 检查依赖
 # -----------------------------------------------------------------------------
-echo "[1/5] 检查编译依赖..." | tee -a "$LOG_FILE"
-if ! check_deps build-essential flex bison dwarves \
-                libssl-dev libelf-dev cpio lz4; then
-    exit 1
-fi
+# 安装依赖(apt-get 幂等)
+install_deps build-essential flex bison dwarves \
+             libssl-dev libelf-dev cpio lz4
 echo "依赖已安装" | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------

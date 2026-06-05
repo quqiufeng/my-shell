@@ -94,11 +94,9 @@ if [[ ! -d "$SRC_DIR" ]]; then
 fi
 cd "$SRC_DIR"
 
-# 检查依赖
-if ! check_deps build-essential libncurses-dev bison flex \
-                libssl-dev libelf-dev bc dwarves; then
-    exit 1
-fi
+# 安装依赖(apt-get 幂等,已装的不会重装)
+install_deps build-essential libncurses-dev bison flex \
+             libssl-dev libelf-dev bc dwarves
 
 lib_init "build_kernel" "$KERNEL_LOCALVERSION"
 

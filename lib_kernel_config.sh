@@ -124,29 +124,15 @@ MAKE="${MAKE:-make}"
 # 依赖检查
 # -----------------------------------------------------------------------------
 
-# 检查一组 apt 包是否已安装
-# 用法: check_deps pkg1 pkg2 ...
-# 输出: 返回 0 都已安装, 1 有缺失(打印需要安装的命令)
-#
-# 实现注意:
-#   用 dpkg-query -W 替代 dpkg -l | grep,避免 pipefail + SIGPIPE 问题
-#   (dpkg -l 输出大量内容,grep -q 命中后关闭管道会导致 dpkg 被 SIGPIPE 杀掉,
-#    在 setsid + pipefail 环境下会误判为包不存在)
-check_deps() {
-    local missing=""
-    for pkg in "$@"; do
-        # dpkg-query 对不存在的包返回非零
-        if ! dpkg-query -W -f='${Status}\n' "$pkg" 2>/dev/null \
-                | grep -q "^install ok installed$"; then
-            missing="$missing $pkg"
-        fi
-    done
-    if [[ -n "$missing" ]]; then
-        echo "缺少依赖:$missing"
-        echo "请运行: sudo apt install -y$missing"
-        return 1
-    fi
-    return 0
+# 直接安装一组 apt 包(不检查,幂等)
+# 用法: install_deps pkg1 pkg2 ...
+# 说明:
+#   apt-get install 对已安装的包是 no-op,重复执行安全
+#   不做预检查,避免 dpkg -l + pipefail + setsid 下的 SIGPIPE 误判
+#   sudo 失败时由 set -e 终止脚本
+install_deps() {
+    echo "[依赖] 正在确保以下包已安装:$*"
+    sudo apt-get install -y "$@" >> "$LOG_FILE" 2>&1
 }
 
 # -----------------------------------------------------------------------------
