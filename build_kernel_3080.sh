@@ -125,8 +125,8 @@ if [[ -f .config && -d arch/x86/boot && "$FORCE_FULL_REBUILD" == "false" ]]; the
     log_step "[1/9] 检测到已有编译配置,启用增量编译模式"
 else
     log_step "[1/9] 完整重建模式(清除所有编译产物)..."
-    make clean >> "$LOG_FILE" 2>&1 || true
-    make mrproper >> "$LOG_FILE" 2>&1 || true
+    make clean 2>&1 | tee -a "$LOG_FILE" || true
+    make mrproper 2>&1 | tee -a "$LOG_FILE" || true
 fi
 
 # -----------------------------------------------------------------------------
@@ -312,7 +312,7 @@ if [[ "$INCREMENTAL" == "false" || "$FORCE_RECONFIGURE" == "true" ]]; then
     # [4/9] 更新配置
     # -----------------------------------------------------------------------------
     log_step "[4/9] 更新配置(自动接受新选项默认值)..."
-    make olddefconfig >> "$LOG_FILE" 2>&1
+    make olddefconfig 2>&1 | tee -a "$LOG_FILE"
 
     OPTIMIZED_CONFIG="$CONFIG_BACKUP_DIR/config-rtx3080-optimized-$CONFIG_TIMESTAMP"
     cp .config "$OPTIMIZED_CONFIG"
@@ -337,13 +337,13 @@ make -j"$JOBS" 2>&1 | tee -a "$LOG_FILE"
 # [6/9] 安装内核模块
 # -----------------------------------------------------------------------------
 log_step "[6/9] 安装内核模块"
-sudo make modules_install >> "$LOG_FILE" 2>&1
+sudo make modules_install 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # [7/9] 安装内核镜像
 # -----------------------------------------------------------------------------
 log_step "[7/9] 安装内核镜像"
-sudo make install >> "$LOG_FILE" 2>&1
+sudo make install 2>&1 | tee -a "$LOG_FILE"
 
 # 获取内核版本号(只需计算一次)
 KERNEL_RELEASE=$(make kernelrelease 2>/dev/null || echo "")
@@ -356,7 +356,7 @@ if [[ -n "$KERNEL_RELEASE" ]]; then
     log_step "[8/9] 检查 initramfs"
     if [[ ! -f "$INITRAMFS" ]]; then
         log_step "      initramfs 缺失,正在生成..."
-        sudo update-initramfs -c -k "$KERNEL_RELEASE" >> "$LOG_FILE" 2>&1
+        sudo update-initramfs -c -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
         if [[ -f "$INITRAMFS" ]]; then
             log_step "      initramfs 生成成功: $INITRAMFS"
         else
@@ -379,7 +379,7 @@ else
     if [[ -n "$KERNEL_RELEASE" ]]; then
         build_nvidia_dkms "$KERNEL_RELEASE"
         log_step "      重新生成 initramfs(包含 NVIDIA 模块)"
-        sudo update-initramfs -u -k "$KERNEL_RELEASE" >> "$LOG_FILE" 2>&1
+        sudo update-initramfs -u -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
     else
         log_step "      警告: 内核版本号为空,跳过 NVIDIA DKMS"
     fi
@@ -396,7 +396,7 @@ sync_config_to_my_shell "config-6.8.12-rtx3080-current"
 # 更新 GRUB,默认启动新内核
 # -----------------------------------------------------------------------------
 log_step "[额外] 更新 GRUB"
-sudo update-grub >> "$LOG_FILE" 2>&1
+sudo update-grub 2>&1 | tee -a "$LOG_FILE"
 set_grub_default "$KERNEL_RELEASE" "new"
 
 # -----------------------------------------------------------------------------

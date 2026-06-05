@@ -114,7 +114,7 @@ safe_make() {
     local target="$1"
     shift || true
     # 不使用管道避免 pipefail 问题
-    "$MAKE" $target "$@" >> "$LOG_FILE" 2>&1
+    "$MAKE" $target "$@" 2>&1 | tee -a "$LOG_FILE"
 }
 
 # 获取当前脚本的 MAKE 变量
@@ -478,10 +478,10 @@ build_nvidia_dkms() {
     sudo rm -rf "/var/lib/dkms/nvidia/$nvidia_ver/$kver" 2>/dev/null || true
 
     log_step "  编译 NVIDIA DKMS 模块..."
-    sudo dkms build "nvidia/$nvidia_ver" -k "$kver" >> "$LOG_FILE" 2>&1
+    sudo dkms build "nvidia/$nvidia_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
 
     log_step "  安装 NVIDIA DKMS 模块..."
-    sudo dkms install "nvidia/$nvidia_ver" -k "$kver" >> "$LOG_FILE" 2>&1
+    sudo dkms install "nvidia/$nvidia_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
 
     log_step "  NVIDIA DKMS 模块编译完成"
 }
@@ -515,7 +515,7 @@ set_grub_default() {
     # 检查 GRUB 是否能找到这个条目
     if sudo grep -q "with Linux $target_kver" /boot/grub/grub.cfg 2>/dev/null; then
         sudo sed -i "s|^GRUB_DEFAULT=.*|GRUB_DEFAULT=\"$grub_default\"|" /etc/default/grub
-        sudo update-grub >> "$LOG_FILE" 2>&1
+        sudo update-grub 2>&1 | tee -a "$LOG_FILE"
         log_step "  GRUB 默认启动已设置"
     else
         log_step "  警告: 在 grub.cfg 中找不到 '$target_kver',保持原 GRUB 默认"

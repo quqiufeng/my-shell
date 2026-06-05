@@ -86,7 +86,7 @@ echo "依赖已安装" | tee -a "$LOG_FILE"
 # [2/5] 清理并复制官方配置
 # -----------------------------------------------------------------------------
 echo "[2/5] 准备官方配置..." | tee -a "$LOG_FILE"
-make clean >> "$LOG_FILE" 2>&1 || true
+make clean 2>&1 | tee -a "$LOG_FILE" || true
 
 if [[ ! -f Microsoft/config-wsl ]]; then
     echo "错误: 找不到 Microsoft/config-wsl" | tee -a "$LOG_FILE"
@@ -190,7 +190,7 @@ disable_raid
 
 # 更新配置
 echo "  - 更新配置依赖..." | tee -a "$LOG_FILE"
-make olddefconfig >> "$LOG_FILE" 2>&1
+make olddefconfig 2>&1 | tee -a "$LOG_FILE"
 echo "配置精简完成" | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
@@ -200,13 +200,13 @@ echo "[5/5] 编译内核 (使用 $JOBS 线程)..." | tee -a "$LOG_FILE"
 echo "    预计 15-25 分钟..." | tee -a "$LOG_FILE"
 
 # 6.8+ 时 KCFLAGS 已经在 optimize_cpu_modern 中 export
-make KCONFIG_CONFIG=.config -j"$JOBS" >> "$LOG_FILE" 2>&1
+make KCONFIG_CONFIG=.config -j"$JOBS" 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # 安装模块
 # -----------------------------------------------------------------------------
 echo "安装内核模块..." | tee -a "$LOG_FILE"
-make INSTALL_MOD_PATH="$PWD/modules" modules_install >> "$LOG_FILE" 2>&1
+make INSTALL_MOD_PATH="$PWD/modules" modules_install 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # 总结

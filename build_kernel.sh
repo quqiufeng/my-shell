@@ -109,8 +109,8 @@ if [[ -f .config && -d arch/x86/boot && "$FORCE_FULL_REBUILD" == "false" ]]; the
     log_step "[1/9] 检测到已有编译配置,启用增量编译模式"
 else
     log_step "[1/9] 完整重建模式(清除所有编译产物)..."
-    make clean >> "$LOG_FILE" 2>&1 || true
-    make mrproper >> "$LOG_FILE" 2>&1 || true
+    make clean 2>&1 | tee -a "$LOG_FILE" || true
+    make mrproper 2>&1 | tee -a "$LOG_FILE" || true
 fi
 
 # -----------------------------------------------------------------------------
@@ -226,7 +226,7 @@ if [[ "$INCREMENTAL" == "false" || "$FORCE_RECONFIGURE" == "true" ]]; then
     # [4/9] 更新配置
     # -----------------------------------------------------------------------------
     log_step "[4/9] 更新配置(自动接受新选项默认值)..."
-    make olddefconfig >> "$LOG_FILE" 2>&1
+    make olddefconfig 2>&1 | tee -a "$LOG_FILE"
 
     # 备份优化后的配置
     OPTIMIZED_CONFIG="$CONFIG_BACKUP_DIR/config-optimized-$CONFIG_TIMESTAMP"
@@ -252,13 +252,13 @@ make -j"$JOBS" 2>&1 | tee -a "$LOG_FILE"
 # [6/9] 安装内核模块
 # -----------------------------------------------------------------------------
 log_step "[6/9] 安装内核模块"
-sudo make modules_install >> "$LOG_FILE" 2>&1
+sudo make modules_install 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # [7/9] 安装内核镜像
 # -----------------------------------------------------------------------------
 log_step "[7/9] 安装内核镜像并更新 GRUB"
-sudo make install >> "$LOG_FILE" 2>&1
+sudo make install 2>&1 | tee -a "$LOG_FILE"
 
 # -----------------------------------------------------------------------------
 # [8/9] 保存配置
@@ -272,7 +272,7 @@ sync_config_to_my_shell "config-6.8.12-custom-current"
 # [9/9] 更新 GRUB,默认启动原内核(更安全)
 # -----------------------------------------------------------------------------
 log_step "[9/9] 更新 GRUB"
-sudo update-grub >> "$LOG_FILE" 2>&1
+sudo update-grub 2>&1 | tee -a "$LOG_FILE"
 set_grub_default "$KERNEL_RELEASE" "original"
 
 # -----------------------------------------------------------------------------
