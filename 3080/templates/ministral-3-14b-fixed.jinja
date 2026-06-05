@@ -42,19 +42,22 @@
     {{- tools_definition }}
 {%- endif %}
 
-{#- Checks for alternating user/assistant messages. #}
-{#- FIXED: Count ALL assistant messages (including tool_calls) to avoid false alarms. #}
-{#- The original template skipped tool_call assistants, causing consecutive user #}
-{#- detection when tool calls were involved (opencode agent multi-turn). #}
-{%- set ns = namespace(index=0) %}
-{%- for message in loop_messages %}
-    {%- if message.role == 'user' or message.role == 'assistant' %}
-        {%- if (message['role'] == 'user') != (ns.index % 2 == 0) %}
-            {{- raise_exception('After the optional system message, conversation roles must alternate user and assistant roles except for tool calls and results.') }}
-        {%- endif %}
-        {%- set ns.index = ns.index + 1 %}
-    {%- endif %}
-{%- endfor %}
+{#- Alternation check: DISABLED. #}
+{#- The original check requires strict user/assistant alternation, but #}
+{#- opencode sends sequences like user→tc1→tool→tc2→tool→user where #}
+{#- tool_call assistants are skipped, creating consecutive user messages. #}
+{#- The correct fix (PR #7490) inserts assistant("Done.") on the client side. #}
+{#- Since we can't modify opencode, we disable the check server-side. #}
+{#- The message rendering below handles all roles correctly regardless. #}
+{#- {%- set ns = namespace(index=0) %} #}
+{#- {%- for message in loop_messages %} #}
+{#-     {%- if message.role == 'user' or (message.role == 'assistant' and (message.tool_calls is not defined or message.tool_calls is none or message.tool_calls|length == 0)) %} #}
+{#-         {%- if (message['role'] == 'user') != (ns.index % 2 == 0) %} #}
+{#-             {{- raise_exception('After the optional system message, conversation roles must alternate user and assistant roles except for tool calls and results.') }} #}
+{#-         {%- endif %} #}
+{#-         {%- set ns.index = ns.index + 1 %} #}
+{#-     {%- endif %} #}
+{#- {%- endfor %} #}
 
 {#- Handle conversation messages. #}
 {%- for message in loop_messages %}
