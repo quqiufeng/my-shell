@@ -272,9 +272,60 @@ set -euo pipefail
 # =============================================================
 # OpenCode 配置文件 (~/.config/opencode/opencode.json)
 # =============================================================
+#
+# ⚠️ 踩坑记录 — 2026-06-04: opencode Jinja Exception 修复
+# ─────────────────────────────────────────────────────────
+#
+# 【问题 1: developer role 不兼容】
+# opencode 默认 small model 是 gpt-5-nano (内置值, 用于 title 生成等小任务)。
+# AI SDK @ai-sdk/openai-compatible 对 GPT-5 系列模型使用 Responses API 格式
+# (/v1/responses)，消息中带 role:"developer"。Mistral 3 原始 Jinja template
+# 不认识 developer role → 触发异常: "Only user, assistant and tool roles are
+# supported, got developer."
+#
+# 【问题 2: tool_call 交替检查缺陷】
+# 原始 Jinja template 的 alternation check 跳过 tool_call assistant 不计数:
+#   {%- if message.role == 'user' or (message.role == 'assistant' and
+#        (message.tool_calls is not defined or ...)) %}
+# 导致 opencode agent 多轮 tool call 时序:
+#   user → assistant(tool_call) → tool → user
+# 被识别为 "连续两个 user" → 触发: "After the optional system message,
+# conversation roles must alternate user and assistant roles..."
+#
+# 【修复方法 (双管齐下)】
+# 1. opencode 配置 (~/.config/opencode/opencode.json):
+#    设置 small_model 指向本地模型名，避免 title 生成用 gpt-5-nano
+#    触发 Responses API (仍可能被 SDK 调用 Responses API 时触发问题 2)
+# 2. llama.cpp chat template:
+#    自定义修复版 Jinja template:
+#    /opt/my-shell/3080/templates/ministral-3-14b-fixed.jinja
+#    - developer role → 映射为 system
+#    - 修复 alternation check: 所有 assistant 都参与交替计数
+#    (通过 --chat-template-file 参数加载)
+#
+# 【验证】
+#   curl -s http://localhost:11434/v1/responses \
+#     -H "Content-Type: application/json" \
+#     -d '{"model":"Ministral-3-14B-Instruct-2512",
+#          "input":[{"role":"developer","content":"..."},
+#                   {"role":"user","content":"..."}]}'
+#   → developer role 正常处理, 无 Jinja 异常
+#
+#   curl -s http://localhost:11434/v1/chat/completions \
+#     -H "Content-Type: application/json" \
+#     -d '{"model":"Ministral-3-14B-Instruct-2512",
+#          "messages":[
+#            {"role":"user","content":"list files"},
+#            {"role":"assistant","content":"","tool_calls":[...]},
+#            {"role":"tool","content":"..."},
+#            {"role":"user","content":"read file1"}
+#          ]}'
+#   → 多轮 tool call 正常, 无交替误报
+# ─────────────────────────────────────────────────────────
 # {
 #   "$schema": "https://opencode.ai/config.json",
 #   "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
+#   "small_model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
 #   "agent": {
 #     "build": {
 #       "model": "openai/Ministral-3-14B-Instruct-2512-UD-Q4_K_XL.gguf",
@@ -376,6 +427,7 @@ exec $LLAMA_SERVER \
   --host 0.0.0.0 \
   --port $PORT \
   --jinja \
+  --chat-template-file /opt/my-shell/3080/templates/ministral-3-14b-fixed.jinja \
   -ngl $NGL \
   -c $CTX \
   --batch-size $BATCH \
@@ -398,4 +450,10 @@ exec $LLAMA_SERVER \
   --timeout 300 \
   --metrics
 
-# 使用 GGUF 内置的 Mistral 3 chat template (原生支持 Tool Call / Function Calling)
+# 使用自定义修复后的 Mistral 3 chat template
+# 修复内容 (vs GGUF 内置):
+#   1. 支持 developer role → 映射为 system (opencode Responses API 兼容)
+#   2. 修复 tool_call 交替检查: 原始模板跳过 tool_call assistant 不计数,
+#      导致连续 user 消息误报 Jinja Exception (opencode agent 多轮 tool call 必触发)
+# 模板文件: /opt/my-shell/3080/templates/ministral-3-14b-fixed.jinja
+# 原始模板参考: /opt/llama.cpp/models/templates/mistralai-Ministral-3-14B-Reasoning-2512.jinja
