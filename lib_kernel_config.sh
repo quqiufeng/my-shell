@@ -455,10 +455,17 @@ optimize_cpu_modern() {
 # 获取已安装的 NVIDIA 专有驱动版本号
 # 用法: get_nvidia_driver_version
 # 输出: 版本号字符串(如 "535.183.06"),未找到则输出空
+#
+# 实现注意:
+#   用 dpkg-query 替代 dpkg -l,避免 pipefail + SIGPIPE 问题
+#   dpkg -l 输出大量行,awk 找到第一行就 exit,导致 dpkg 被 SIGPIPE 杀掉
+#   在 set -e + pipefail 环境下整个函数会返回 141,导致脚本终止
 get_nvidia_driver_version() {
-    dpkg -l 2>/dev/null \
-        | awk '/^ii\s+nvidia-driver-[0-9]/{print $3; exit}' \
-        | sed 's/-[0-9].*$//'
+    # dpkg-query 对不存在的包返回非零,需要 || true 兜底
+    dpkg-query -W -f='${Package} ${Version}\n' "nvidia-driver-*" 2>/dev/null \
+        | awk '/^nvidia-driver-[0-9]/{print $2; exit}' \
+        | sed 's/-[0-9].*$//' \
+        || true
 }
 
 # 编译并安装 NVIDIA DKMS 模块(手动模式)
