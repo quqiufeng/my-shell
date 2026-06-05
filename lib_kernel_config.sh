@@ -130,9 +130,10 @@ MAKE="${MAKE:-make}"
 #   apt-get install 对已安装的包是 no-op,重复执行安全
 #   不做预检查,避免 dpkg -l + pipefail + setsid 下的 SIGPIPE 误判
 #   sudo 失败时由 set -e 终止脚本
+#   此函数在 lib_init 之前调用,所以不写 LOG_FILE(直接输出到 stdout)
 install_deps() {
     echo "[依赖] 正在确保以下包已安装:$*"
-    sudo apt-get install -y "$@" >> "$LOG_FILE" 2>&1
+    sudo apt-get install -y "$@"
 }
 
 # -----------------------------------------------------------------------------
