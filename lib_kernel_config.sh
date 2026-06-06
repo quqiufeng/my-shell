@@ -499,7 +499,11 @@ build_nvidia_dkms() {
     fi
 
     log_step "  检测到 NVIDIA 驱动版本: $nvidia_ver"
-    log_step "  清理旧的 DKMS 构建缓存..."
+    log_step "  清理旧的 DKMS 构建缓存+已安装模块..."
+
+    # 先 clean remove(会清理 /var/lib/dkms/.../$kver/ 和 /lib/modules/.../updates/dkms/)
+    # 再手动删构建目录,确保 dkms build 从源码重新构建
+    sudo dkms remove "nvidia/$nvidia_ver" -k "$kver" 2>/dev/null || true
     sudo rm -rf "/var/lib/dkms/nvidia/$nvidia_ver/$kver" 2>/dev/null || true
 
     log_step "  编译 NVIDIA DKMS 模块..."
@@ -507,6 +511,15 @@ build_nvidia_dkms() {
 
     log_step "  安装 NVIDIA DKMS 模块..."
     sudo dkms install "nvidia/$nvidia_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
+
+    # 验证安装状态
+    if sudo dkms status "nvidia/$nvidia_ver" -k "$kver" 2>/dev/null \
+        | grep -Eq "installed$"; then
+        log_step "  NVIDIA DKMS 模块状态: installed (正常)"
+    else
+        log_step "  警告: DKMS 状态异常,尝试重新安装..."
+        sudo dkms install "nvidia/$nvidia_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
+    fi
 
     log_step "  NVIDIA DKMS 模块编译完成"
 }
