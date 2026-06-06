@@ -361,7 +361,7 @@ else
     DKMS_WAS_ENABLED=false
 fi
 
-# 失败时也要恢复 dkms
+# 异常退出时也要恢复 dkms
 trap '[[ "$DKMS_WAS_ENABLED" == "true" ]] && sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms 2>/dev/null || true' EXIT
 
 sudo make install 2>&1 | tee -a "$LOG_FILE"
@@ -369,6 +369,7 @@ sudo make install 2>&1 | tee -a "$LOG_FILE"
 # 恢复 dkms autoinstall(留给 apt 安装新内核时使用)
 if [[ "$DKMS_WAS_ENABLED" == "true" ]]; then
     sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms
+    trap - EXIT
     log_step "      已恢复 dkms autoinstall"
 fi
 
