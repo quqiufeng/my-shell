@@ -437,31 +437,37 @@ optimize_cpu_legacy() {
     done
 }
 
-# 新内核(>=6.8)的 CPU 优化:保留 GENERIC_CPU,用 KCFLAGS 注入 -march
+# 新内核(>=6.8)的 CPU 优化
+# 6.8.x: 只剩 GENERIC_CPU,用 KCFLAGS + Makefile 注入 -march
+# 7.0+: 新增 CONFIG_X86_NATIVE_CPU,自动 -march=native(最优雅)
 optimize_cpu_modern() {
     local march="$1"
-    # 6.8+ 只剩 GENERIC_CPU,保留它(Kconfig 自动启用)
+
+    # 7.0+ 有 X86_NATIVE_CPU 选项,自动 -march=native,不需要任何 hack
+    if kconfig_has "CONFIG_X86_NATIVE_CPU"; then
+        log_step "  - 检测到 CONFIG_X86_NATIVE_CPU(7.0+),使用原生优化"
+        scripts/config --set-val CONFIG_X86_NATIVE_CPU y 2>&1 | tee -a "$LOG_FILE"
+        scripts/config --set-val CONFIG_X86_GENERIC n 2>&1 | tee -a "$LOG_FILE" 2>/dev/null || true
+        log_step "  - 已启用 CONFIG_X86_NATIVE_CPU (作用: -march=native)"
+        return 0
+    fi
+
+    # 6.8.x 路径:只有 GENERIC_CPU,需要改 Makefile
+    log_step "  - 6.8.x 内核路径:保留 GENERIC_CPU,用 Makefile 注入 -march=$march"
     set_kconfig CONFIG_GENERIC_CPU y
 
-    # 重要: 内核 KBUILD_CFLAGS 会被 arch/x86/Makefile 中的
-    #   cflags-$(CONFIG_GENERIC_CPU) += -mtune=generic
-    # 覆盖(它用 += 追加且在 KCFLAGS 之后被引用)。
-    # KCFLAGS 环境变量传不到这一行,所以必须直接改 Makefile。
     local makefile="${SRC_DIR:-/opt/linux/src/linux-6.8.12}/arch/x86/Makefile"
     if [[ -f "$makefile" ]]; then
         if grep -q "cflags-\$(CONFIG_GENERIC_CPU).*march=$march" "$makefile"; then
             log_step "  - Makefile 已含 -march=$march(无需改)"
         else
-            # 备份原文件
             cp "$makefile" "${makefile}.bak"
-            # 把 -mtune=generic 替换为 -march=$march -mtune=$march
             sed -i "s|cflags-\$(CONFIG_GENERIC_CPU)\s*+=\s*-mtune=generic|cflags-\$(CONFIG_GENERIC_CPU) += -march=$march -mtune=$march|" "$makefile"
             log_step "  - 已修改 arch/x86/Makefile:cflags += -march=$march -mtune=$march"
             log_step "    (备份:${makefile}.bak)"
         fi
     fi
 
-    # 顺便设置 KCFLAGS(给 Rust 等其他子模块用,kernel 主体用 Makefile 注入)
     export KCFLAGS="-march=$march -mtune=$march -O2"
     log_step "  - KCFLAGS='$KCFLAGS' (Makefile 注入是主路径)"
 }
