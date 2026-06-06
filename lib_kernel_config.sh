@@ -442,10 +442,28 @@ optimize_cpu_modern() {
     local march="$1"
     # 6.8+ 只剩 GENERIC_CPU,保留它(Kconfig 自动启用)
     set_kconfig CONFIG_GENERIC_CPU y
-    # 设置 KCFLAGS 环境变量,会通过 Makefile 传递到 KBUILD_CFLAGS
+
+    # 重要: 内核 KBUILD_CFLAGS 会被 arch/x86/Makefile 中的
+    #   cflags-$(CONFIG_GENERIC_CPU) += -mtune=generic
+    # 覆盖(它用 += 追加且在 KCFLAGS 之后被引用)。
+    # KCFLAGS 环境变量传不到这一行,所以必须直接改 Makefile。
+    local makefile="${SRC_DIR:-/opt/linux/src/linux-6.8.12}/arch/x86/Makefile"
+    if [[ -f "$makefile" ]]; then
+        if grep -q "cflags-\$(CONFIG_GENERIC_CPU).*march=$march" "$makefile"; then
+            log_step "  - Makefile 已含 -march=$march(无需改)"
+        else
+            # 备份原文件
+            cp "$makefile" "${makefile}.bak"
+            # 把 -mtune=generic 替换为 -march=$march -mtune=$march
+            sed -i "s|cflags-\$(CONFIG_GENERIC_CPU)\s*+=\s*-mtune=generic|cflags-\$(CONFIG_GENERIC_CPU) += -march=$march -mtune=$march|" "$makefile"
+            log_step "  - 已修改 arch/x86/Makefile:cflags += -march=$march -mtune=$march"
+            log_step "    (备份:${makefile}.bak)"
+        fi
+    fi
+
+    # 顺便设置 KCFLAGS(给 Rust 等其他子模块用,kernel 主体用 Makefile 注入)
     export KCFLAGS="-march=$march -mtune=$march -O2"
-    log_step "  - 已设置 KCFLAGS='$KCFLAGS'"
-    log_step "  - 注意: KCFLAGS 需要在执行 make 时作为环境变量传入"
+    log_step "  - KCFLAGS='$KCFLAGS' (Makefile 注入是主路径)"
 }
 
 # -----------------------------------------------------------------------------
