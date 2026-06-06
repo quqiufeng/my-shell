@@ -258,7 +258,22 @@ sudo make modules_install 2>&1 | tee -a "$LOG_FILE"
 # [7/9] 安装内核镜像
 # -----------------------------------------------------------------------------
 log_step "[7/9] 安装内核镜像并更新 GRUB"
+
+# 临时禁用 dkms autoinstall(避免对新内核找不到 headers 而失败)
+if [[ -f /etc/kernel/postinst.d/dkms ]]; then
+    sudo mv /etc/kernel/postinst.d/dkms /etc/kernel/postinst.d/dkms.disabled
+    DKMS_DISABLED=true
+    trap '[[ "${DKMS_DISABLED:-false}" == "true" ]] && sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms 2>/dev/null || true' EXIT
+fi
+
 sudo make install 2>&1 | tee -a "$LOG_FILE"
+
+# 恢复
+if [[ "${DKMS_DISABLED:-false}" == "true" ]]; then
+    sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms
+    unset DKMS_DISABLED
+    trap - EXIT
+fi
 
 # -----------------------------------------------------------------------------
 # [8/9] 保存配置

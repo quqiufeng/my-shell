@@ -343,7 +343,30 @@ sudo make modules_install 2>&1 | tee -a "$LOG_FILE"
 # [7/9] 安装内核镜像
 # -----------------------------------------------------------------------------
 log_step "[7/9] 安装内核镜像"
+
+# 临时禁用 dkms autoinstall
+# 原因:make install 触发 /etc/kernel/postinst.d/dkms 自动构建 NVIDIA,
+#       但新内核没有对应的 linux-headers-<ver> deb 包,dkms 找不到 header 会失败
+#       (错误: kernel package linux-headers-<ver> is not supported)
+#       我们在 [9/9] 手动用源码树 build/install,不依赖 dkms autoinstall
+if [[ -f /etc/kernel/postinst.d/dkms ]]; then
+    log_step "      临时禁用 dkms autoinstall(用源码树手动构建更可靠)"
+    sudo mv /etc/kernel/postinst.d/dkms /etc/kernel/postinst.d/dkms.disabled
+    DKMS_WAS_ENABLED=true
+else
+    DKMS_WAS_ENABLED=false
+fi
+
+# 失败时也要恢复 dkms
+trap '[[ "$DKMS_WAS_ENABLED" == "true" ]] && sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms 2>/dev/null || true' EXIT
+
 sudo make install 2>&1 | tee -a "$LOG_FILE"
+
+# 恢复 dkms autoinstall(留给 apt 安装新内核时使用)
+if [[ "$DKMS_WAS_ENABLED" == "true" ]]; then
+    sudo mv /etc/kernel/postinst.d/dkms.disabled /etc/kernel/postinst.d/dkms
+    log_step "      已恢复 dkms autoinstall"
+fi
 
 # 获取内核版本号(只需计算一次)
 KERNEL_RELEASE=$(make kernelrelease 2>/dev/null || echo "")
