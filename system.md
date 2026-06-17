@@ -929,4 +929,94 @@ ip addr show | grep "inet "
 
 ---
 
-*文档更新：2026-05-27*
+---
+
+## 24. 禁用烦人的 xdg-open 弹框（Chrome 自定义协议弹窗）
+
+### 24.1 问题描述
+
+打开网页时，Chrome 频繁弹出 xdg-open 对话框，询问是否打开外部应用（如 `bytedance://`、`wxlocalresource://`、`dingtalk://` 等）。"大部分网站都有这个问题"。
+
+### 24.2 解决方案：双重防护
+
+使用 **Chrome URLBlocklist 策略** + **智能 xdg-open 包装脚本**，双重拦截。
+
+### 24.3 Chrome 策略配置（浏览器级）
+
+创建 Chrome 受管策略文件，将已知弹框协议加入黑名单：
+
+```bash
+sudo mkdir -p /etc/opt/chrome/policies/managed
+```
+
+```json
+{
+  "URLBlocklist": [
+    "wxlocalresource://*",
+    "bytedance://*",
+    "dingtalk://*",
+    "snssdk://*",
+    "taobao://*",
+    "alipay://*",
+    "weixin://*",
+    "wechat://*",
+    "openapp://*",
+    "tencent://*",
+    "qq://*",
+    "mqq://*",
+    "tbopen://*",
+    "alipayqr://*",
+    "douyin://*",
+    "zoommtg://*",
+    "zoomus://*",
+    "msteams://*",
+    "teams://*",
+    "slack://*"
+  ],
+  "ExternalProtocolDialogShowAlwaysOpenCheckbox": true
+}
+```
+
+写入文件 `/etc/opt/chrome/policies/managed/block-custom-protocols.json`。
+
+> **注意**：不要用 `URLWhitelist`，否则 Chrome 会把这些协议当作合法 URL 处理，转交给 Ubuntu App Center。
+
+### 24.4 智能 xdg-open 包装脚本（系统级）
+
+备份原 `xdg-open` 并替换为过滤脚本：
+
+```bash
+# 备份原文件
+sudo cp /usr/bin/xdg-open /usr/bin/xdg-open.real
+```
+
+脚本逻辑：
+- **放行**安全协议：`http://`, `https://`, `mailto:`, `tel:`, `sms:`, `ftp:`, `file:`, `irc:`, `xmpp:`, `magnet:`, `steam:`, `apt:`
+- **拦截**已知广告/跟踪协议：80+ 种（见脚本中 `KNOWN_BAD_PROTOCOLS` 列表）
+- **默认拦截**所有未知自定义协议
+- 所有操作记录到 `/tmp/xdg-open.log`
+
+脚本位置：`/usr/bin/xdg-open`
+
+```bash
+# 安装后设置可执行权限
+sudo chmod +x /usr/bin/xdg-open
+```
+
+### 24.5 验证
+
+```bash
+# 查看 Chrome 策略是否生效（在 Chrome 地址栏输入 chrome://policy）
+# 查看拦截日志
+cat /tmp/xdg-open.log
+```
+
+### 24.6 后续调整
+
+- **添加新协议**：编辑 `/etc/opt/chrome/policies/managed/block-custom-protocols.json` 和 `/usr/bin/xdg-open` 中的 `KNOWN_BAD_PROTOCOLS` 列表
+- **允许某个协议**：从 `URLBlocklist` 和 `KNOWN_BAD_PROTOCOLS` 中移除，加入 `SAFE_PROTOCOLS`
+- **恢复原始 xdg-open**：`sudo mv /usr/bin/xdg-open.real /usr/bin/xdg-open`
+
+---
+
+*文档更新：2026-06-18*
