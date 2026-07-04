@@ -11,9 +11,9 @@
 #   - 系统:   Ubuntu 24.04 LTS (LVM 根分区)
 #
 # 编译目标:
-#   - 源码:   linux-7.0.11
-#   - 版本:   7.0.11-rtx3080-$(date +%Y%m%d)
-#   - 位置:   /opt/linux/src/linux-7.0.11/
+#   - 源码:   linux-7.1.2
+#   - 版本:   7.1.2-rtx3080-$(date +%Y%m%d)
+#   - 位置:   /opt/linux/src/linux-7.1.2/
 #
 # 7.0 内核新特性:
 #   - CONFIG_X86_NATIVE_CPU 取代旧 Kconfig CPU 选项,自动 -march=native
@@ -26,7 +26,7 @@
 #   - 改了 CONFIG_PREEMPT 后必须重编 DKMS(ABI 改变)
 #
 # 使用方式:
-#   cd /opt/linux/src/linux-7.0.11
+#   cd /opt/linux/src/linux-7.1.2
 #   setsid bash ~/my-shell/build_kernel_3080_7.0.sh > /tmp/build_kernel_3080_7.0.log 2>&1 < /dev/null &
 #   tail -f /tmp/build_kernel_3080_7.0.log
 #
@@ -46,10 +46,10 @@ lib_setup_strict_mode
 # -----------------------------------------------------------------------------
 # 全局变量
 # -----------------------------------------------------------------------------
-SRC_DIR="/opt/linux/src/linux-7.0.11"
+SRC_DIR="/opt/linux/src/linux-7.1.2"
 KERNEL_LOCALVERSION="-rtx3080-$(date +%Y%m%d)"
 CONFIG_BACKUP_DIR="$HOME/.config/kernel-builds"
-MY_SHELL_CONFIG="$HOME/my-shell/config-7.0.11-rtx3080-current"
+MY_SHELL_CONFIG="$HOME/my-shell/config-7.1.2-rtx3080-current"
 FORCE_FULL_REBUILD=false
 FORCE_RECONFIGURE=false
 SKIP_NVIDIA=false
@@ -412,7 +412,7 @@ fi
 # -----------------------------------------------------------------------------
 log_step "[额外] 保存编译配置"
 save_final_config "$KERNEL_RELEASE"
-sync_config_to_my_shell "config-7.0.11-rtx3080-current"
+sync_config_to_my_shell "config-7.1.2-rtx3080-current"
 
 # -----------------------------------------------------------------------------
 # 更新 GRUB,默认启动新内核
@@ -427,7 +427,7 @@ set_grub_default "$KERNEL_RELEASE" "new"
 print_summary "$KERNEL_RELEASE"
 echo ""
 echo "后续步骤:"
-echo "  1. Kernel 7.0.11-rtx3080-* 已编译, NVIDIA 驱动已通过 DKMS 重新编译"
+echo "  1. Kernel 7.1.2-rtx3080-* 已编译, NVIDIA 驱动已通过 DKMS 重新编译"
 echo "  2. 重启验证: nvidia-smi 应能正常显示"
 echo "  3. 如有问题:在 GRUB 菜单选择旧内核启动排查"
 echo ""
