@@ -365,6 +365,35 @@ optimize_scheduler_desktop() {
     set_kconfig CONFIG_SCHED_SMT n
 }
 
+# 启用 Android Binder(供 Waydroid 容器化 Android 使用)
+# 用法: enable_waydroid_binder
+# 说明:
+#   - 7.x 内核 ANDROID_BINDER_IPC 为 bool,只能 =y
+#   - BINDERFS 让每个 IPC namespace 动态分配 /dev/binder*,Waydroid 依赖它
+#   - 设备列表留空,统一走 binderfs 动态分配(与 Ubuntu 官方内核一致)
+#   - 新内核已移除 ASHMEM,Waydroid 改用 memfd(CONFIG_MEMFD_CREATE 已有)
+enable_waydroid_binder() {
+    log_step "  - 启用 Android Binder IPC(Waydroid)"
+    set_kconfig CONFIG_ANDROID_BINDER_IPC y
+    set_kconfig CONFIG_ANDROID_BINDERFS y
+    set_kconfig CONFIG_ANDROID_BINDER_DEVICES ""
+}
+
+# 启用 legacy iptables NAT(Waydroid 网络依赖)
+# 用法: enable_waydroid_netfilter
+# 说明:
+#   - waydroid-net.sh 优先使用 iptables-legacy 的 nat/mangle 表
+#   - 新内核默认只保留 nftables 后端,需显式打开 legacy x_tables
+enable_waydroid_netfilter() {
+    log_step "  - 启用 legacy iptables NAT(Waydroid 网络)"
+    set_kconfig CONFIG_NETFILTER_XTABLES_LEGACY y
+    set_kconfig CONFIG_IP_NF_IPTABLES_LEGACY m
+    set_kconfig CONFIG_IP_NF_FILTER m
+    set_kconfig CONFIG_IP_NF_NAT m
+    set_kconfig CONFIG_IP_NF_TARGET_MASQUERADE m
+    set_kconfig CONFIG_IP_NF_MANGLE m
+}
+
 # -----------------------------------------------------------------------------
 # CPU 微架构优化(适配 6.8.x 已移除 Kconfig 选项)
 # -----------------------------------------------------------------------------

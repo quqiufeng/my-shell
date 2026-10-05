@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Linux 7.0 内核编译安装脚本 —— AMD Ryzen 5 3500X + RTX 3080 专用优化版
+# Linux 7.2.3 内核编译安装脚本 —— AMD Ryzen 5 3500X + RTX 3080 专用优化版
 # =============================================================================
 #
 # 硬件环境:
@@ -11,14 +11,14 @@
 #   - 系统:   Ubuntu 24.04 LTS (LVM 根分区)
 #
 # 编译目标:
-#   - 源码:   linux-7.1.2
-#   - 版本:   7.1.2-rtx3080-$(date +%Y%m%d)
-#   - 位置:   /opt/linux/src/linux-7.1.2/
+#   - 源码:   linux-7.2.3
+#   - 版本:   7.2.3-rtx3080-$(date +%Y%m%d)
+#   - 位置:   /opt/linux/src/linux-7.2.3/
 #
-# 7.0 内核新特性:
+# 7.2.3 内核新特性:
 #   - CONFIG_X86_NATIVE_CPU 取代旧 Kconfig CPU 选项,自动 -march=native
 #   - Rust 驱动正式稳定(第一公民)
-#   - 大量性能改进和安全更新(对比 6.8.12 跨 2 年)
+#   - 大量性能改进和安全更新(对比 6.8.12 跨 3 年)
 #
 # NVIDIA 注意事项:
 #   - 关闭 nouveau,使用 NVIDIA 专有驱动(通过 DKMS 编译)
@@ -26,7 +26,7 @@
 #   - 改了 CONFIG_PREEMPT 后必须重编 DKMS(ABI 改变)
 #
 # 使用方式:
-#   cd /opt/linux/src/linux-7.1.2
+#   cd /opt/linux/src/linux-7.2.3
 #   setsid bash ~/my-shell/build_kernel_3080_7.0.sh > /tmp/build_kernel_3080_7.0.log 2>&1 < /dev/null &
 #   tail -f /tmp/build_kernel_3080_7.0.log
 #
@@ -46,10 +46,10 @@ lib_setup_strict_mode
 # -----------------------------------------------------------------------------
 # 全局变量
 # -----------------------------------------------------------------------------
-SRC_DIR="/opt/linux/src/linux-7.1.2"
+SRC_DIR="/opt/linux/src/linux-7.2.3"
 KERNEL_LOCALVERSION="-rtx3080-$(date +%Y%m%d)"
 CONFIG_BACKUP_DIR="$HOME/.config/kernel-builds"
-MY_SHELL_CONFIG="$HOME/my-shell/config-7.1.2-rtx3080-current"
+MY_SHELL_CONFIG="$HOME/my-shell/config-7.2.3-rtx3080-current"
 FORCE_FULL_REBUILD=false
 FORCE_RECONFIGURE=false
 SKIP_NVIDIA=false
@@ -286,6 +286,11 @@ if [[ "$INCREMENTAL" == "false" || "$FORCE_RECONFIGURE" == "true" ]]; then
     set_kconfig_safe CONFIG_VHOST_CROSS_ENDIAN_LEGACY n
     disable_third_party_hypervisors
 
+    # Waydroid 容器化 Android 支持(Binder + legacy iptables NAT)
+    log_step "  - 启用 Waydroid 支持"
+    enable_waydroid_binder
+    enable_waydroid_netfilter
+
     # 其它精简
     log_step "  - 移除嵌入式/老旧驱动"
     disable_fc_scsi
@@ -412,7 +417,7 @@ fi
 # -----------------------------------------------------------------------------
 log_step "[额外] 保存编译配置"
 save_final_config "$KERNEL_RELEASE"
-sync_config_to_my_shell "config-7.1.2-rtx3080-current"
+sync_config_to_my_shell "config-7.2.3-rtx3080-current"
 
 # -----------------------------------------------------------------------------
 # 更新 GRUB,默认启动新内核
@@ -427,7 +432,7 @@ set_grub_default "$KERNEL_RELEASE" "new"
 print_summary "$KERNEL_RELEASE"
 echo ""
 echo "后续步骤:"
-echo "  1. Kernel 7.1.2-rtx3080-* 已编译, NVIDIA 驱动已通过 DKMS 重新编译"
+echo "  1. Kernel 7.2.3-rtx3080-* 已编译, NVIDIA 驱动已通过 DKMS 重新编译"
 echo "  2. 重启验证: nvidia-smi 应能正常显示"
 echo "  3. 如有问题:在 GRUB 菜单选择旧内核启动排查"
 echo ""
