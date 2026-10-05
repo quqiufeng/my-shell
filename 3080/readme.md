@@ -343,6 +343,19 @@ adb -s 192.168.240.112:5555 shell ls /sdcard
 adb -s 192.168.240.112:5555 install app.apk
 ```
 
+> **旁加载 ARM APK**：Waydroid x86_64 靠 libndk 翻译运行 arm64/arm 应用，`adb install` 即可。
+> 若报 `INSTALL_FAILED_VERIFICATION_FAILURE: Install not allowed`（Play Protect 包校验拦截），
+> 先关校验再装：
+> ```bash
+> adb shell settings put global verifier_verify_adb_installs 0
+> adb shell settings put global package_verifier_enable 0
+> adb install -r app.apk
+> ```
+> 启动用显式 Activity 更可靠（`monkey` 有时不触发）：
+> ```bash
+> adb shell am start -W -n <包名>/<启动Activity>
+> ```
+
 无需 adb 的内置方式（直接进容器 shell / 看日志）：
 
 ```bash
@@ -361,6 +374,7 @@ sudo waydroid logcat
 | `Failed to get service 'binder'` / 容器起不来 | 未重启到新内核，或 binder 未生效；`cat /proc/filesystems \| grep binderfs`、`dmesg \| grep -i binder` |
 | `waydroid container start` 失败 | `journalctl -u waydroid-container -e` |
 | 容器无网络 / DNS 失败 | 确认 legacy iptables 模块已加载：`sudo modprobe ip_tables iptable_nat iptable_filter iptable_mangle`；`sudo iptables-legacy -t nat -L -n`；确认 `dnsmasq` 已装 |
+| 虚拟机没声音 | **先查 Android 媒体音量**（最常见）：`adb shell settings get system volume_music_speaker`，过低就用音量键拉满 `for i in $(seq 1 15); do adb shell input keyevent 24; done`。再查宿主 `wpctl status`，播放时应有名为 **Waydroid** 的流且接到你实际在用的 sink。原理：HAL 连容器内 `/run/xdg/pulse/native`（bind 自宿主 `/run/user/1000/pulse/native`）。若 `adb shell getprop init.svc.vendor.audio-hal` 显示 `stopping`（HAL 卡死），`waydroid session stop && sudo waydroid container stop` 后重启会话即可恢复 |
 | Wayland 连接失败 `failed to connect to display` | `XDG_RUNTIME_DIR=/run/user/$(id -u)`、`WAYLAND_DISPLAY` 与 Weston `--socket` 一致 |
 | NVIDIA 黑屏/花屏 | 用第 3.4 节软件渲染，或 Weston 加 `--renderer=pixman` |
 | 硬解/游戏性能差 | 优先硬件渲染；软件渲染仅保证兼容 |
