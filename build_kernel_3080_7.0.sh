@@ -25,6 +25,119 @@
 #   - 脚本会自动重新编译 NVIDIA DKMS 模块(make install 时的自动构建不可靠)
 #   - 改了 CONFIG_PREEMPT 后必须重编 DKMS(ABI 改变)
 #
+# =============================================================================
+# GPU 解锁(gpu-unlock)
+# =============================================================================
+#
+# 项目地址: https://github.com/Zagitta/gpu-unlock
+#
+# 作用:
+#   把 GA102/GA103/GA104/GA106(含本机 RTX 3080 20GB)的 FP/BF16 指令
+#   发射速率从 GeForce 的半速解锁到专业卡全速。社区实测(3080 20GB):
+#     - 稠密 BF16 GEMM:约 +56~59%(3090 Ti 上 FP16 +35%, TF32 约翻倍)
+#     - LLM prefill +14~36%,FlashAttention/扩散模型变快
+#     - decode(显存带宽瓶颈)和 INT8 基本不变;输出比特级一致
+#
+# 原理:
+#   1. 借鉴 CMP 矿卡解锁的 V67/PLM 手法,在 nvidia 驱动 bind 之前写入
+#      速度选择器 SS0=0x88888888(全速 BF16)、SS1=0x8(IMLA4)
+#   2. 加载 NVIDIA 官方 gsp/booter 固件,然后做一次 FLR 复位
+#   3. 模块放在 initramfs 里且必须排在 nvidia 之前加载;不改 vBIOS、
+#      不 patch 驱动,所以驱动更新不受影响,每次开机重新解锁
+#   4. 睡眠时显卡掉电会清掉选择器,模块用 suspend notifier 在 nvidia
+#      resume 之前再解锁一次(可用 gpu_unlock.resume=0 关闭)
+#
+# 安装流程(首次,一次性):
+#   git clone https://github.com/Zagitta/gpu-unlock
+#   cd gpu-unlock && sudo make install-deb
+#   # 内核命令行需要 gpu_unlock.targets=all(本脚本会自动补齐)
+#   # 手动方式: 编辑 /etc/default/grub 的 GRUB_CMDLINE_LINUX_DEFAULT
+#   #           然后 sudo update-grub
+#
+# 加载顺序(Ubuntu 上很容易踩的坑):
+#   initramfs-tools 的 /init 先跑 init-top/udev, 再跑 load_modules。
+#   nvidia 模块被打进 initramfs 后, udev 会按 PCI modalias 在 load_modules
+#   之前就把它加载并绑定显卡, 此时 gpu_unlock 再加载只能得到 -EBUSY。
+#   所以需要 /etc/modprobe.d/gpu-unlock.conf:
+#       softdep nvidia pre: gpu_unlock
+#   让 libkmod 在加载 nvidia 之前先 modprobe gpu_unlock。
+#   本脚本会自动写入该文件; 手工安装时如果 journalctl 看到
+#   "nvidia 0000:xx:00.0: gpu_unlock: unlock failed (-16)" 就补上它。
+#   注意: kmod 对同一条 softdep 只认第一个读到的文件,改前先确认没有别处
+#   已经定义 `softdep nvidia`。
+#
+# 升级/换内核流程:
+#   - 升级内核:直接跑本脚本。[9/9] 会为新内核重建 nvidia 和 gpu-unlock,
+#     然后统一重建 initramfs。自编译内核没有 dpkg 的 kernel postinst 钩子,
+#     DKMS 不会自动触发,必须靠这一步。
+#   - 升级 gpu-unlock 项目本身:
+#       cd gpu-unlock && git pull && sudo make install-deb
+#     然后重跑本脚本(或手动 dkms install + update-initramfs -u -k)。
+#
+# 验证:
+#   journalctl -k -b | grep gpu_unlock     # 应出现 "gpu_unlock: unlocked"
+#   modinfo gpu_unlock                     # 确认已安装
+#   lspci -nnk -s 26:00.0                  # 确认驱动仍是 nvidia
+#
+# 关闭/卸载:
+#   临时关闭:去掉内核命令行的 gpu_unlock.targets=(改 GRUB 后 update-grub)
+#   彻底卸载:sudo apt purge gpu-unlock-dkms gpu-unlock-firmware
+#
+# 注意:
+#   - 本机 3080 是显示卡,解锁时屏幕会短暂黑屏约 1 秒,属正常现象
+#   - 是 GPU 固件/寄存器级操作,只对支持列表内的消费级卡有效
+#   - 装好后不要手动 rmmod nvidia;模块只在开机/唤醒时动作
+#
+# =============================================================================
+# 故障修复: 外部模块与运行内核 ABI 不一致(DKMS 模块加载失败)
+# =============================================================================
+#
+# 原理:
+#   外部模块编出来的 .ko 必须和运行内核三样东西对上:
+#     1. vermagic: CONFIG_LOCALVERSION + SMP/PREEMPT/MODULE_UNLOAD/MODVERSIONS
+#     2. struct module 布局: CONFIG_MODULE_UNLOAD / KALLSYMS(_ALL) /
+#        TRACEPOINTS / FTRACE / LIVEPATCH / JUMP_LABEL / KASAN / RANDSTRUCT 等
+#     3. 导出符号 CRC: 内核构建时生成的 Module.symvers
+#   自编译内核没有 linux-headers-<ver> deb,DKMS 只能通过
+#   /lib/modules/<ver>/build 指向的源码树取头文件和符号表。一旦这棵树的
+#   .config 被换成别的(误跑 menuconfig/defconfig、换成另一套精简配置等),
+#   新编的模块加载时会报:
+#     "module gpu_unlock: .gnu.linkonce.this_module section size must match
+#      the kernel's built struct module size at run time"    (第 2 项不符)
+#     "disagrees about version of symbol module_layout"      (第 3 项不符)
+#   已经在用的 nvidia 老模块不受影响,因为它们是当初用正确的树编好的。
+#
+# 判断当前树是否匹配(脚本 [1/9] 会自动做这件事,不一致就自动转 --reconfig):
+#   grep -E '^CONFIG_(LOCALVERSION|MODULE_UNLOAD|KASAN)=' \
+#       /boot/config-$(uname -r) /opt/linux/src/linux-7.2.3/.config
+#   cat /opt/linux/src/linux-7.2.3/include/config/kernel.release
+#
+# 修复过程(不要改动那棵被污染的树):
+#   1. 确认报错:
+#        sudo journalctl -k -b | grep -E 'gpu_unlock|this_module|disagrees'
+#        modinfo -F vermagic /lib/modules/$(uname -r)/updates/dkms/gpu_unlock.ko
+#        readelf -SW .../gpu_unlock.ko | grep this_module    # 应为 0x500
+#   2. 用干净源码 + 运行内核的 /boot/config 建独立 O= 构建目录:
+#        mkdir -p /tmp/kb && cp /boot/config-$(uname -r) /tmp/kb/.config
+#        make -C /opt/linux-7.2.3-clean O=/tmp/kb olddefconfig
+#        make -C /opt/linux-7.2.3-clean O=/tmp/kb -j$(nproc) modules_prepare
+#   3. 生成匹配的 Module.symvers:
+#      CRC 只存在内核镜像的 __kcrctab(只读数据)里,System.map 只有地址,
+#      所以从 /proc/kcore 读,再用 /proc/kallsyms 的 _text 校准 KASLR 偏移:
+#        sudo python3 gpu_unlock_symvers.py $(uname -r) /tmp/kb/Module.symvers
+#      可以拿 nvidia.ko 里 module_layout 的 CRC 校验提取结果。
+#   4. 用这个目录编译并装回:
+#        make -C /tmp/kb M=<gpu_unlock 源码> modules
+#        装到 /lib/modules/$(uname -r)/updates/dkms/, 然后 depmod,
+#        update-initramfs -u -k $(uname -r), 重启
+#   5. 一条命令完成 2~4:
+#        ./build_kernel_3080_7.0.sh --repair-gpu-unlock
+#      可用 CLEAN_SRC=<目录> 指定干净源码树(默认 /opt/linux-7.2.3-clean)。
+#
+# 预防: 脚本 [1/9] 会对比树 .config 与 /boot/config-$(uname -r) 的 ABI 关键项,
+#   不一致时自动切到 --reconfig 模式(从运行内核的 config 重新生成),不会再
+#   把错误的 .config 带进增量编译。
+#
 # 使用方式:
 #   cd /opt/linux/src/linux-7.2.3
 #   setsid bash ~/my-shell/build_kernel_3080_7.0.sh > /tmp/build_kernel_3080_7.0.log 2>&1 < /dev/null &
@@ -34,6 +147,8 @@
 #   --rebuild     强制完整重新编译
 #   --reconfig    强制重新配置内核选项
 #   --no-nvidia   跳过 NVIDIA DKMS 编译(测试用)
+#   --no-gpu-unlock 跳过 gpu-unlock DKMS 编译(调试用)
+#   --repair-gpu-unlock 只修复 gpu-unlock 加载失败(不编译内核)
 #   --help        显示帮助
 # =============================================================================
 
@@ -53,6 +168,8 @@ MY_SHELL_CONFIG="$HOME/my-shell/config-7.2.3-rtx3080-current"
 FORCE_FULL_REBUILD=false
 FORCE_RECONFIGURE=false
 SKIP_NVIDIA=false
+SKIP_GPU_UNLOCK=false
+REPAIR_GPU_UNLOCK=false
 
 # -----------------------------------------------------------------------------
 # 参数解析
@@ -74,6 +191,16 @@ while [[ $# -gt 0 ]]; do
             echo "[参数] 跳过 NVIDIA DKMS 编译"
             shift
             ;;
+        --no-gpu-unlock)
+            SKIP_GPU_UNLOCK=true
+            echo "[参数] 跳过 gpu-unlock DKMS 编译"
+            shift
+            ;;
+        --repair-gpu-unlock)
+            REPAIR_GPU_UNLOCK=true
+            echo "[参数] 修复 gpu-unlock 与运行内核的 ABI 不一致"
+            shift
+            ;;
         --help|-h)
             cat <<EOF
 用法: $0 [选项]
@@ -82,6 +209,8 @@ while [[ $# -gt 0 ]]; do
   --rebuild     强制完整重新编译(清除所有编译产物)
   --reconfig    强制重新配置内核选项
   --no-nvidia   跳过 NVIDIA DKMS 编译步骤
+  --no-gpu-unlock 跳过 gpu-unlock DKMS 编译步骤
+  --repair-gpu-unlock 只修复 gpu-unlock(不编译内核),用运行内核的配置重编模块
   --help        显示此帮助
 EOF
             exit 0
@@ -93,6 +222,15 @@ EOF
             ;;
     esac
 done
+
+# -----------------------------------------------------------------------------
+# 只修复 gpu-unlock(不编译内核)
+# -----------------------------------------------------------------------------
+if [[ "$REPAIR_GPU_UNLOCK" == "true" ]]; then
+    lib_init "repair_gpu_unlock" "$(uname -r)"
+    repair_gpu_unlock_abi || exit 1
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # 初始化
@@ -115,6 +253,18 @@ lib_init "build_kernel_3080" "$KERNEL_LOCALVERSION"
 INCREMENTAL=false
 if [[ -f .config && -d arch/x86/boot && "$FORCE_FULL_REBUILD" == "false" ]]; then
     INCREMENTAL=true
+
+    # 树里的 .config 如果被换过,增量编译会把错误配置带进新内核,
+    # 之后 DKMS 编出的外部模块(nvidia/gpu-unlock)会加载失败。
+    # 这里对比 ABI 关键项,不一致就自动转成 --reconfig。
+    if [[ "$FORCE_RECONFIGURE" == "false" ]] \
+        && ! kernel_config_abi_matches .config "/boot/config-$(uname -r)"; then
+        log_step "[1/9] 警告: 树里的 .config 与运行内核的 ABI 关键配置不一致:"
+        kernel_abi_config_diff .config "/boot/config-$(uname -r)" | tee -a "$LOG_FILE"
+        log_step "[1/9] 自动切换为 --reconfig(从 /boot/config-$(uname -r) 重新生成)"
+        FORCE_RECONFIGURE=true
+    fi
+
     log_step "[1/9] 检测到已有编译配置,启用增量编译模式"
 else
     log_step "[1/9] 完整重建模式(清除所有编译产物)..."
@@ -397,7 +547,7 @@ if [[ -n "$KERNEL_RELEASE" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# [9/9] NVIDIA DKMS 编译(自动 / 手动)
+# [9/9] DKMS 编译(自动 / 手动):NVIDIA + gpu-unlock
 # -----------------------------------------------------------------------------
 if [[ "$SKIP_NVIDIA" == "true" ]]; then
     log_step "[9/9] 跳过 NVIDIA DKMS 编译(--no-nvidia)"
@@ -405,10 +555,18 @@ else
     log_step "[9/9] 编译 NVIDIA DKMS 模块"
     if [[ -n "$KERNEL_RELEASE" ]]; then
         build_nvidia_dkms "$KERNEL_RELEASE"
-        log_step "      重新生成 initramfs(包含 NVIDIA 模块)"
+
+        if [[ "$SKIP_GPU_UNLOCK" == "true" ]]; then
+            log_step "      跳过 gpu-unlock DKMS 编译(--no-gpu-unlock)"
+        else
+            log_step "      编译 gpu-unlock DKMS 模块(需在 initramfs 中先于 nvidia)"
+            build_gpu_unlock_dkms "$KERNEL_RELEASE"
+        fi
+
+        log_step "      重新生成 initramfs(包含 NVIDIA + gpu_unlock 模块)"
         sudo update-initramfs -u -k "$KERNEL_RELEASE" 2>&1 | tee -a "$LOG_FILE"
     else
-        log_step "      警告: 内核版本号为空,跳过 NVIDIA DKMS"
+        log_step "      警告: 内核版本号为空,跳过 DKMS 编译"
     fi
 fi
 
@@ -423,6 +581,10 @@ sync_config_to_my_shell "config-7.2.3-rtx3080-current"
 # 更新 GRUB,默认启动新内核
 # -----------------------------------------------------------------------------
 log_step "[额外] 更新 GRUB"
+if [[ "$SKIP_GPU_UNLOCK" != "true" && -n "$(get_gpu_unlock_version)" ]]; then
+    ensure_gpu_unlock_softdep
+    ensure_gpu_unlock_cmdline
+fi
 sudo update-grub 2>&1 | tee -a "$LOG_FILE"
 set_grub_default "$KERNEL_RELEASE" "new"
 
@@ -432,13 +594,16 @@ set_grub_default "$KERNEL_RELEASE" "new"
 print_summary "$KERNEL_RELEASE"
 echo ""
 echo "后续步骤:"
-echo "  1. Kernel 7.2.3-rtx3080-* 已编译, NVIDIA 驱动已通过 DKMS 重新编译"
+echo "  1. Kernel 7.2.3-rtx3080-* 已编译, NVIDIA/gpu-unlock 已通过 DKMS 重新编译"
 echo "  2. 重启验证: nvidia-smi 应能正常显示"
-echo "  3. 如有问题:在 GRUB 菜单选择旧内核启动排查"
+echo "  3. 解锁验证: journalctl -k -b | grep gpu_unlock (应出现 unlocked)"
+echo "  4. 如有问题:在 GRUB 菜单选择旧内核启动排查"
 echo ""
 echo "增量编译提示:"
-echo "  - ./build_kernel_3080_7.0.sh             增量编译"
-echo "  - ./build_kernel_3080_7.0.sh --rebuild   强制完整重新编译"
-echo "  - ./build_kernel_3080_7.0.sh --reconfig  重新配置内核选项"
-echo "  - ./build_kernel_3080_7.0.sh --no-nvidia 跳过 NVIDIA DKMS"
+echo "  - ./build_kernel_3080_7.0.sh                  增量编译"
+echo "  - ./build_kernel_3080_7.0.sh --rebuild        强制完整重新编译"
+echo "  - ./build_kernel_3080_7.0.sh --reconfig       重新配置内核选项"
+echo "  - ./build_kernel_3080_7.0.sh --no-nvidia      跳过 NVIDIA DKMS"
+echo "  - ./build_kernel_3080_7.0.sh --no-gpu-unlock  跳过 gpu-unlock DKMS"
+echo "  - ./build_kernel_3080_7.0.sh --repair-gpu-unlock 修复模块加载失败(不编译内核)"
 echo "  - 所有内核配置保存在: $CONFIG_BACKUP_DIR/"

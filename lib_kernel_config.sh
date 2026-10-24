@@ -560,6 +560,240 @@ build_nvidia_dkms() {
 }
 
 # -----------------------------------------------------------------------------
+# gpu-unlock(GPU 解锁)相关
+# -----------------------------------------------------------------------------
+
+# 获取已安装的 gpu-unlock DKMS 版本号
+# 用法: get_gpu_unlock_version
+# 输出: 版本号字符串(如 "1.0.0"),未安装则输出空
+get_gpu_unlock_version() {
+    # dkms status 格式: gpu-unlock/1.0.0, 7.2.3-xxx, x86_64: installed
+    dkms status 2>/dev/null \
+        | awk -F'[/,]' '/^gpu-unlock\//{print $2; exit}' \
+        || true
+}
+
+# 编译并安装 gpu-unlock DKMS 模块(手动模式,自编译内核时使用)
+# 用法: build_gpu_unlock_dkms <kernel_release>
+#
+# 说明: gpu_unlock 必须在 initramfs 里先于 nvidia 加载,模块才会生效;
+#       所以这里只负责为新内核重建模块,initramfs 由调用方统一重建。
+build_gpu_unlock_dkms() {
+    local kver="$1"
+    local unlock_ver
+    unlock_ver="$(get_gpu_unlock_version)"
+
+    if [[ -z "$unlock_ver" ]]; then
+        log_step "  未检测到 gpu-unlock DKMS 包,跳过(先执行 make install-deb)"
+        return 0
+    fi
+
+    log_step "  检测到 gpu-unlock 版本: $unlock_ver"
+    log_step "  清理旧的 DKMS 构建缓存+已安装模块..."
+
+    # 和 NVIDIA 一样:先 remove,再删构建目录,确保从源码重新构建
+    sudo dkms remove "gpu-unlock/$unlock_ver" -k "$kver" 2>/dev/null || true
+    sudo rm -rf "/var/lib/dkms/gpu-unlock/$unlock_ver/$kver" 2>/dev/null || true
+
+    log_step "  编译 gpu-unlock DKMS 模块..."
+    sudo dkms build "gpu-unlock/$unlock_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
+
+    log_step "  安装 gpu-unlock DKMS 模块..."
+    sudo dkms install "gpu-unlock/$unlock_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
+
+    if sudo dkms status "gpu-unlock/$unlock_ver" -k "$kver" 2>/dev/null \
+        | grep -Eq "installed$"; then
+        log_step "  gpu-unlock DKMS 模块状态: installed (正常)"
+    else
+        log_step "  警告: DKMS 状态异常,尝试重新安装..."
+        sudo dkms install "gpu-unlock/$unlock_ver" -k "$kver" 2>&1 | tee -a "$LOG_FILE"
+    fi
+
+    log_step "  gpu-unlock DKMS 模块编译完成"
+}
+
+# 确保 nvidia 加载前先加载 gpu_unlock(幂等)
+# 用法: ensure_gpu_unlock_softdep
+#
+# Ubuntu 的 initramfs 里 init-top/udev 会在 load_modules 之前按 PCI modalias
+# 自动加载 nvidia,此时 gpu_unlock 还没加载,解锁会报 -EBUSY。
+# softdep 让 libkmod 在加载 nvidia 之前先 modprobe gpu_unlock。
+ensure_gpu_unlock_softdep() {
+    local conf="/etc/modprobe.d/gpu-unlock.conf"
+    local existing
+
+    existing="$(grep -ls '^softdep[[:space:]]\+nvidia[[:space:]]' \
+        /etc/modprobe.d/*.conf /usr/lib/modprobe.d/*.conf 2>/dev/null | head -1)"
+
+    if [[ -n "$existing" ]] && grep -qs 'gpu_unlock' "$existing"; then
+        log_step "  softdep nvidia pre: gpu_unlock 已存在($existing)"
+        return 0
+    fi
+    if [[ -n "$existing" ]]; then
+        log_step "  警告: $existing 已有 softdep nvidia 规则(kmod 只认第一条):"
+        grep -s '^softdep[[:space:]]\+nvidia' "$existing" | sed 's/^/    /' | tee -a "$LOG_FILE"
+    fi
+
+    log_step "  写入 $conf(nvidia 加载前先拉 gpu_unlock)"
+    sudo install -Dm644 /dev/stdin "$conf" <<'EOF'
+# gpu_unlock: 在 nvidia 绑定显卡之前先解锁(gpu-unlock 项目要求)
+softdep nvidia pre: gpu_unlock
+EOF
+    log_step "  已写入,重建 initramfs 后生效"
+}
+
+# 确保内核命令行启用 gpu_unlock(幂等,只在缺失时写入一次)
+# 用法: ensure_gpu_unlock_cmdline
+ensure_gpu_unlock_cmdline() {
+    if sudo grep -q 'gpu_unlock\.targets=' /etc/default/grub 2>/dev/null; then
+        log_step "  gpu_unlock.targets 已在内核命令行中,保持原值"
+        return 0
+    fi
+
+    log_step "  向 GRUB_CMDLINE_LINUX_DEFAULT 追加 gpu_unlock.targets=all"
+    sudo sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"$/GRUB_CMDLINE_LINUX_DEFAULT="\1gpu_unlock.targets=all "/' \
+        /etc/default/grub
+
+    if sudo grep -q 'gpu_unlock\.targets=all' /etc/default/grub 2>/dev/null; then
+        log_step "  已写入,update-grub 后生效"
+    else
+        log_step "  警告: 自动写入失败,请手动在 /etc/default/grub 追加 gpu_unlock.targets=all"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# 内核配置一致性检查(外部模块 ABI)
+# -----------------------------------------------------------------------------
+
+# 影响外部模块 ABI 的关键配置: vermagic / struct module 布局 / 符号 CRC
+# 用法: kernel_abi_config_digest <config 文件>
+# 输出: 每行 "CONFIG_X=值"(未设置记为 n)
+kernel_abi_config_digest() {
+    local cfg="$1" k v
+    [[ -r "$cfg" ]] || return 1
+    for k in CONFIG_SMP CONFIG_PREEMPT CONFIG_PREEMPT_NONE CONFIG_PREEMPT_VOLUNTARY \
+             CONFIG_PREEMPT_RT CONFIG_MODULE_UNLOAD CONFIG_MODVERSIONS \
+             CONFIG_MODULE_SIG CONFIG_MODULE_SIG_ALL CONFIG_MODULE_SIG_FORCE \
+             CONFIG_KALLSYMS CONFIG_KALLSYMS_ALL CONFIG_TRACEPOINTS \
+             CONFIG_FTRACE CONFIG_DYNAMIC_FTRACE CONFIG_LIVEPATCH \
+             CONFIG_JUMP_LABEL CONFIG_KASAN CONFIG_KASAN_GENERIC \
+             CONFIG_RANDSTRUCT CONFIG_RANDSTRUCT_FULL CONFIG_MODULE_COMPRESS; do
+        v="$(sed -n "s/^$k=//p" "$cfg" 2>/dev/null | head -1)"
+        printf '%s=%s\n' "$k" "${v:-n}"
+    done
+}
+
+# 判断源码树 .config 是否与运行内核配置在 ABI 上一致
+# 用法: kernel_config_abi_matches <树 .config> <运行内核 config>
+# 返回: 0 一致, 1 不一致
+# 注意: 不比较 CONFIG_LOCALVERSION 的具体日期(每次编译都会变),
+#       只要求运行内核有 localversion 时树里的不能为空。
+kernel_config_abi_matches() {
+    local tree="$1" run="$2"
+
+    diff -q <(kernel_abi_config_digest "$tree") \
+            <(kernel_abi_config_digest "$run") >/dev/null 2>&1 || return 1
+
+    if grep -q '^CONFIG_LOCALVERSION="..*"' "$run" 2>/dev/null \
+        && ! grep -q '^CONFIG_LOCALVERSION="..*"' "$tree" 2>/dev/null; then
+        return 1
+    fi
+    return 0
+}
+
+# 打印两份内核配置在 ABI 上的差异
+# 用法: kernel_abi_config_diff <树 .config> <运行内核 config>
+kernel_abi_config_diff() {
+    diff -u <(kernel_abi_config_digest "$1") \
+            <(kernel_abi_config_digest "$2") 2>/dev/null \
+        | grep -E '^[-+][A-Z]' | sed 's/^/  /' || true
+}
+
+# 用「与当前运行内核一致」的配置重建外部模块环境,并修复 gpu-unlock
+# 用法: repair_gpu_unlock_abi [内核版本] [干净源码目录]
+#
+# 场景: 源码树的 .config 被改成了别的配置, DKMS 用这棵树编出来的模块
+#       vermagic / struct module / 符号 CRC 与运行内核不一致, 加载时报
+#       "this_module section size must match" 或 "disagrees about version"。
+# 做法: 不改动原树, 用另一套干净源码 + /boot/config-<ver> 建 O= 目录,
+#       从运行内核提取 CRC 生成 Module.symvers, 重编 gpu-unlock 并装回 initramfs。
+repair_gpu_unlock_abi() {
+    local kver="${1:-$(uname -r)}"
+    local clean_src="${2:-${CLEAN_SRC:-/opt/linux-7.2.3-clean}}"
+    local kbuild="/tmp/gpu-unlock-kbuild-$kver"
+    local here="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+    local jobs="${JOBS:-$(nproc)}"
+    local unlock_ver msrc mbld symvers
+
+    if [[ ! -d "$clean_src" ]]; then
+        log_step "  错误: 干净源码目录不存在: $clean_src"
+        return 1
+    fi
+    if [[ ! -f "/boot/config-$kver" ]]; then
+        log_step "  错误: 找不到 /boot/config-$kver"
+        return 1
+    fi
+    unlock_ver="$(get_gpu_unlock_version)"
+    msrc="/usr/src/gpu-unlock-$unlock_ver"
+    if [[ -z "$unlock_ver" || ! -d "$msrc" ]]; then
+        log_step "  错误: 未安装 gpu-unlock DKMS 源码(先 make install-deb)"
+        return 1
+    fi
+    if [[ ! -f "$here/gpu_unlock_symvers.py" ]]; then
+        log_step "  错误: 缺少 $here/gpu_unlock_symvers.py"
+        return 1
+    fi
+
+    log_step "  内核版本: $kver"
+    log_step "  干净源码: $clean_src"
+    log_step "  独立构建目录: $kbuild"
+
+    rm -rf "$kbuild"
+    mkdir -p "$kbuild"
+    cp "/boot/config-$kver" "$kbuild/.config"
+
+    log_step "  按运行内核的配置生成头文件..."
+    make -s -C "$clean_src" O="$kbuild" olddefconfig 2>&1 | tee -a "$LOG_FILE" || return 1
+    make -s -C "$clean_src" O="$kbuild" -j"$jobs" modules_prepare 2>&1 \
+        | tee -a "$LOG_FILE" || return 1
+
+    if [[ "$(cat "$kbuild/include/config/kernel.release" 2>/dev/null)" != "$kver" ]]; then
+        log_step "  错误: 构建目录的 kernel.release 与 $kver 不一致"
+        return 1
+    fi
+
+    symvers="$kbuild/Module.symvers"
+    log_step "  从运行内核提取导出符号 CRC..."
+    sudo python3 "$here/gpu_unlock_symvers.py" "$kver" "$symvers" 2>&1 \
+        | tee -a "$LOG_FILE" || return 1
+
+    mbld="$kbuild/modules/gpu-unlock"
+    mkdir -p "$(dirname "$mbld")"
+    rm -rf "$mbld"
+    cp -r "$msrc" "$mbld" || return 1
+    log_step "  编译 gpu_unlock($unlock_ver)..."
+    make -C "$kbuild" M="$mbld" modules 2>&1 | tee -a "$LOG_FILE" || return 1
+
+    if [[ ! -f "$mbld/gpu_unlock.ko" ]]; then
+        log_step "  错误: 没有生成 $mbld/gpu_unlock.ko"
+        return 1
+    fi
+
+    ensure_gpu_unlock_softdep
+
+    log_step "  安装模块并重建 initramfs..."
+    sudo install -m644 "$mbld/gpu_unlock.ko" \
+        "/lib/modules/$kver/updates/dkms/gpu_unlock.ko"
+    sudo install -Dm644 "$mbld/gpu_unlock.ko" \
+        "/var/lib/dkms/gpu-unlock/$unlock_ver/$kver/x86_64/module/gpu_unlock.ko"
+    sudo depmod -a "$kver"
+    sudo update-initramfs -u -k "$kver" 2>&1 | tail -2 | tee -a "$LOG_FILE"
+
+    log_step "  完成: $(modinfo -F vermagic "/lib/modules/$kver/updates/dkms/gpu_unlock.ko")"
+    log_step "  重启后生效; 验证: journalctl -k -b | grep gpu_unlock"
+}
+
+# -----------------------------------------------------------------------------
 # GRUB 默认启动设置
 # -----------------------------------------------------------------------------
 
