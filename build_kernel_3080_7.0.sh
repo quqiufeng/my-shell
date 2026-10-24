@@ -38,6 +38,34 @@
 #     - LLM prefill +14~36%,FlashAttention/扩散模型变快
 #     - decode(显存带宽瓶颈)和 INT8 基本不变;输出比特级一致
 #
+# 本机实测收益(RTX 3080 20GB, 320W 功耗墙, 2026-10-25 严格 A/B):
+#   方法: 同一负载分别跑两次启动 —— 一次带 gpu_unlock.targets=all,
+#   一次在 grub.cfg 里临时去掉它; 固定 seed/参数/数据/缓存, 只差解不解锁。
+#
+#   1) 纯 GEMM (8192³, fp32 累加, 10 次中位):
+#        BF16  59.6 -> 111.8 TFLOPS  (+88%)
+#        FP16  60.9 -> 112.9 TFLOPS  (+85%)
+#        TF32  30.2 ->  58.6 TFLOPS  (+94%)
+#
+#   2) LoRA 训练 (musubi-tuner, Z-Image Base bf16, 1024, rank16,
+#      blocks_to_swap=2, 30 图, 60 步, seed 42):
+#        3m39s (3.72 s/step) -> 2m35s (2.64 s/step)
+#        耗时 -29.2%, 吞吐 +41.3%; 按 1600 步正式配方折算约 99min -> 70min
+#        收益最大的真实场景: DiT 前向+反向都是 bf16 GEMM, 纯算力密集
+#
+#   3) stock RL 训练 (stock_rl_train, train_7y, 3500ep, bf16 autocast):
+#        R1 1287s -> 1123s (-12.7%); 全链 R1-R9+G1: 3h52m -> 3h22m
+#        收益被 CPU 侧摊薄: 每 ep 约 360ms, sim/数据/同步占大半,
+#        训练时 GPU 利用率只有 ~11%(ppo 段 188->162ms, lstm_pre 87->82ms)
+#
+#   4) 出图推理 (sd.cpp, z_image_turbo-Q8_K GGUF, 2560x1440, EasyCache,
+#      seed 25630): 218.7s vs 205.7/222.6s —— 在 ±8% 波动内, 基本无提升
+#        原因: 每步要读 6.8GB 量化权重(~570GB/s, 接近 760GB/s 上限),
+#        瓶颈是显存带宽/反量化, 不是 FP16 算力; 输出 PNG md5 完全一致
+#
+#   结论: 算力密集(GEMM / LoRA 训练 / LLM prefill)收益明显; 显存带宽受限
+#   (量化推理)和 CPU 受限(股票 RL 的 sim)场景收益很小甚至没有。
+#
 # 原理:
 #   1. 借鉴 CMP 矿卡解锁的 V67/PLM 手法,在 nvidia 驱动 bind 之前写入
 #      速度选择器 SS0=0x88888888(全速 BF16)、SS1=0x8(IMLA4)
