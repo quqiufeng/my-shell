@@ -709,6 +709,52 @@ kernel_abi_config_diff() {
         | grep -E '^[-+][A-Z]' | sed 's/^/  /' || true
 }
 
+# 从源码压缩包 + 保存的 build meta 恢复 DKMS 构建环境(不重编内核)
+# 用法: restore_kernel_build_env <kver> <tarball> <meta_dir> <源码目录>
+#
+# build meta 指构建内核时保存的 .config + Module.symvers:
+#   - .config 决定 struct module 布局 / vermagic
+#   - Module.symvers 决定导出符号 CRC(必须与运行内核一致)
+# 这里只做 olddefconfig + modules_prepare(几分钟), 不做完整内核编译,
+# 所以源码树被删掉、只留 tar.xz 时也能恢复 DKMS 重编能力。
+restore_kernel_build_env() {
+    local kver="$1" tarball="$2" meta="$3" dst="$4"
+    local jobs="${JOBS:-$(nproc)}"
+    local top extracted
+
+    [[ -f "$tarball" ]] || { log_step "  错误: 找不到源码包 $tarball"; return 1; }
+    [[ -f "$meta/.config" ]] || { log_step "  错误: 找不到 $meta/.config"; return 1; }
+    [[ -f "$meta/Module.symvers" ]] || {
+        log_step "  错误: 找不到 $meta/Module.symvers(缺它 CRC 无法匹配)"
+        return 1
+    }
+
+    if [[ ! -f "$dst/Makefile" ]]; then
+        log_step "  解压源码包到 $(dirname "$dst") ..."
+        mkdir -p "$(dirname "$dst")" || return 1
+        top="$(dirname "$dst")"
+        tar -xf "$tarball" -C "$top" || return 1
+        extracted="$top/$(basename "$tarball" .tar.xz)"
+        if [[ "$extracted" != "$dst" && -d "$extracted" ]]; then
+            [[ -e "$dst" ]] && rm -rf "$dst"
+            mv "$extracted" "$dst" || return 1
+        fi
+    fi
+
+    cp "$meta/.config" "$dst/.config" || return 1
+    log_step "  按保存的配置生成头文件(不重编内核)..."
+    make -s -C "$dst" olddefconfig 2>&1 | tee -a "$LOG_FILE" || return 1
+    make -s -C "$dst" -j"$jobs" modules_prepare 2>&1 | tee -a "$LOG_FILE" || return 1
+
+    if [[ "$(cat "$dst/include/config/kernel.release" 2>/dev/null)" != "$kver" ]]; then
+        log_step "  错误: 构建目录的 kernel.release 与 $kver 不一致"
+        return 1
+    fi
+
+    cp "$meta/Module.symvers" "$dst/Module.symvers" || return 1
+    log_step "  已恢复 DKMS 构建环境: $dst"
+}
+
 # 用「与当前运行内核一致」的配置重建外部模块环境,并修复 gpu-unlock
 # 用法: repair_gpu_unlock_abi [内核版本] [干净源码目录]
 #
