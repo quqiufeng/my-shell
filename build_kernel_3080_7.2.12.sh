@@ -141,15 +141,29 @@
 #       /boot/config-$(uname -r) /opt/linux/src/linux-7.2.12/.config
 #   cat /opt/linux/src/linux-7.2.12/include/config/kernel.release
 #
-# 修复过程(不要改动那棵被污染的树):
+# 干净源码从哪来(本机现状, 重要):
+#   - DKMS 依赖 /opt/linux/src/linux-7.2.12(带 build 产物;
+#     /lib/modules/$(uname -r)/build 指向它) => 这棵树不能 make mrproper,
+#     否则以后 nvidia/gpu-unlock 重新编模块会找不到头文件和 Module.symvers。
+#   - 但 make O=<dir> 要求源码树是干净的, 不能拿上面那棵带产物的树做 O= 构建
+#     (会报 "source tree is not clean, please run 'make mrproper'")。
+#   - 旧的 /opt/linux-7.2.3-clean 已删除。需要修 ABI 时, 先从源码包解压一份
+#     干净副本(约 1.5G, 只做一次):
+#        mkdir -p /opt/linux-7.2.12-clean
+#        tar -xf /opt/linux/src/linux-7.2.12.tar.xz \
+#            -C /opt/linux-7.2.12-clean --strip-components=1
+#     或用 CLEAN_SRC=<其它干净目录> 指定(必须与运行内核版本一致)。
+#
+# 修复过程(不要改动 /opt/linux/src/linux-7.2.12 这棵带 build 产物的树):
 #   1. 确认报错:
 #        sudo journalctl -k -b | grep -E 'gpu_unlock|this_module|disagrees'
 #        modinfo -F vermagic /lib/modules/$(uname -r)/updates/dkms/gpu_unlock.ko
 #        readelf -SW .../gpu_unlock.ko | grep this_module    # 应为 0x500
-#   2. 用干净源码 + 运行内核的 /boot/config 建独立 O= 构建目录:
+#   2. 用干净源码 + 运行内核的 /boot/config 建独立 O= 构建目录
+#      (下面按默认的 /opt/linux-7.2.12-clean 写):
 #        mkdir -p /tmp/kb && cp /boot/config-$(uname -r) /tmp/kb/.config
-#        make -C /opt/linux-7.2.3-clean O=/tmp/kb olddefconfig
-#        make -C /opt/linux-7.2.3-clean O=/tmp/kb -j$(nproc) modules_prepare
+#        make -C /opt/linux-7.2.12-clean O=/tmp/kb olddefconfig
+#        make -C /opt/linux-7.2.12-clean O=/tmp/kb -j$(nproc) modules_prepare
 #   3. 生成匹配的 Module.symvers:
 #      CRC 只存在内核镜像的 __kcrctab(只读数据)里,System.map 只有地址,
 #      所以从 /proc/kcore 读,再用 /proc/kallsyms 的 _text 校准 KASLR 偏移:
@@ -161,8 +175,10 @@
 #        update-initramfs -u -k $(uname -r), 重启
 #   5. 一条命令完成 2~4:
 #        ./build_kernel_3080_7.2.12.sh --repair-gpu-unlock
-#      可用 CLEAN_SRC=<目录> 指定干净源码树; 该树必须与**运行内核**版本一致
-#      (默认 /opt/linux-7.2.3-clean, 只适用于修 7.2.3 运行的机器)。
+#      默认 CLEAN_SRC=/opt/linux-7.2.12-clean; 目录不存在时脚本会直接打印
+#      上面的解压命令并退出(不会拿带 build 产物的树硬编)。
+#      显式指定:
+#        CLEAN_SRC=/opt/linux-7.2.12-clean ./build_kernel_3080_7.2.12.sh --repair-gpu-unlock
 #
 # 预防: 脚本 [1/9] 会对比树 .config 与 /boot/config-$(uname -r) 的 ABI 关键项,
 #   不一致时自动切到 --reconfig 模式(从运行内核的 config 重新生成),不会再
@@ -170,8 +186,8 @@
 #
 # 使用方式:
 #   cd /opt/linux/src/linux-7.2.12
-#   setsid bash ~/my-shell/build_kernel_3080_7.2.12.sh > /tmp/build_kernel_3080_7.0.log 2>&1 < /dev/null &
-#   tail -f /tmp/build_kernel_3080_7.0.log
+#   setsid bash ~/my-shell/build_kernel_3080_7.2.12.sh > /tmp/build_kernel_3080_7.2.12.log 2>&1 < /dev/null &
+#   tail -f /tmp/build_kernel_3080_7.2.12.log
 #
 # 参数:
 #   --rebuild     强制完整重新编译
@@ -258,7 +274,18 @@ done
 # -----------------------------------------------------------------------------
 if [[ "$REPAIR_GPU_UNLOCK" == "true" ]]; then
     lib_init "repair_gpu_unlock" "$(uname -r)"
-    repair_gpu_unlock_abi || exit 1
+    clean_src="${CLEAN_SRC:-/opt/linux-7.2.12-clean}"
+    if [[ ! -d "$clean_src" ]]; then
+        log_step "  未找到干净源码树: $clean_src"
+        log_step "  先解压一份干净源码(约 1.5G, 只做一次):"
+        log_step "    mkdir -p /opt/linux-7.2.12-clean"
+        log_step "    tar -xf /opt/linux/src/linux-7.2.12.tar.xz -C /opt/linux-7.2.12-clean --strip-components=1"
+        log_step "  或用 CLEAN_SRC=<目录> 指定(必须与运行内核版本一致)"
+        log_step "  注意: 不要用 /opt/linux/src/linux-7.2.12 本体(它带 build 产物,"
+        log_step "        O= 构建会报 source tree is not clean, 且 mrproper 会破坏 DKMS)"
+        exit 1
+    fi
+    repair_gpu_unlock_abi "$(uname -r)" "$clean_src" || exit 1
     exit 0
 fi
 
