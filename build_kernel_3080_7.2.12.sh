@@ -180,6 +180,20 @@
 #      显式指定:
 #        CLEAN_SRC=/opt/linux-7.2.12-clean ./build_kernel_3080_7.2.12.sh --repair-gpu-unlock
 #
+# DKMS 重建(不重编内核; 源码树已删也能用):
+#   构建内核时把 .config 和 Module.symvers(CRC 依据)保存到了
+#   ~/kernel-meta-7.2.12/, 源码包留在 /opt/linux/src/linux-7.2.12.tar.xz。
+#   需要重编 nvidia / gpu_unlock(驱动升级、修 ABI 等)时:
+#        ./build_kernel_3080_7.2.12.sh --rebuild-dkms
+#   流程: 解压源码(已存在则跳过) -> 复制保存的 .config ->
+#         olddefconfig + modules_prepare(几分钟, 不编内核) ->
+#         复制保存的 Module.symvers -> dkms build/install nvidia + gpu_unlock ->
+#         depmod + update-initramfs
+#   路径可覆盖:
+#        KERNEL_TARBALL=<tar.xz> KERNEL_META=<目录> KERNEL_SRC=<源码目录>
+#   警告: Module.symvers 不能丢, 否则 CRC 与运行内核不匹配, 加载时报
+#         "disagrees about version of symbol module_layout"。
+#
 # 预防: 脚本 [1/9] 会对比树 .config 与 /boot/config-$(uname -r) 的 ABI 关键项,
 #   不一致时自动切到 --reconfig 模式(从运行内核的 config 重新生成),不会再
 #   把错误的 .config 带进增量编译。
@@ -216,6 +230,7 @@ FORCE_RECONFIGURE=false
 SKIP_NVIDIA=false
 SKIP_GPU_UNLOCK=false
 REPAIR_GPU_UNLOCK=false
+REBUILD_DKMS=false
 
 # -----------------------------------------------------------------------------
 # 参数解析
@@ -247,6 +262,11 @@ while [[ $# -gt 0 ]]; do
             echo "[参数] 修复 gpu-unlock 与运行内核的 ABI 不一致"
             shift
             ;;
+        --rebuild-dkms)
+            REBUILD_DKMS=true
+            echo "[参数] 用源码包+保存的配置/symvers 重建 DKMS(不编译内核)"
+            shift
+            ;;
         --help|-h)
             cat <<EOF
 用法: $0 [选项]
@@ -257,6 +277,7 @@ while [[ $# -gt 0 ]]; do
   --no-nvidia   跳过 NVIDIA DKMS 编译步骤
   --no-gpu-unlock 跳过 gpu-unlock DKMS 编译步骤
   --repair-gpu-unlock 只修复 gpu-unlock(不编译内核),用运行内核的配置重编模块
+  --rebuild-dkms 用源码包+保存的 .config/Module.symvers 重建 nvidia/gpu_unlock DKMS
   --help        显示此帮助
 EOF
             exit 0
@@ -268,6 +289,32 @@ EOF
             ;;
     esac
 done
+
+# -----------------------------------------------------------------------------
+# 只重建 DKMS(不编译内核): 源码树已删, 用 tar.xz + 保存的 .config/Module.symvers
+# -----------------------------------------------------------------------------
+if [[ "$REBUILD_DKMS" == "true" ]]; then
+    lib_init "rebuild_dkms" "$(uname -r)"
+    kver="$(uname -r)"
+    upver="${kver%%-*}"
+    tarball="${KERNEL_TARBALL:-/opt/linux/src/linux-$upver.tar.xz}"
+    meta="${KERNEL_META:-$HOME/kernel-meta-$upver}"
+    build_link="$(readlink "/lib/modules/$kver/build" 2>/dev/null || true)"
+    src="${KERNEL_SRC:-${build_link:-/opt/linux/src/linux-$upver}}"
+    log_step "  内核: $kver"
+    log_step "  源码包: $tarball"
+    log_step "  build meta: $meta"
+    log_step "  源码目录: $src"
+    restore_kernel_build_env "$kver" "$tarball" "$meta" "$src" || exit 1
+    build_nvidia_dkms "$kver" || exit 1
+    build_gpu_unlock_dkms "$kver" || exit 1
+    ensure_gpu_unlock_softdep
+    ensure_gpu_unlock_cmdline
+    log_step "  重建 initramfs..."
+    sudo update-initramfs -u -k "$kver" 2>&1 | tail -2 | tee -a "$LOG_FILE"
+    log_step "  完成; 重启后验证 journalctl -k -b | grep gpu_unlock"
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # 只修复 gpu-unlock(不编译内核)
